@@ -54,7 +54,7 @@ export async function gerarPdfMes(opts: PdfMesOpts): Promise<Blob> {
   }
 
   const canvas = await html2canvas(target, {
-    scale: 2,
+    scale: 1.5,
     backgroundColor: '#FFFAF3',
     useCORS: true,
     logging: false,
@@ -63,23 +63,22 @@ export async function gerarPdfMes(opts: PdfMesOpts): Promise<Blob> {
   root.unmount();
   container.remove();
 
-  const pdf = new jsPDF({ unit: 'pt', format: 'a4', orientation: 'portrait' });
+  const pdf = new jsPDF({ unit: 'pt', format: 'a4', orientation: 'portrait', compress: true });
   const pdfW = pdf.internal.pageSize.getWidth();
   const pdfH = pdf.internal.pageSize.getHeight();
   const ratio = canvas.width / canvas.height;
-  // Cobre a página A4. Se a imagem for mais alta que 1 página, divide.
   const imgW = pdfW;
   const imgH = imgW / ratio;
-  const imgData = canvas.toDataURL('image/png');
+  // JPEG @ 0.85 reduz tamanho ~5×–10× vs PNG sem perda visível pro chefe
+  const imgData = canvas.toDataURL('image/jpeg', 0.85);
 
   if (imgH <= pdfH) {
-    pdf.addImage(imgData, 'PNG', 0, 0, imgW, imgH);
+    pdf.addImage(imgData, 'JPEG', 0, 0, imgW, imgH, undefined, 'FAST');
   } else {
-    // Multi-página · adiciona em pedaços de pdfH
     let remaining = imgH;
     let yOffset = 0;
     while (remaining > 0) {
-      pdf.addImage(imgData, 'PNG', 0, -yOffset, imgW, imgH);
+      pdf.addImage(imgData, 'JPEG', 0, -yOffset, imgW, imgH, undefined, 'FAST');
       remaining -= pdfH;
       yOffset += pdfH;
       if (remaining > 0) pdf.addPage();
