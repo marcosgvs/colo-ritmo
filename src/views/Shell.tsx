@@ -4,6 +4,7 @@ import { detectarConflitos } from '@/lib/data';
 import { useMemo } from 'react';
 import { RoleBanner } from '@/components/atoms';
 import { BlockDrawer } from '@/components/drawer';
+import type { Notificacao } from '@/components/notif';
 import { Header, FAB, type AddTipo, type NavKey } from '@/components/shell';
 
 interface ShellProps {
@@ -19,6 +20,8 @@ interface ShellProps {
   onAdd?: (t: AddTipo) => void;
   onTrocar?: (b: Bloco) => void;
   onCeder?: (b: Bloco) => void;
+  notificacoes?: Notificacao[];
+  onMarcarLida?: (id: string) => void;
   children: ReactNode;
 }
 
@@ -40,6 +43,8 @@ export function Shell({
   onAdd,
   onTrocar,
   onCeder,
+  notificacoes,
+  onMarcarLida,
   children,
 }: ShellProps) {
   const conflitos = useMemo(
@@ -55,6 +60,8 @@ export function Shell({
         carga={carga}
         onNav={setActive}
         conflitos={conflitos}
+        notificacoes={notificacoes}
+        onMarcarLida={onMarcarLida}
       />
 
       <main

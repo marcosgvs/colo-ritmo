@@ -1,5 +1,6 @@
 import type { Mode } from '@/types';
 import { ColoMark } from '@/components/atoms';
+import { NotifSino, type Notificacao } from '@/components/notif';
 import { CargaBadge } from './CargaBadge';
 import { NavIcon, type IconName } from './NavIcon';
 
@@ -44,9 +45,20 @@ interface HeaderProps {
   onCmdK?: () => void;
   onNav?: (k: NavKey) => void;
   conflitos?: number;
+  notificacoes?: Notificacao[];
+  onMarcarLida?: (id: string) => void;
 }
 
-export function Header({ active, mode, carga, onCmdK, onNav, conflitos = 0 }: HeaderProps) {
+export function Header({
+  active,
+  mode,
+  carga,
+  onCmdK,
+  onNav,
+  conflitos = 0,
+  notificacoes,
+  onMarcarLida,
+}: HeaderProps) {
   const items = NAV_ITEMS.filter((i) => i.roles.includes(mode));
   return (
     <header
@@ -162,6 +174,10 @@ export function Header({ active, mode, carga, onCmdK, onNav, conflitos = 0 }: He
           ⌘K
         </kbd>
       </button>
+
+      {notificacoes && onMarcarLida && (
+        <NotifSino notificacoes={notificacoes} onMarcarLida={onMarcarLida} />
+      )}
 
       <button
         type="button"

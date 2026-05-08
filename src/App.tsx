@@ -5,6 +5,7 @@ import { HandVariantContext } from '@/components/atoms';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserState } from '@/hooks/useUserState';
 import { usePreviewMode } from '@/hooks/usePreviewMode';
+import { useNotificacoes } from '@/hooks/useNotificacoes';
 import { registrarServiceWorker } from '@/lib/push';
 
 // Telas críticas (Login + Semana = first paint) ficam eager — o resto
@@ -51,6 +52,7 @@ export function App() {
   const userId = auth.status === 'logado' ? auth.user?.id ?? null : null;
   const userState = useUserState(userId);
   const preview = usePreviewMode();
+  const notif = useNotificacoes(userId);
 
   const [mode, setMode] = useState<Mode>('medica');
   const [active, setActive] = useState<NavKey>('agenda');
@@ -143,6 +145,8 @@ export function App() {
               hospitais={userState.state.hospitais}
               selecionado={null}
               setSelecionado={() => {}}
+              notificacoes={notif.notificacoes}
+              onMarcarLida={notif.marcarLida}
             >
               <Suspense fallback={<ViewLoading />}>
                 <Detalhe
@@ -176,6 +180,8 @@ export function App() {
                 setActive('trocas');
               }}
               onAdd={(t) => setAdicionando(t)}
+              notificacoes={notif.notificacoes}
+              onMarcarLida={notif.marcarLida}
             >
               <Suspense fallback={<ViewLoading />}>
                 <ViewSwitch
