@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import type { Bloco, HospitaisMap, Preferencias } from '@/types';
-import { sugerirPlantoes } from './solver.js';
+import { compararLentes, sugerirPlantoes } from './solver.js';
 
 const HOSPITAIS: HospitaisMap = {
   HBDF: {
@@ -110,7 +110,7 @@ describe('sugerirPlantoes', () => {
     expect(r.blocos).toEqual([]);
   });
 
-  test('para quando atinge meta', () => {
+  test('para quando atinge meta · lente equilibrar (default)', () => {
     const meta1k: Preferencias = { ...PREFS, metaMensal: 1500 };
     const r = sugerirPlantoes({
       blocos: [],
@@ -118,8 +118,58 @@ describe('sugerirPlantoes', () => {
       preferencias: meta1k,
       mes: '2026-05',
     });
-    // 1 plantão público de R$ 1800 já passa de R$ 1500 (líquido ~1305)
-    // 2 plantões já bate · não vai mais que 2-3
     expect(r.blocos.length).toBeLessThanOrEqual(3);
+    expect(r.lente).toBe('equilibrar');
+  });
+});
+
+describe('lentes do solver', () => {
+  test('lente descansar gera menos sugestões que ganhar', () => {
+    const descansar = sugerirPlantoes({
+      blocos: [], hospitais: HOSPITAIS, preferencias: PREFS, mes: '2026-05',
+      lente: 'descansar',
+    });
+    const ganhar = sugerirPlantoes({
+      blocos: [], hospitais: HOSPITAIS, preferencias: PREFS, mes: '2026-05',
+      lente: 'ganhar',
+    });
+    expect(descansar.blocos.length).toBeLessThanOrEqual(ganhar.blocos.length);
+  });
+
+  test('lente descansar nunca cria 3+ dias seguidos', () => {
+    const r = sugerirPlantoes({
+      blocos: [], hospitais: HOSPITAIS, preferencias: PREFS, mes: '2026-05',
+      lente: 'descansar',
+    });
+    expect(r.resumo.diasSeguidosMax).toBeLessThan(3);
+  });
+
+  test('lente descansar nunca invade recuperação', () => {
+    const r = sugerirPlantoes({
+      blocos: [], hospitais: HOSPITAIS, preferencias: PREFS, mes: '2026-05',
+      lente: 'descansar',
+    });
+    expect(r.resumo.recuperacoesInvadidas).toBe(0);
+  });
+
+  test('lente ganhar tende a render mais que equilibrar', () => {
+    const eq = sugerirPlantoes({
+      blocos: [], hospitais: HOSPITAIS, preferencias: PREFS, mes: '2026-05',
+      lente: 'equilibrar',
+    });
+    const gn = sugerirPlantoes({
+      blocos: [], hospitais: HOSPITAIS, preferencias: PREFS, mes: '2026-05',
+      lente: 'ganhar',
+    });
+    expect(gn.resumo.receitaEstimada).toBeGreaterThanOrEqual(eq.resumo.receitaEstimada);
+  });
+
+  test('compararLentes devolve as 3 sugestões', () => {
+    const c = compararLentes({
+      blocos: [], hospitais: HOSPITAIS, preferencias: PREFS, mes: '2026-05',
+    });
+    expect(c.descansar.lente).toBe('descansar');
+    expect(c.equilibrar.lente).toBe('equilibrar');
+    expect(c.ganhar.lente).toBe('ganhar');
   });
 });

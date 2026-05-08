@@ -1,11 +1,16 @@
 import type { Bloco, BlocoCedido, BlocoPlantao, Mode, Nivel } from '@/types';
-import { CARGA_MES, fmtDate, fmtRange, getHospital } from '@/lib/data';
+import type { AnaliseDescanso } from '@/lib/data';
+import { CARGA_MES, cargaSemanal, fmtDate, fmtRange, getHospital } from '@/lib/data';
 import { Eyebrow, Hand, Mono } from '@/components/atoms';
 import { Card } from './Card';
 
 interface RailProps {
   blocos: Bloco[];
   mode: Mode;
+  /** Análise de descanso da janela visível (semana atual) · opcional. */
+  analise?: AnaliseDescanso;
+  /** Blocos da janela visível, pra carga semanal · opcional. */
+  blocosDaJanela?: Bloco[];
 }
 
 function nivelColor(n: Nivel): string {
@@ -83,6 +88,89 @@ function SmallBtn({ children, ghost, onClick }: SmallBtnProps) {
     >
       {children}
     </button>
+  );
+}
+
+interface RespiracaoCardProps {
+  analise: AnaliseDescanso;
+  carga: number | null;
+}
+
+function RespiracaoCard({ analise, carga }: RespiracaoCardProps) {
+  const horas = Math.floor(analise.maiorDescansoContinuo);
+  const cor = analise.alertaDescansoCurto
+    ? 'var(--coral-ink)'
+    : analise.alerta3DiasSeguidos || analise.recuperacoesInvadidas.length > 0
+    ? '#B8884A'
+    : 'var(--sage-ink)';
+  const surface = analise.alertaDescansoCurto
+    ? 'var(--coral-surface)'
+    : analise.alerta3DiasSeguidos || analise.recuperacoesInvadidas.length > 0
+    ? 'rgba(184,136,74,0.10)'
+    : 'var(--sage-surface)';
+
+  return (
+    <div
+      style={{
+        background: surface,
+        borderRadius: 16,
+        padding: '18px 20px',
+        position: 'relative',
+      }}
+    >
+      <Eyebrow color={cor} style={{ opacity: 0.8 }}>
+        respiração da semana
+      </Eyebrow>
+      <p
+        style={{
+          fontFamily: 'var(--font-display)',
+          fontWeight: 500,
+          fontSize: 30,
+          letterSpacing: '-0.02em',
+          margin: '4px 0 2px',
+          color: cor,
+          lineHeight: 1.05,
+        }}
+      >
+        {horas}h
+      </p>
+      <Mono style={{ display: 'block', color: 'var(--ink-3)' }}>
+        descanso contínuo · maior bloco
+      </Mono>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 14 }}>
+        {carga !== null && (
+          <Linha rotulo="plantão" valor={`${carga}h`} dim />
+        )}
+        <Linha
+          rotulo="dias seguidos"
+          valor={String(analise.diasSeguidos)}
+          dim={analise.diasSeguidos < 3}
+        />
+        {analise.recuperacoesInvadidas.length > 0 && (
+          <Linha
+            rotulo="recuperação invadida"
+            valor={`${analise.recuperacoesInvadidas.length}×`}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Linha({ rotulo, valor, dim }: { rotulo: string; valor: string; dim?: boolean }) {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'baseline',
+        font: '500 13px/1.2 var(--font-body)',
+        color: dim ? 'var(--ink-3)' : 'var(--ink-2)',
+      }}
+    >
+      <span>{rotulo}</span>
+      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{valor}</span>
+    </div>
   );
 }
 
@@ -167,7 +255,7 @@ function Row({ dot, children }: RowProps) {
   );
 }
 
-export function Rail({ blocos, mode }: RailProps) {
+export function Rail({ blocos, mode, analise, blocosDaJanela }: RailProps) {
   const proximos = blocos
     .filter((b): b is BlocoPlantao => b.tipo === 'plantao')
     .sort((a, b) => a.data.localeCompare(b.data) || a.horaInicio - b.horaInicio);
@@ -178,8 +266,13 @@ export function Rail({ blocos, mode }: RailProps) {
     (b): b is BlocoPlantao => b.tipo === 'plantao' && Boolean(b.viaTroca),
   );
 
+  const cargaJanela = blocosDaJanela ? cargaSemanal(blocosDaJanela) : null;
+
   return (
     <aside style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {analise && (
+        <RespiracaoCard analise={analise} carga={cargaJanela} />
+      )}
       {proximoDestaque && <ProximoCard b={proximoDestaque} mode={mode} />}
 
       <Card title="ritmo do mês" eyebrow="carga · 4 semanas">

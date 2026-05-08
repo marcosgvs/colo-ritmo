@@ -54,7 +54,7 @@ export function Financeiro({ blocos, hospitais, metaMensal }: FinanceiroProps) {
             ? pct === 100
               ? 'meta batida · pode tirar o pé do acelerador'
               : `${pct}% da meta · faltam R$ ${(metaMensal - total).toLocaleString('pt-BR')}`
-            : `R$ ${total.toLocaleString('pt-BR')} líquido estimado · valores conferidos no fechamento`
+            : `R$ ${total.toLocaleString('pt-BR')} estimado · valores conferidos no fechamento`
         }
       />
 
@@ -79,7 +79,7 @@ export function Financeiro({ blocos, hospitais, metaMensal }: FinanceiroProps) {
                   borderRadius: 14,
                   padding: '18px 20px',
                   display: 'grid',
-                  gridTemplateColumns: '1fr auto auto auto',
+                  gridTemplateColumns: '1fr auto auto',
                   gap: 18,
                   alignItems: 'center',
                 }}
@@ -100,8 +100,7 @@ export function Financeiro({ blocos, hospitais, metaMensal }: FinanceiroProps) {
                   </p>
                 </div>
                 <Coluna label="plantões" valor={String(r.plantoes)} />
-                <Coluna label="bruto" valor={`R$ ${r.bruto.toLocaleString('pt-BR')}`} />
-                <Coluna label="líquido" valor={`R$ ${r.liquido.toLocaleString('pt-BR')}`} destaque />
+                <Coluna label="valor" valor={`R$ ${r.liquido.toLocaleString('pt-BR')}`} destaque />
               </div>
             );
           })}
@@ -117,7 +116,7 @@ export function Financeiro({ blocos, hospitais, metaMensal }: FinanceiroProps) {
               justifyContent: 'space-between',
             }}
           >
-            <Eyebrow>total · líquido estimado</Eyebrow>
+            <Eyebrow>total estimado</Eyebrow>
             <span
               style={{
                 fontFamily: 'var(--font-display)',
@@ -150,7 +149,7 @@ export function Financeiro({ blocos, hospitais, metaMensal }: FinanceiroProps) {
             adicional de noturno some quando o plantão cruza 22h–6h.
           </p>
           <p style={{ font: '400 13px/1.5 var(--font-body)', color: 'var(--ink-2)', margin: 0 }}>
-            o líquido é uma estimativa: ~94% pra PJ, ~72,5% pra cooperativa/CLT. confere no fechamento real do mês.
+            o valor é estimativa: ~94% pra PJ, ~72,5% pra cooperativa/CLT. confere no fechamento real do mês.
           </p>
           {metaMensal && (
             <div style={{ marginTop: 4 }}>

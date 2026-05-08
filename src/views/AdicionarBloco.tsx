@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { Bloco, HospitaisMap } from '@/types';
+import type { Bloco, BlocoPlantao, HospitaisMap } from '@/types';
 import type { AddTipo } from '@/components/shell';
 import { Eyebrow, Hand, Mono, Pill } from '@/components/atoms';
+import { JanelaPreview } from '@/components/preview';
 import { detectarConflitos, fmtDate, fmtRange } from '@/lib/data';
 
 interface AdicionarBlocoProps {
@@ -267,6 +268,16 @@ export function AdicionarBloco({
         <Mono style={{ display: 'block', marginTop: 14, color: 'var(--ink-3)' }}>
           {fmtDate(data)} · {fmtRange(horaInicio, duracao)} · {duracao}h
         </Mono>
+
+        {tipo === 'plantao' && hospitalId && (
+          <div style={{ marginTop: 14 }}>
+            <JanelaPreview
+              blocos={blocosAtuais}
+              hospitais={hospitais}
+              novoBloco={novoBloco as BlocoPlantao}
+            />
+          </div>
+        )}
 
         {conflitos.length > 0 && (
           <div

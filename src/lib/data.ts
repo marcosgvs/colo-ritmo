@@ -53,6 +53,46 @@ export {
   eventoParaBloco,
 } from './ics.js';
 
+export {
+  analisarDescanso,
+  espelhoDescanso,
+  faixaRecuperacao,
+  faixaAbsoluta,
+  faixasRecuperacaoNaSemana,
+  RECUPERACAO_NOITE_HORAS,
+  DESCANSO_MIN_SAUDAVEL,
+} from './descanso.js';
+export type {
+  AnaliseDescanso,
+  EspelhoDescanso,
+  RecuperacaoInvadida,
+  FaixaRecuperacaoNoDia,
+  Faixa,
+} from './descanso.js';
+
+export {
+  analisarMesAnterior,
+  mesAnteriorISO,
+} from './diagnostico.js';
+export type {
+  DiagnosticoMes,
+  Classificacao,
+  LenteSugerida,
+} from './diagnostico.js';
+
+export {
+  agruparPorHospital,
+  copiarTexto,
+  download,
+  downloadString,
+  fmtMesAnoExtenso,
+  gerarPDF,
+  montarCSV,
+  montarMensagem,
+  nomeArquivo,
+} from './exportar.js';
+export type { DadosExportacao, AgrupadoPorHospital } from './exportar.js';
+
 export const HOSPITAIS: HospitaisMap = {
   HSL: {
     id: 'HSL',

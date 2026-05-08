@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import type { Bloco, HospitaisMap, Mode } from '@/types';
 import {
   adicionaDia,
+  analisarDescanso,
   cargaSemanal,
   fromISO,
   HOJE,
@@ -9,7 +10,7 @@ import {
   MESES,
   semanaDe,
 } from '@/lib/data';
-import { Eyebrow, Hand } from '@/components/atoms';
+import { Eyebrow, Hand, Mono } from '@/components/atoms';
 import { WeekGrid } from '@/components/week';
 import { Rail } from '@/components/rail';
 
@@ -27,7 +28,13 @@ export function Semana({ blocos, hospitais: _h, mode, loading, erro, onSelectBlo
   const semanaIso = useMemo(() => semanaDe(refIso), [refIso]);
   const inicio = semanaIso[0]!;
   const fim = semanaIso[6]!;
-  const carga = cargaSemanal(blocos.filter((b) => semanaIso.includes(b.data)));
+  const blocosDaSemana = blocos.filter((b) => semanaIso.includes(b.data));
+  const carga = cargaSemanal(blocosDaSemana);
+  const analise = useMemo(
+    () => analisarDescanso(blocos, inicio, fim),
+    [blocos, inicio, fim],
+  );
+  const respiracao = Math.floor(analise.maiorDescansoContinuo);
   const label = formatRangeSemana(inicio, fim);
 
   return (
@@ -63,9 +70,26 @@ export function Semana({ blocos, hospitais: _h, mode, loading, erro, onSelectBlo
         >
           sua semana.
         </h1>
-        <Hand color="var(--lavender-ink)" size={20} style={{ display: 'block', marginTop: 8 }}>
-          {loading ? 'carregando seus plantões…' : `${carga}h previstas`}
-        </Hand>
+        {loading ? (
+          <Hand color="var(--lavender-ink)" size={20} style={{ display: 'block', marginTop: 8 }}>
+            carregando seus plantões…
+          </Hand>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, marginTop: 8, flexWrap: 'wrap' }}>
+            <Hand
+              color={analise.alertaDescansoCurto ? 'var(--coral-ink)' : 'var(--sage-ink)'}
+              size={22}
+            >
+              {respiracao}h de descanso contínuo
+            </Hand>
+            <Mono style={{ color: 'var(--ink-3)' }}>
+              {carga}h de plantão
+              {analise.diasSeguidos >= 3 && ` · ${analise.diasSeguidos} dias seguidos`}
+              {analise.recuperacoesInvadidas.length > 0 &&
+                ` · ${analise.recuperacoesInvadidas.length} recuperação invadida`}
+            </Mono>
+          </div>
+        )}
       </div>
 
       <div
@@ -115,7 +139,7 @@ export function Semana({ blocos, hospitais: _h, mode, loading, erro, onSelectBlo
           }}
         />
 
-        <Rail blocos={blocos} mode={mode} />
+        <Rail blocos={blocos} mode={mode} analise={analise} blocosDaJanela={blocosDaSemana} />
       </div>
     </>
   );

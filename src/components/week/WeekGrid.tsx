@@ -1,5 +1,5 @@
 import type { Bloco } from '@/types';
-import { DOWS, HOJE, SEMANA } from '@/lib/data';
+import { DOWS, HOJE, SEMANA, faixasRecuperacaoNaSemana } from '@/lib/data';
 import { Hand } from '@/components/atoms';
 import { DayColumn } from './DayColumn';
 import { blocosDoDia, expandirBlocos } from './expandirBlocos';
@@ -35,6 +35,7 @@ export function WeekGrid({
 }: WeekGridProps) {
   const totalH = VIEW_HORAS * density;
   const expandidos = expandirBlocos(blocos);
+  const recPorDia = faixasRecuperacaoNaSemana(blocos, semanaIso);
   const handleSelect = onSelectBloco ?? (() => {});
 
   return (
@@ -159,6 +160,7 @@ export function WeekGrid({
           <DayColumn
             key={d}
             blocos={blocosDoDia(expandidos, d)}
+            faixasRecuperacao={recPorDia.filter((r) => r.data === d)}
             density={density}
             isHoje={d === hojeIso}
             isLast={idx === 6}

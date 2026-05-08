@@ -2,24 +2,63 @@ import type { Bloco, BlocoPlantao, HospitaisMap, Preferencias } from '@/types';
 import { adicionaDia, diaSemanaBR, fimDoMes, fromISO, inicioDoMes, semanaDe } from './dates.js';
 import { detectarConflitos } from './conflitos.js';
 import { calcRemuneracaoBloco } from './remuneracao.js';
+import { analisarDescanso } from './descanso.js';
 
 /**
- * Solver simples · sugere plantões pro mês respeitando preferências e
- * regras de hospital. Heurística de 1 passada (não otimização global):
+ * Solver heurístico greedy · sugere plantões pro mês respeitando
+ * preferências, regras de hospital e a "lente" escolhida:
  *
- *   1. mapeia limites mensais já usados (plantões existentes contam)
- *   2. itera cada dia do mês
- *   3. pula dias evitados, dias com bloco existente, dias com plantão
- *      próximo (intervalo mínimo de descanso)
- *   4. escolhe hospital preferido com vaga
- *   5. usa janela preferida (dia/noite/ambos)
- *   6. para quando atingir meta de remuneração ou esgotar dias
+ *   descansar  → maximiza descanso real (pula 3 dias entre sugestões,
+ *                deixa 1 plantão de margem em max/semana, rejeita se
+ *                invade recuperação ou cria 3 dias seguidos, ignora meta)
+ *   equilibrar → comportamento original (pula 2 dias, para na meta,
+ *                rejeita invasão de recuperação)
+ *   ganhar     → maximiza receita (pula 1 dia, prefere janela noturna
+ *                quando paga mais, não para na meta, só esbarra em CFM)
  *
- * Retorna apenas plantões SUGERIDOS · ids prefixados com `sug-` pra
- * caller diferenciar. Não modifica estado.
+ * Bloqueios e sono entram via `diasOcupados` no `calcularLimites` —
+ * solver nunca sugere em dia já ocupado.
  */
 
 const DOWS_BR = ['seg', 'ter', 'qua', 'qui', 'sex', 'sáb', 'dom'];
+
+export type Lente = 'descansar' | 'equilibrar' | 'ganhar';
+
+interface LenteCfg {
+  pulosEntreSugestoes: number;
+  margemMaxSemana: number;
+  pararQuandoMetaBate: boolean;
+  rejeitarSeInvadeRecuperacao: boolean;
+  rejeitarSe3DiasSeguidos: boolean;
+  preferirNoturno: boolean;
+}
+
+const LENTES: Record<Lente, LenteCfg> = {
+  descansar: {
+    pulosEntreSugestoes: 3,
+    margemMaxSemana: 1,
+    pararQuandoMetaBate: false,
+    rejeitarSeInvadeRecuperacao: true,
+    rejeitarSe3DiasSeguidos: true,
+    preferirNoturno: false,
+  },
+  equilibrar: {
+    pulosEntreSugestoes: 2,
+    margemMaxSemana: 0,
+    pararQuandoMetaBate: true,
+    rejeitarSeInvadeRecuperacao: true,
+    rejeitarSe3DiasSeguidos: false,
+    preferirNoturno: false,
+  },
+  ganhar: {
+    pulosEntreSugestoes: 1,
+    margemMaxSemana: 0,
+    pararQuandoMetaBate: false,
+    rejeitarSeInvadeRecuperacao: false,
+    rejeitarSe3DiasSeguidos: false,
+    preferirNoturno: true,
+  },
+};
 
 export interface SugerirOpts {
   blocos: Bloco[];
@@ -27,16 +66,31 @@ export interface SugerirOpts {
   preferencias: Preferencias;
   /** Mês ISO `YYYY-MM`. */
   mes: string;
+  /** Default `equilibrar`. */
+  lente?: Lente;
 }
 
 export interface SugestaoSolver {
   blocos: BlocoPlantao[];
+  lente: Lente;
   resumo: {
     sugeridos: number;
     receitaEstimada: number;
     metaPct: number | null;
+    /** Maior bloco contínuo de descanso real do mês com sugestões aplicadas. */
+    maiorDescansoContinuo: number;
+    /** Maior sequência de dias rodando após aplicar. */
+    diasSeguidosMax: number;
+    /** Recuperações invadidas após aplicar (idealmente 0). */
+    recuperacoesInvadidas: number;
     motivosPulados: string[];
   };
+}
+
+export interface ComparativoLentes {
+  descansar: SugestaoSolver;
+  equilibrar: SugestaoSolver;
+  ganhar: SugestaoSolver;
 }
 
 interface Limites {
@@ -69,40 +123,85 @@ function calcularLimites(blocos: Bloco[], mesISO: string): Limites {
   return { porHospitalMes, porHospitalSemana, diasOcupados };
 }
 
+/**
+ * Score de receita de um plantão por janela. Usado pela lente "ganhar"
+ * pra escolher a janela mais lucrativa quando o hospital aceita ambas.
+ */
+function receitaJanela(
+  hospitalId: string,
+  hospitais: HospitaisMap,
+  noturno: boolean,
+): number {
+  const hosp = hospitais[hospitalId];
+  if (!hosp) return 0;
+  const fake: BlocoPlantao = {
+    id: 'tmp',
+    tipo: 'plantao',
+    hospitalId,
+    data: '2000-01-01',
+    horaInicio: noturno ? 19 : 7,
+    duracao: 12,
+    setor: '',
+  };
+  return calcRemuneracaoBloco(fake, hosp).liquido;
+}
+
 function escolherHospital(
   diaISO: string,
   hospitais: HospitaisMap,
   prefs: Preferencias,
   limites: Limites,
+  cfg: LenteCfg,
 ): string | null {
   const ordem = [
     ...prefs.hospitaisPreferidos.filter((id) => hospitais[id]),
     ...Object.keys(hospitais).filter((id) => !prefs.hospitaisPreferidos.includes(id)),
   ];
 
-  for (const id of ordem) {
+  // Lente "ganhar" reordena por receita potencial · ainda dá leve preferência aos preferidos
+  const ranqueado = cfg.preferirNoturno
+    ? [...ordem].sort((a, b) => {
+        const pa = prefs.hospitaisPreferidos.includes(a) ? 0 : 1;
+        const pb = prefs.hospitaisPreferidos.includes(b) ? 0 : 1;
+        if (pa !== pb) return pa - pb;
+        return receitaJanela(b, hospitais, true) - receitaJanela(a, hospitais, true);
+      })
+    : ordem;
+
+  for (const id of ranqueado) {
     const hosp = hospitais[id];
     if (!hosp) continue;
     const usadoMes = limites.porHospitalMes.get(id) ?? 0;
     if (usadoMes >= hosp.regras.maxPorMes) continue;
+    const limiteSemana = Math.max(1, hosp.regras.maxPorSemana - cfg.margemMaxSemana);
     const usadoSemana =
       limites.porHospitalSemana.get(semanaKey(diaISO))?.get(id) ?? 0;
-    if (usadoSemana >= hosp.regras.maxPorSemana) continue;
+    if (usadoSemana >= limiteSemana) continue;
     return id;
   }
   return null;
 }
 
-function janelaParaPlantao(prefs: Preferencias): { horaInicio: number; duracao: number } {
-  if (prefs.janelaPreferida === 'noite') return { horaInicio: 19, duracao: 12 };
-  if (prefs.janelaPreferida === 'ambos') {
-    return { horaInicio: 7, duracao: 12 };
+function janelaParaPlantao(
+  prefs: Preferencias,
+  hospitalId: string,
+  hospitais: HospitaisMap,
+  cfg: LenteCfg,
+): { horaInicio: number; duracao: number } {
+  if (cfg.preferirNoturno) {
+    const dia = receitaJanela(hospitalId, hospitais, false);
+    const noite = receitaJanela(hospitalId, hospitais, true);
+    if (noite > dia) return { horaInicio: 19, duracao: 12 };
   }
+  if (prefs.janelaPreferida === 'noite') return { horaInicio: 19, duracao: 12 };
   return { horaInicio: 7, duracao: 12 };
 }
 
 export function sugerirPlantoes(opts: SugerirOpts): SugestaoSolver {
   const { blocos, hospitais, preferencias, mes } = opts;
+  const lente: Lente = opts.lente ?? 'equilibrar';
+  const cfg = LENTES[lente];
+
   const ini = inicioDoMes(`${mes}-01`);
   const fim = fimDoMes(`${mes}-01`);
   const fimT = fromISO(fim).getTime();
@@ -111,7 +210,6 @@ export function sugerirPlantoes(opts: SugerirOpts): SugestaoSolver {
   const sugeridos: BlocoPlantao[] = [];
   const motivos: string[] = [];
 
-  // remuneração-alvo (líquida)
   const meta = preferencias.metaMensal;
   let receitaAcum = 0;
   for (const b of blocos) {
@@ -122,6 +220,7 @@ export function sugerirPlantoes(opts: SugerirOpts): SugestaoSolver {
     receitaAcum += calcRemuneracaoBloco(b, hosp).liquido;
   }
 
+  const limitePorSemana = preferencias.maxPlantoesPorSemana - cfg.margemMaxSemana;
   let cursor = ini;
   let segurancaMax = 60;
 
@@ -140,25 +239,23 @@ export function sugerirPlantoes(opts: SugerirOpts): SugestaoSolver {
       continue;
     }
 
-    // Conta plantões da semana atual
     const semana = semanaDe(cursor);
     const naSemana = [...sugeridos, ...blocos.filter((b) => b.tipo === 'plantao')].filter((b) =>
       semana.includes(b.data),
     ).length;
-    if (naSemana >= preferencias.maxPlantoesPorSemana) {
+    if (naSemana >= limitePorSemana) {
       cursor = adicionaDia(cursor, 1);
       continue;
     }
 
-    const hospitalId = escolherHospital(cursor, hospitais, preferencias, limites);
+    const hospitalId = escolherHospital(cursor, hospitais, preferencias, limites, cfg);
     if (!hospitalId) {
-      motivos.push(`${cursor} pulado · todos hospitais cheios`);
+      motivos.push(`${cursor} pulado · hospitais cheios`);
       cursor = adicionaDia(cursor, 1);
       continue;
     }
     const hosp = hospitais[hospitalId]!;
-
-    const { horaInicio, duracao } = janelaParaPlantao(preferencias);
+    const { horaInicio, duracao } = janelaParaPlantao(preferencias, hospitalId, hospitais, cfg);
 
     const novo: BlocoPlantao = {
       id: `sug-${cursor}-${hospitalId}`,
@@ -170,7 +267,7 @@ export function sugerirPlantoes(opts: SugerirOpts): SugestaoSolver {
       setor: hosp.setores[0] ?? '',
     };
 
-    // Anti-conflito: se gerar conflito grave, pula esse dia
+    // Conflito CFM (sobreposição / sem descanso < 11h) · sempre rejeita
     const conflitos = detectarConflitos(
       [...blocos, ...sugeridos, novo],
       hospitais,
@@ -182,6 +279,27 @@ export function sugerirPlantoes(opts: SugerirOpts): SugestaoSolver {
       motivos.push(`${cursor} pulado · ${fatal.tipo}`);
       cursor = adicionaDia(cursor, 1);
       continue;
+    }
+
+    // Lente-específico: rejeitar se invade recuperação ou cria 3 dias seguidos
+    if (cfg.rejeitarSeInvadeRecuperacao || cfg.rejeitarSe3DiasSeguidos) {
+      const proxIni = adicionaDia(cursor, -2);
+      const proxFim = adicionaDia(cursor, 2);
+      const pre = analisarDescanso([...blocos, ...sugeridos], proxIni, proxFim);
+      const pos = analisarDescanso([...blocos, ...sugeridos, novo], proxIni, proxFim);
+      if (
+        cfg.rejeitarSeInvadeRecuperacao &&
+        pos.recuperacoesInvadidas.length > pre.recuperacoesInvadidas.length
+      ) {
+        motivos.push(`${cursor} pulado · invade recuperação`);
+        cursor = adicionaDia(cursor, 1);
+        continue;
+      }
+      if (cfg.rejeitarSe3DiasSeguidos && pos.diasSeguidos >= 3) {
+        motivos.push(`${cursor} pulado · 3 dias seguidos`);
+        cursor = adicionaDia(cursor, 1);
+        continue;
+      }
     }
 
     sugeridos.push(novo);
@@ -197,20 +315,33 @@ export function sugerirPlantoes(opts: SugerirOpts): SugestaoSolver {
     subSem.set(hospitalId, (subSem.get(hospitalId) ?? 0) + 1);
     receitaAcum += calcRemuneracaoBloco(novo, hosp).liquido;
 
-    if (meta > 0 && receitaAcum >= meta) break;
+    if (cfg.pararQuandoMetaBate && meta > 0 && receitaAcum >= meta) break;
 
-    // Pula 1 dia depois de plantão pra dar respiro (ainda assim conflitos
-    // detectados acima cuidam de descanso menor que 11h).
-    cursor = adicionaDia(cursor, 2);
+    cursor = adicionaDia(cursor, 1 + cfg.pulosEntreSugestoes - 1);
   }
+
+  // Resumo · análise final do mês com sugestões aplicadas
+  const finalAnalise = analisarDescanso([...blocos, ...sugeridos], ini, fim);
 
   return {
     blocos: sugeridos,
+    lente,
     resumo: {
       sugeridos: sugeridos.length,
       receitaEstimada: receitaAcum,
       metaPct: meta > 0 ? Math.min(100, Math.round((receitaAcum / meta) * 100)) : null,
+      maiorDescansoContinuo: finalAnalise.maiorDescansoContinuo,
+      diasSeguidosMax: finalAnalise.diasSeguidos,
+      recuperacoesInvadidas: finalAnalise.recuperacoesInvadidas.length,
       motivosPulados: motivos.slice(0, 8),
     },
+  };
+}
+
+export function compararLentes(opts: Omit<SugerirOpts, 'lente'>): ComparativoLentes {
+  return {
+    descansar: sugerirPlantoes({ ...opts, lente: 'descansar' }),
+    equilibrar: sugerirPlantoes({ ...opts, lente: 'equilibrar' }),
+    ganhar: sugerirPlantoes({ ...opts, lente: 'ganhar' }),
   };
 }

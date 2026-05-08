@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { Bloco, BlocoPlantao, HospitaisMap } from '@/types';
 import { fmtDate, fmtRange, getHospital } from '@/lib/data';
 import { Eyebrow, Hand, Mono, Pill } from '@/components/atoms';
+import { JanelaPreview } from '@/components/preview';
 
 export type ModoTrocaCeder = 'trocar' | 'ceder';
 
@@ -35,7 +36,7 @@ export interface RegistroTroca {
 export function TrocaCederModal({
   modo,
   bloco,
-  outrosPlantoes: _o,
+  outrosPlantoes,
   hospitais,
   onConfirmar,
   onCancelar,
@@ -52,6 +53,24 @@ export function TrocaCederModal({
     quem.trim().length > 0 &&
     (modo === 'ceder' ||
       (recebidoData && recebidoHospital && recebidoDur > 0));
+
+  const blocoRecebido: BlocoPlantao | null = useMemo(() => {
+    if (modo !== 'trocar' || !recebidoData || !recebidoHospital || recebidoDur <= 0) return null;
+    return {
+      id: `troca-preview-${bloco.id}`,
+      tipo: 'plantao',
+      hospitalId: recebidoHospital,
+      data: recebidoData,
+      horaInicio: recebidoHora,
+      duracao: recebidoDur,
+      setor: hospitais[recebidoHospital]?.setores[0] ?? '',
+    };
+  }, [modo, recebidoData, recebidoHospital, recebidoHora, recebidoDur, hospitais, bloco.id]);
+
+  const blocosSemOriginal = useMemo(
+    () => outrosPlantoes.filter((b) => b.id !== bloco.id),
+    [outrosPlantoes, bloco.id],
+  );
 
   function confirmar() {
     if (!valido) return;
@@ -224,6 +243,14 @@ export function TrocaCederModal({
                 />
               </Field>
             </div>
+
+            {blocoRecebido && (
+              <JanelaPreview
+                blocos={blocosSemOriginal}
+                hospitais={hospitais}
+                novoBloco={blocoRecebido}
+              />
+            )}
           </>
         )}
 
