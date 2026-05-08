@@ -13,6 +13,8 @@ import { registrarServiceWorker } from '@/lib/push';
 import { Login } from '@/views/Login';
 import { Shell } from '@/views/Shell';
 import { Semana } from '@/views/Semana';
+import { AdicionarBloco } from '@/views/AdicionarBloco';
+import type { AddTipo } from '@/components/shell';
 
 const Onboarding = lazy(() => import('@/views/Onboarding').then((m) => ({ default: m.Onboarding })));
 const Mes = lazy(() => import('@/views/Mes').then((m) => ({ default: m.Mes })));
@@ -55,6 +57,7 @@ export function App() {
   const [selecionado, setSelecionado] = useState<Bloco | null>(null);
   const [detalheBloco, setDetalheBloco] = useState<Bloco | null>(null);
   const [pulouOnboarding, setPulouOnboarding] = useState(false);
+  const [adicionando, setAdicionando] = useState<AddTipo | null>(null);
 
   // Cookie de preview força o mode (Marcos vendo como X sem login real).
   useEffect(() => {
@@ -77,6 +80,11 @@ export function App() {
   // ---- Helpers de mutação --------------------------------------------------
   const adicionarBlocos = (novos: BlocoPlantao[]) => {
     userState.setState({ blocos: [...userState.state.blocos, ...novos] });
+  };
+
+  const adicionarBloco = (b: Bloco) => {
+    userState.setState({ blocos: [...userState.state.blocos, b] });
+    setAdicionando(null);
   };
 
   const salvarHospital = (id: string, h: Hospital) => {
@@ -167,7 +175,7 @@ export function App() {
                 setSelecionado(null);
                 setActive('trocas');
               }}
-              onAdd={(t) => console.info('FAB:', t)}
+              onAdd={(t) => setAdicionando(t)}
             >
               <Suspense fallback={<ViewLoading />}>
                 <ViewSwitch
@@ -185,6 +193,16 @@ export function App() {
                 />
               </Suspense>
             </Shell>
+          )}
+
+          {adicionando && (
+            <AdicionarBloco
+              tipo={adicionando}
+              hospitais={userState.state.hospitais}
+              blocosAtuais={userState.state.blocos}
+              onSalvar={adicionarBloco}
+              onCancelar={() => setAdicionando(null)}
+            />
           )}
         </>
       )}
