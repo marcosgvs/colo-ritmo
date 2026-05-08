@@ -1,0 +1,278 @@
+/* =============================================================
+   Colo Pediatria — Design Tokens
+   Sampled directly from the eight Colo Pediatria logo PNGs.
+   Hex values are verbatim from the Figma brief — não alterar.
+   ============================================================= */
+
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Nunito:wght@400;500;600;700;800&family=Patrick+Hand&family=Caveat:wght@500;600;700&family=Shadows+Into+Light+Two&family=Homemade+Apple&display=swap');
+
+:root {
+  /* ----------------------------------------------------------
+     NEUTRALS — warm marrom-cinza. Nunca branco/preto puro.
+     ---------------------------------------------------------- */
+  --bg:        #FFFAF3;   /* creme · fundo de TUDO */
+  --bg-alt:    #FAF3E8;   /* surface · ligeiramente mais quente */
+  --line:      #EBE8E5;   /* 14% ink · borda visível */
+  --line-2:    #DAD3CD;   /*  8% ink · borda sussurrada */
+  --ink:       #3A2E2A;   /* marrom-cinza · texto principal */
+  --ink-2:     #6B5C56;   /* texto secundário */
+  --ink-3:     #9A8A82;   /* placeholder · terciário */
+
+  /* ----------------------------------------------------------
+     COLOR FAMILIES — 8 famílias dusty (do logo)
+     Cada família tem: surface (fundo) e ink (text/stroke/fill).
+     Nunca usar saturação total — sempre a versão "dusty".
+     ---------------------------------------------------------- */
+  --sand:        #E8C79A;  --sand-ink:     #C5AE99;  --sand-surface:    #FBF1E1;
+  --coral:       #E7A59C;  --coral-ink:    #C77264;  --coral-surface:   #FBE9E5;
+  --sage:        #A4D498;  --sage-ink:     #5A6E50;  --sage-surface:    #ECF6E7;
+  --olive:       #C5BE99;  --olive-ink:    #99A36B;  --olive-surface:   #F1EFE0;
+  --lavender:    #A299CB;  --lavender-ink: #5A4E8C;  --lavender-surface:#ECEAF4;
+  --pink:        #E79BC4;  --pink-ink:     #B25A8C;  --pink-surface:    #FAEAF2;
+  --blue:        #9BC2E7;  --blue-ink:     #3D7884;  --blue-surface:    #EAF2F9;
+  --aqua:        #9AD8E1;  --aqua-ink:     #6FA6CF;  --aqua-surface:    #E8F6F8;
+
+  /* Aux text colors used in screen examples */
+  --blue-text:    #6FA6CF;   /* sobre #EAF2F9 */
+  --blue-text-2:  #9ABDC6;   /* "pediatria" no logo */
+  --sage-text:    #7BB36A;   /* sobre #ECF6E7 */
+
+  /* ----------------------------------------------------------
+     SEMANTIC — versões "dusty" das famílias.
+     ok=sage (sono protegido). warn=sand (40-60h).
+     err=coral (60h+ / conflito). info=blue.
+     ---------------------------------------------------------- */
+  --ok:        var(--sage);    --ok-ink:    var(--sage-ink);    --ok-surface:   var(--sage-surface);
+  --warn:      var(--sand);    --warn-ink:  #D9A85A;            --warn-surface: var(--sand-surface);
+  --err:       var(--coral);   --err-ink:   var(--coral-ink);   --err-surface:  var(--coral-surface);
+  --info:      var(--blue);    --info-ink:  var(--blue-text);   --info-surface: var(--blue-surface);
+
+  /* Brand · Colo Ritmo (sub-produto) usa lavender/aqua nos role banners */
+  --brand:        var(--lavender);
+  --brand-ink:    var(--lavender-ink);
+  --brand-50:     rgba(162,153,203,0.32);  /* focus ring */
+
+  /* ----------------------------------------------------------
+     SPACING — base 4px scale (s-1 .. s-9)
+     ---------------------------------------------------------- */
+  --s-1:  4px;
+  --s-2:  8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+  --s-7: 48px;
+  --s-8: 64px;
+  --s-9: 96px;
+
+  /* ----------------------------------------------------------
+     RADII
+     ---------------------------------------------------------- */
+  --r-sm:   8px;
+  --r-md:  16px;
+  --r-lg:  20px;   /* radius default em Cards */
+  --r-xl:  28px;
+  --r-pill: 32px;  /* ou metade da altura, o que for menor */
+
+  /* ----------------------------------------------------------
+     SHADOWS — quentes. rgba do ink (#3A2E2A), nunca cinza-preto.
+     ---------------------------------------------------------- */
+  --shadow-sm: 0 1px 2px 0 rgba(58,46,42,0.06), 0 2px 6px 0 rgba(58,46,42,0.04);
+  --shadow-md: 0 2px 6px 0 rgba(58,46,42,0.06), 0 8px 24px 0 rgba(58,46,42,0.06);
+  --shadow-lg: 0 8px 24px 0 rgba(58,46,42,0.08), 0 24px 48px 0 rgba(58,46,42,0.08);
+  --shadow-focus: 0 0 0 3px var(--brand-50);
+
+  /* ----------------------------------------------------------
+     TYPE — sistema
+       Display (h1/h2): Fraunces (serif quente)
+       Body / UI:       Nunito (sans humanista)
+       Handwritten:     Caveat (recados, dia-da-semana, eyebrows leves)
+       Mono:            ui-monospace (timestamps, nº de plantão)
+     ---------------------------------------------------------- */
+  --font-display:     'Fraunces', 'Iowan Old Style', Georgia, serif;
+  --font-body:        'Nunito', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-handwritten: 'Caveat', 'Segoe Script', cursive;
+  --font-mono:        ui-monospace, 'SF Mono', 'Roboto Mono', Menlo, Consolas, monospace;
+
+  /* Type scale — Type semantics */
+  --t-display-size: 56px;  --t-display-weight: 500;  --t-display-lh: 1.0;   --t-display-tracking: -0.02em;
+  --t-h1-size:      40px;  --t-h1-weight:      500;  --t-h1-lh:      1.05;  --t-h1-tracking:      -0.015em;
+  --t-h2-size:      32px;  --t-h2-weight:      500;  --t-h2-lh:      1.1;   --t-h2-tracking:      -0.01em;
+  --t-h3-size:      24px;  --t-h3-weight:      600;  --t-h3-lh:      1.15;  --t-h3-tracking:      -0.005em;
+  --t-h4-size:      20px;  --t-h4-weight:      600;  --t-h4-lh:      1.2;   --t-h4-tracking:       0em;
+  --t-lede-size:    20px;  --t-lede-weight:    400;  --t-lede-lh:    1.5;
+  --t-body-size:    16px;  --t-body-weight:    400;  --t-body-lh:    1.55;
+  --t-small-size:   14px;  --t-small-weight:   400;  --t-small-lh:   1.45;
+  --t-eyebrow-size: 12px;  --t-eyebrow-weight: 700;  --t-eyebrow-lh: 1.0;   --t-eyebrow-tracking: 0.08em;
+  --t-mono-size:    13px;  --t-mono-weight:    500;  --t-mono-lh:    1.4;
+  --t-hand-size:    24px;  --t-hand-weight:    600;  --t-hand-lh:    1.0;
+}
+
+/* =============================================================
+   GLOBAL RESET-LITE + base typography
+   ============================================================= */
+html, body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: var(--t-body-size);
+  line-height: var(--t-body-lh);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* =============================================================
+   SEMANTIC TYPE CLASSES
+   ============================================================= */
+.t-display, h1.display {
+  font-family: var(--font-display);
+  font-size: var(--t-display-size);
+  font-weight: var(--t-display-weight);
+  line-height: var(--t-display-lh);
+  letter-spacing: var(--t-display-tracking);
+  color: var(--ink);
+}
+h1, .t-h1 {
+  font-family: var(--font-display);
+  font-size: var(--t-h1-size);
+  font-weight: var(--t-h1-weight);
+  line-height: var(--t-h1-lh);
+  letter-spacing: var(--t-h1-tracking);
+  color: var(--ink);
+  margin: 0;
+}
+h2, .t-h2 {
+  font-family: var(--font-display);
+  font-size: var(--t-h2-size);
+  font-weight: var(--t-h2-weight);
+  line-height: var(--t-h2-lh);
+  letter-spacing: var(--t-h2-tracking);
+  color: var(--ink);
+  margin: 0;
+}
+h3, .t-h3 {
+  font-family: var(--font-body);
+  font-size: var(--t-h3-size);
+  font-weight: var(--t-h3-weight);
+  line-height: var(--t-h3-lh);
+  letter-spacing: var(--t-h3-tracking);
+  color: var(--ink);
+  margin: 0;
+}
+h4, .t-h4 {
+  font-family: var(--font-body);
+  font-size: var(--t-h4-size);
+  font-weight: var(--t-h4-weight);
+  line-height: var(--t-h4-lh);
+  color: var(--ink);
+  margin: 0;
+}
+.t-lede {
+  font-family: var(--font-body);
+  font-size: var(--t-lede-size);
+  font-weight: var(--t-lede-weight);
+  line-height: var(--t-lede-lh);
+  color: var(--ink-2);
+}
+p, .t-body {
+  font-family: var(--font-body);
+  font-size: var(--t-body-size);
+  font-weight: var(--t-body-weight);
+  line-height: var(--t-body-lh);
+  color: var(--ink-2);
+  margin: 0;
+}
+.t-small {
+  font-size: var(--t-small-size);
+  line-height: var(--t-small-lh);
+  color: var(--ink-2);
+}
+.t-eyebrow {
+  font-family: var(--font-body);
+  font-size: var(--t-eyebrow-size);
+  font-weight: var(--t-eyebrow-weight);
+  line-height: var(--t-eyebrow-lh);
+  letter-spacing: var(--t-eyebrow-tracking);
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.t-mono, code {
+  font-family: var(--font-mono);
+  font-size: var(--t-mono-size);
+  font-weight: var(--t-mono-weight);
+  line-height: var(--t-mono-lh);
+  color: var(--ink-2);
+}
+.t-hand {
+  font-family: var(--font-handwritten);
+  font-size: var(--t-hand-size);
+  font-weight: var(--t-hand-weight);
+  line-height: var(--t-hand-lh);
+  color: var(--ink-2);
+}
+
+/* =============================================================
+   Helper: chip/pill utility for color-family swatches
+   ============================================================= */
+.swatch {
+  border-radius: var(--r-md);
+  border: 1px solid rgba(58,46,42,0.06);
+}
+
+
+/* =====================================================================
+   Animations · transições entre telas, FAB, conflito pulsante
+   ===================================================================== */
+@keyframes colo-page-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes colo-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes colo-fab-in {
+  from { opacity: 0; transform: translateX(8px) scale(0.98); }
+  to   { opacity: 1; transform: translateX(0) scale(1); }
+}
+@keyframes colo-pulse-conflict {
+  0%,100% { box-shadow: 0 0 0 0 rgba(199,114,100,0.32); }
+  50%     { box-shadow: 0 0 0 6px rgba(199,114,100,0); }
+}
+@keyframes colo-skel-shimmer {
+  0%   { background-position: -300px 0; }
+  100% { background-position: 300px 0; }
+}
+
+/* =====================================================================
+   A11y · focus visível, respeito a prefers-reduced-motion
+   ===================================================================== */
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--lavender-ink);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+.skip-link {
+  position: absolute; top: -40px; left: 12px;
+  background: var(--ink); color: var(--bg);
+  padding: 8px 14px; border-radius: 8px;
+  font: 600 13px/1 var(--font-body);
+  z-index: 1000;
+}
+.skip-link:focus { top: 12px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Skeleton placeholder */
+.colo-skel {
+  background: linear-gradient(90deg, var(--bg-alt) 0%, color-mix(in oklab, var(--bg-alt) 60%, var(--line)) 50%, var(--bg-alt) 100%);
+  background-size: 600px 100%;
+  border-radius: var(--r-sm);
+  animation: colo-skel-shimmer 1.4s linear infinite;
+}

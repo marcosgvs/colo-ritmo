@@ -1,0 +1,136 @@
+import type { Bloco as BlocoT } from '@/types';
+import { Bloco } from '@/components/atoms';
+import { getHospital } from '@/lib/data';
+
+interface BlocoComContinuidadeProps {
+  b: BlocoT;
+  density: number;
+  onClick: () => void;
+}
+
+/**
+ * Wrapper que adiciona a indicação visual de continuidade noturna:
+ *   _seg='inicio' → faixa serrilhada no rodapé + badge "entra na madrugada"
+ *   _seg='fim'    → faixa serrilhada no topo  + badge "vem de ontem"
+ */
+export function BlocoComContinuidade({ b, density, onClick }: BlocoComContinuidadeProps) {
+  const seg = b._seg;
+  const hosp = b.tipo === 'plantao' || b.tipo === 'cedido' ? getHospital(b.hospitalId) : undefined;
+  const cor = hosp?.cor;
+  const corInk = cor ? `var(--${cor}-ink)` : 'var(--ink-2)';
+  const cortePattern = `linear-gradient(90deg, ${corInk} 0 6px, transparent 6px 12px)`;
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <Bloco b={b} density={density} onClick={onClick} />
+
+      {seg === 'inicio' && (
+        <>
+          <div
+            style={{
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              height: 8,
+              background: cortePattern,
+              backgroundSize: '12px 8px',
+              opacity: 0.7,
+              borderBottomLeftRadius: 12,
+              borderBottomRightRadius: 12,
+              pointerEvents: 'none',
+            }}
+          />
+          <div
+            style={{
+              position: 'absolute',
+              bottom: 4,
+              right: 6,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              background: corInk,
+              color: 'var(--bg)',
+              font: '600 9px/1 var(--font-body)',
+              padding: '4px 7px 4px 6px',
+              borderRadius: 6,
+              letterSpacing: '0.04em',
+              textTransform: 'lowercase',
+              pointerEvents: 'none',
+              whiteSpace: 'nowrap',
+              boxShadow: '0 1px 3px rgba(45,42,50,0.15)',
+            }}
+          >
+            <svg
+              width="9"
+              height="9"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M6 9l6 6 6-6" />
+            </svg>
+            entra na madrugada
+          </div>
+        </>
+      )}
+
+      {seg === 'fim' && (
+        <>
+          <div
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: 8,
+              background: cortePattern,
+              backgroundSize: '12px 8px',
+              opacity: 0.7,
+              borderTopLeftRadius: 12,
+              borderTopRightRadius: 12,
+              pointerEvents: 'none',
+            }}
+          />
+          <div
+            style={{
+              position: 'absolute',
+              top: 4,
+              right: 6,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              background: corInk,
+              color: 'var(--bg)',
+              font: '600 9px/1 var(--font-body)',
+              padding: '4px 7px 4px 6px',
+              borderRadius: 6,
+              letterSpacing: '0.04em',
+              textTransform: 'lowercase',
+              pointerEvents: 'none',
+              whiteSpace: 'nowrap',
+              boxShadow: '0 1px 3px rgba(45,42,50,0.15)',
+            }}
+          >
+            <svg
+              width="9"
+              height="9"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M18 15l-6-6-6 6" />
+            </svg>
+            vem de ontem
+          </div>
+        </>
+      )}
+    </div>
+  );
+}

@@ -1,0 +1,529 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <title>Colo Ritmo · Handoff dev</title>
+  <link rel="stylesheet" href="assets/colors_and_type.css">
+  <style>
+    html, body { margin: 0; padding: 0; background: var(--bg-alt); color: var(--ink); font-family: var(--font-body); }
+    *, *::before, *::after { box-sizing: border-box; }
+    .doc { max-width: 1100px; margin: 0 auto; padding: 56px 32px 120px; }
+    .nav { position: sticky; top: 0; background: var(--bg-alt); border-bottom: 1px solid var(--line); z-index: 10; padding: 14px 32px; display: flex; gap: 22px; font: 600 12px/1 var(--font-body); text-transform: uppercase; letter-spacing: 0.08em; }
+    .nav a { color: var(--ink-3); text-decoration: none; }
+    .nav a:hover { color: var(--ink); }
+    section { margin-top: 72px; scroll-margin-top: 70px; }
+    h1.doc-h1 { font-family: var(--font-display); font-weight: 500; font-size: clamp(40px, 5vw, 60px); letter-spacing: -0.025em; line-height: 1; margin: 0 0 12px; color: var(--ink); }
+    h2.doc-h2 { font-family: var(--font-display); font-weight: 500; font-size: 32px; letter-spacing: -0.015em; margin: 0 0 8px; color: var(--ink); }
+    h3.doc-h3 { font-family: var(--font-display); font-weight: 500; font-size: 22px; letter-spacing: -0.01em; margin: 28px 0 12px; color: var(--ink); }
+    p.lede { font: 400 18px/1.55 var(--font-body); color: var(--ink-2); max-width: 64ch; margin: 0 0 24px; }
+    .eyebrow { font: 700 11px/1 var(--font-body); text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink-3); }
+    .quote { font-family: var(--font-display); font-style: italic; font-weight: 400; font-size: 22px; line-height: 1.4; color: var(--lavender-ink); border-left: 3px solid var(--lavender-ink); padding-left: 18px; margin: 24px 0; max-width: 60ch; }
+
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+
+    /* Token cards */
+    .token { background: var(--bg); border: 1px solid var(--line); border-radius: 14px; padding: 18px; }
+    .token .swatch { height: 70px; border-radius: 10px; border: 1px solid var(--line); margin-bottom: 12px; }
+    .token .var { font: 500 12px/1.3 var(--font-mono); color: var(--ink); display: block; }
+    .token .hex { font: 500 12px/1.3 var(--font-mono); color: var(--ink-3); display: block; margin-top: 2px; }
+    .token .label { font: 600 11px/1 var(--font-body); text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-3); margin-bottom: 8px; }
+    .token .role { font: 500 13px/1.4 var(--font-body); color: var(--ink-2); margin-top: 8px; }
+
+    /* Color family triplet */
+    .family { background: var(--bg); border-radius: 14px; padding: 18px; border: 1px solid var(--line); }
+    .family-name { font-family: var(--font-display); font-weight: 500; font-size: 20px; letter-spacing: -0.005em; color: var(--ink); margin-bottom: 4px; }
+    .family-meaning { font: 500 12px/1.4 var(--font-body); color: var(--ink-3); margin-bottom: 14px; }
+    .family-strip { display: grid; grid-template-columns: 60px 1fr; gap: 10px; align-items: center; padding: 6px 0; }
+    .family-chip { height: 38px; border-radius: 8px; border: 1px solid var(--line); }
+    .family-meta { font: 500 12px/1.3 var(--font-mono); color: var(--ink-2); }
+    .family-meta small { color: var(--ink-3); display: block; margin-top: 2px; font: 500 11px/1 var(--font-mono); }
+
+    /* Type sample */
+    .type-row { display: grid; grid-template-columns: 200px 1fr; gap: 24px; align-items: baseline; padding: 18px 0; border-bottom: 1px solid var(--line); }
+    .type-row:last-child { border-bottom: none; }
+    .type-meta { font: 500 12px/1.5 var(--font-mono); color: var(--ink-3); }
+    .type-meta strong { display: block; color: var(--ink); font: 500 13px/1.3 var(--font-mono); margin-bottom: 4px; }
+    .type-sample { color: var(--ink); }
+
+    /* Spec table */
+    .spec { background: var(--bg); border: 1px solid var(--line); border-radius: 14px; padding: 24px; margin-top: 16px; }
+    .spec-row { display: grid; grid-template-columns: 180px 1fr; gap: 18px; padding: 10px 0; border-top: 1px solid var(--line); align-items: baseline; }
+    .spec-row:first-of-type { border-top: none; padding-top: 0; }
+    .spec-row dt { font: 600 12px/1.3 var(--font-body); text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); }
+    .spec-row dd { font: 500 14px/1.5 var(--font-body); color: var(--ink); margin: 0; }
+    .spec-row dd code, code.inl { font: 500 12px/1.3 var(--font-mono); background: var(--bg-alt); padding: 2px 6px; border-radius: 4px; color: var(--ink); }
+
+    /* Demo of components rendered live */
+    .demo { background: var(--bg-alt); border: 1px dashed var(--line-2); border-radius: 14px; padding: 32px; display: flex; flex-wrap: wrap; gap: 18px; align-items: center; justify-content: center; }
+    .btn-primary { font: 600 14px/1 var(--font-body); padding: 12px 22px; border-radius: 999px; border: none; background: var(--ink); color: var(--bg); cursor: pointer; }
+    .btn-ghost { font: 600 14px/1 var(--font-body); padding: 12px 18px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--ink-2); cursor: pointer; }
+    .btn-tinted { font: 600 14px/1 var(--font-body); padding: 12px 22px; border-radius: 999px; border: none; background: var(--lavender-ink); color: var(--bg); cursor: pointer; }
+    .btn-danger { font: 600 14px/1 var(--font-body); padding: 12px 22px; border-radius: 999px; border: 1px solid var(--coral); background: transparent; color: var(--coral-ink); cursor: pointer; }
+    .pill { font: 600 11px/1 var(--font-body); text-transform: uppercase; letter-spacing: 0.06em; padding: 6px 12px; border-radius: 999px; }
+    .input { width: 100%; max-width: 320px; padding: 12px 14px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; font: 500 14px var(--font-body); color: var(--ink); }
+    .input:focus { outline: none; border-color: var(--lavender-ink); box-shadow: var(--shadow-focus); }
+
+    /* Spacing scale */
+    .space-row { display: grid; grid-template-columns: 80px 1fr 200px; gap: 18px; padding: 10px 0; align-items: center; border-bottom: 1px dashed var(--line); }
+    .space-row:last-child { border-bottom: none; }
+    .space-bar { background: var(--lavender); border-radius: 4px; height: 18px; }
+
+    /* Copy do/don't */
+    .copy-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .copy-card { padding: 18px 20px; border-radius: 14px; }
+    .copy-card.do { background: var(--sage-surface); border-left: 3px solid var(--sage-ink); }
+    .copy-card.dont { background: var(--coral-surface); border-left: 3px solid var(--coral-ink); }
+    .copy-card .label { font: 700 10px/1 var(--font-body); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px; }
+    .copy-card.do .label { color: var(--sage-ink); }
+    .copy-card.dont .label { color: var(--coral-ink); }
+    .copy-card .ex { font: 500 15px/1.4 var(--font-body); color: var(--ink); }
+
+    .anti-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .anti { background: var(--coral-surface); border-left: 3px solid var(--coral-ink); padding: 16px 18px; border-radius: 12px; }
+    .anti strong { color: var(--coral-ink); display: block; font: 700 11px/1 var(--font-body); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
+    .anti span { font: 500 13px/1.5 var(--font-body); color: var(--ink-2); }
+
+    .principio { background: var(--bg); border: 1px solid var(--line); border-radius: 14px; padding: 22px 24px; }
+    .principio h4 { font-family: var(--font-display); font-weight: 500; font-size: 22px; letter-spacing: -0.005em; color: var(--ink); margin: 0 0 6px; }
+    .principio p { font: 400 14px/1.5 var(--font-body); color: var(--ink-2); margin: 0; }
+    .principio .num { font: 500 12px/1 var(--font-mono); color: var(--lavender-ink); margin-bottom: 8px; display: block; }
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <a href="#tokens">tokens</a>
+    <a href="#cor">cor</a>
+    <a href="#type">type</a>
+    <a href="#espaco">espaço</a>
+    <a href="#componentes">componentes</a>
+    <a href="#copy">copy</a>
+    <a href="#principios">princípios</a>
+    <a href="#anti">anti-padrões</a>
+  </nav>
+
+  <main class="doc">
+    <header>
+      <span class="eyebrow">handoff · v1.0 · maio/26</span>
+      <h1 class="doc-h1">Colo Ritmo · handoff dev</h1>
+      <p class="lede">
+        Tokens, specs de componente e regras de copy pra o time de engenharia construir telas novas
+        sem precisar perguntar a cada 3 minutos. Quando bater dúvida, o default é: <em>seguir o que está aqui</em>.
+      </p>
+      <div class="quote">
+        Colo é colo. Não é feature, não é dashboard, não é "produtividade". Tudo neste app deveria fazer alguém respirar mais fundo, não acelerar.
+      </div>
+    </header>
+
+    <!-- ========== TOKENS RAIZ ========== -->
+    <section id="tokens">
+      <span class="eyebrow">§ 1</span>
+      <h2 class="doc-h2">tokens · neutros + raio + sombra</h2>
+      <p class="lede">A base creme. Nunca branco/preto puro. Sempre marrom-cinza quente.</p>
+
+      <h3 class="doc-h3">neutros</h3>
+      <div class="grid-4">
+        <div class="token"><div class="swatch" style="background:#FFFAF3"></div><span class="var">--bg</span><span class="hex">#FFFAF3</span><div class="role">creme · fundo de TUDO</div></div>
+        <div class="token"><div class="swatch" style="background:#FAF3E8"></div><span class="var">--bg-alt</span><span class="hex">#FAF3E8</span><div class="role">surface · cards e drawers</div></div>
+        <div class="token"><div class="swatch" style="background:#EBE8E5"></div><span class="var">--line</span><span class="hex">#EBE8E5</span><div class="role">borda padrão · 14% ink</div></div>
+        <div class="token"><div class="swatch" style="background:#DAD3CD"></div><span class="var">--line-2</span><span class="hex">#DAD3CD</span><div class="role">borda sussurrada · scrollbars</div></div>
+        <div class="token"><div class="swatch" style="background:#3A2E2A"></div><span class="var" style="color:var(--bg)">--ink</span><span class="hex" style="color:var(--bg-alt)">#3A2E2A</span><div class="role">texto principal</div></div>
+        <div class="token"><div class="swatch" style="background:#6B5C56"></div><span class="var" style="color:var(--bg)">--ink-2</span><span class="hex" style="color:var(--bg-alt)">#6B5C56</span><div class="role">secundário · descrições</div></div>
+        <div class="token"><div class="swatch" style="background:#9A8A82"></div><span class="var" style="color:var(--bg)">--ink-3</span><span class="hex" style="color:var(--bg-alt)">#9A8A82</span><div class="role">terciário · placeholders e eyebrows</div></div>
+        <div class="token"><div class="swatch" style="background:linear-gradient(135deg,var(--bg) 50%,var(--bg-alt) 50%);border:1px solid var(--line-2)"></div><span class="var">contraste mín.</span><span class="hex">AA: ink-2 sobre bg</span><div class="role">testar com ferramenta antes de usar tons mais claros como texto</div></div>
+      </div>
+
+      <h3 class="doc-h3">raio</h3>
+      <div class="grid-4">
+        <div class="token"><div style="background:var(--lavender-surface);height:60px;border-radius:4px;margin-bottom:10px"></div><span class="var">--r-sm</span><span class="hex">4 px</span><div class="role">inputs, eyebrows, chips densos</div></div>
+        <div class="token"><div style="background:var(--lavender-surface);height:60px;border-radius:10px;margin-bottom:10px"></div><span class="var">--r-md</span><span class="hex">10 px</span><div class="role">cards internos, inputs grandes</div></div>
+        <div class="token"><div style="background:var(--lavender-surface);height:60px;border-radius:14px;margin-bottom:10px"></div><span class="var">--r-lg</span><span class="hex">14 px</span><div class="role">cards principais, painéis</div></div>
+        <div class="token"><div style="background:var(--lavender-surface);height:60px;border-radius:18px;margin-bottom:10px"></div><span class="var">--r-xl</span><span class="hex">18 px</span><div class="role">drawers, modais, hero cards</div></div>
+        <div class="token"><div style="background:var(--lavender-surface);height:60px;border-radius:999px;margin-bottom:10px"></div><span class="var">--r-pill</span><span class="hex">999 px</span><div class="role">botões, badges, status pills</div></div>
+      </div>
+
+      <h3 class="doc-h3">sombra</h3>
+      <div class="grid-3">
+        <div class="token" style="background:var(--bg-alt)"><div style="background:var(--bg);height:80px;border-radius:10px;box-shadow:0 1px 2px rgba(58,46,42,0.04)"></div><span class="var" style="margin-top:14px;display:block">--shadow-sm</span><div class="role">elevação muito leve · pills com hover</div></div>
+        <div class="token" style="background:var(--bg-alt)"><div style="background:var(--bg);height:80px;border-radius:10px;box-shadow:0 2px 6px rgba(58,46,42,0.06), 0 8px 24px rgba(58,46,42,0.06)"></div><span class="var" style="margin-top:14px;display:block">--shadow-md</span><div class="role">cards interativos, FAB</div></div>
+        <div class="token" style="background:var(--bg-alt)"><div style="background:var(--bg);height:80px;border-radius:14px;box-shadow:0 8px 24px rgba(58,46,42,0.08), 0 24px 48px rgba(58,46,42,0.08)"></div><span class="var" style="margin-top:14px;display:block">--shadow-lg</span><div class="role">drawer, modal, popover</div></div>
+      </div>
+    </section>
+
+    <!-- ========== COR · FAMÍLIAS ========== -->
+    <section id="cor">
+      <span class="eyebrow">§ 2</span>
+      <h2 class="doc-h2">cor · famílias semânticas</h2>
+      <p class="lede">
+        7 famílias. Cada hospital escolhe uma na criação e não muda. Cada uma tem 3 tons:
+        <code class="inl">--{nome}</code> (chip),
+        <code class="inl">--{nome}-ink</code> (texto/borda),
+        <code class="inl">--{nome}-surface</code> (fundo wash).
+      </p>
+
+      <div class="grid-2">
+        <div class="family">
+          <div class="family-name">sand</div>
+          <div class="family-meaning">avisos, plantões diurnos longos, dia comum sem alarme</div>
+          <div class="family-strip"><div class="family-chip" style="background:#E8C79A"></div><div class="family-meta">--sand<small>#E8C79A</small></div></div>
+          <div class="family-strip"><div class="family-chip" style="background:#C5AE99"></div><div class="family-meta">--sand-ink<small>#C5AE99</small></div></div>
+          <div class="family-strip"><div class="family-chip" style="background:#FBF1E1"></div><div class="family-meta">--sand-surface<small>#FBF1E1</small></div></div>
+        </div>
+        <div class="family">
+          <div class="family-name">coral</div>
+          <div class="family-meaning">alerta · 60h+ · conflito · urgente · destrutivo</div>
+          <div class="family-strip"><div class="family-chip" style="background:#E7A59C"></div><div class="family-meta">--coral<small>#E7A59C</small></div></div>
+          <div class="family-strip"><div class="family-chip" style="background:#C77264"></div><div class="family-meta">--coral-ink<small>#C77264</small></div></div>
+          <div class="family-strip"><div class="family-chip" style="background:#FBE9E5"></div><div class="family-meta">--coral-surface<small>#FBE9E5</small></div></div>
+        </div>
+        <div class="family">
+          <div class="family-name">sage</div>
+          <div class="family-meaning">ok · sucesso · dentro do limite · respiração</div>
+          <div class="family-strip"><div class="family-chip" style="background:#A4D498"></div><div class="family-meta">--sage<small>#A4D498</small></div></div>
+          <div class="family-strip"><div class="family-chip" style="background:#5A6E50"></div><div class="family-meta">--sage-ink<small>#5A6E50</small></div></div>
+          <div class="family-strip"><div class="family-chip" style="background:#ECF6E7"></div><div class="family-meta">--sage-surface<small>#ECF6E7</small></div></div>
+        </div>
+        <div class="family">
+          <div class="family-name">lavender</div>
+          <div class="family-meaning">brand · Colo Ritmo · destaque · foco-ring · confiança</div>
+          <div class="family-strip"><div class="family-chip" style="background:#A299CB"></div><div class="family-meta">--lavender<small>#A299CB</small></div></div>
+          <div class="family-strip"><div class="family-chip" style="background:#5A4E8C"></div><div class="family-meta">--lavender-ink<small>#5A4E8C</small></div></div>
+          <div class="family-strip"><div class="family-chip" style="background:#ECEAF4"></div><div class="family-meta">--lavender-surface<small>#ECEAF4</small></div></div>
+        </div>
+        <div class="family">
+          <div class="family-name">blue</div>
+          <div class="family-meaning">noturno · UTI · plantão de longa duração · informativo</div>
+          <div class="family-strip"><div class="family-chip" style="background:#9BC2E7"></div><div class="family-meta">--blue<small>#9BC2E7</small></div></div>
+          <div class="family-strip"><div class="family-chip" style="background:#3D7884"></div><div class="family-meta">--blue-ink<small>#3D7884</small></div></div>
+          <div class="family-strip"><div class="family-chip" style="background:#EAF2F9"></div><div class="family-meta">--blue-surface<small>#EAF2F9</small></div></div>
+        </div>
+        <div class="family">
+          <div class="family-name">olive · pink · aqua</div>
+          <div class="family-meaning">famílias secundárias · só pra hospitais novos quando as primárias acabarem</div>
+          <div class="family-strip"><div class="family-chip" style="background:#C5BE99"></div><div class="family-meta">olive · 99A36B · F1EFE0</div></div>
+          <div class="family-strip"><div class="family-chip" style="background:#E79BC4"></div><div class="family-meta">pink · B25A8C · FAEAF2</div></div>
+          <div class="family-strip"><div class="family-chip" style="background:#9AD8E1"></div><div class="family-meta">aqua · 6FA6CF · E8F6F8</div></div>
+        </div>
+      </div>
+
+      <h3 class="doc-h3">aliases semânticos</h3>
+      <div class="spec">
+        <div class="spec-row"><dt>--ok</dt><dd><code>= --sage</code> · usar pra estados positivos, sem sobreescrever a família do hospital</dd></div>
+        <div class="spec-row"><dt>--warn</dt><dd><code>= --sand</code> · 48h–60h, atrasos pequenos, lembrete</dd></div>
+        <div class="spec-row"><dt>--err</dt><dd><code>= --coral</code> · &gt;60h, conflito, ação destrutiva</dd></div>
+        <div class="spec-row"><dt>--info</dt><dd><code>= --blue</code> · dicas, informações neutras</dd></div>
+        <div class="spec-row"><dt>--brand</dt><dd><code>= --lavender</code> · Colo Ritmo · focus ring, sub-produto</dd></div>
+      </div>
+    </section>
+
+    <!-- ========== TYPE ========== -->
+    <section id="type">
+      <span class="eyebrow">§ 3</span>
+      <h2 class="doc-h2">tipografia · 3 famílias com papéis fixos</h2>
+      <p class="lede">
+        <strong>Fraunces</strong> (display): respira, tem alma. Use só onde a frase importa.
+        <strong>Nunito</strong> (body): redonda e legível. UI inteira.
+        <strong>Caveat / Patrick Hand</strong> (handwritten): toques humanos · max 1 por tela. Toggle por <em>handVariant</em>.
+      </p>
+
+      <div class="spec">
+        <div class="type-row">
+          <div class="type-meta"><strong>display</strong>Fraunces 500<br>clamp(40, 5vw, 60)<br>−0.025em<br>line-height 1</div>
+          <div class="type-sample" style="font-family:var(--font-display);font-weight:500;font-size:54px;letter-spacing:-0.025em;line-height:1">Tem 4 dias até sexta.</div>
+        </div>
+        <div class="type-row">
+          <div class="type-meta"><strong>h1 / page</strong>Fraunces 500<br>clamp(34, 4vw, 44)<br>−0.02em</div>
+          <div class="type-sample" style="font-family:var(--font-display);font-weight:500;font-size:40px;letter-spacing:-0.02em">decisões que precisam de você.</div>
+        </div>
+        <div class="type-row">
+          <div class="type-meta"><strong>h2 / section</strong>Fraunces 500<br>28–32 px<br>−0.015em</div>
+          <div class="type-sample" style="font-family:var(--font-display);font-weight:500;font-size:30px;letter-spacing:-0.015em">por hospital · maio</div>
+        </div>
+        <div class="type-row">
+          <div class="type-meta"><strong>h3 / card title</strong>Fraunces 500<br>20–22 px<br>−0.005em</div>
+          <div class="type-sample" style="font-family:var(--font-display);font-weight:500;font-size:22px;letter-spacing:-0.005em">UTI Pediátrica HBDF</div>
+        </div>
+        <div class="type-row">
+          <div class="type-meta"><strong>lede</strong>Nunito 400<br>16–18 / 1.5<br>ink-2</div>
+          <div class="type-sample" style="font-family:var(--font-body);font-weight:400;font-size:17px;line-height:1.5;color:var(--ink-2);max-width:54ch">Você tem 5 pedidos esperando aprovação. A maioria dá pra resolver em menos de 2 minutos · sem pressa.</div>
+        </div>
+        <div class="type-row">
+          <div class="type-meta"><strong>body</strong>Nunito 400<br>14 / 1.5<br>ink-2</div>
+          <div class="type-sample" style="font-family:var(--font-body);font-weight:400;font-size:14px;line-height:1.5;color:var(--ink-2)">Texto corrido padrão · descrições, parágrafos, hint embaixo de inputs.</div>
+        </div>
+        <div class="type-row">
+          <div class="type-meta"><strong>eyebrow</strong>Nunito 700 · 11px<br>UPPERCASE<br>tracking 0.08em</div>
+          <div class="type-sample" style="font:700 11px/1 var(--font-body);text-transform:uppercase;letter-spacing:0.08em;color:var(--ink-3)">cálculo · mensal</div>
+        </div>
+        <div class="type-row">
+          <div class="type-meta"><strong>handwritten</strong>Caveat 400<br>14–22 px<br>max 1 por tela</div>
+          <div class="type-sample" style="font-family:var(--font-handwritten);font-size:22px;color:var(--lavender-ink)">respira · você ainda tem tempo</div>
+        </div>
+        <div class="type-row">
+          <div class="type-meta"><strong>mono</strong>SF Mono · 12 px<br>tabular nums</div>
+          <div class="type-sample" style="font-family:var(--font-mono);font-size:13px;color:var(--ink-2)">19h00 → 07h00 · 12h · R$ 2.200</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== ESPAÇO ========== -->
+    <section id="espaco">
+      <span class="eyebrow">§ 4</span>
+      <h2 class="doc-h2">espaço · escala 4 px</h2>
+      <p class="lede">Tudo é múltiplo de 4. Use generosamente · gap maior antes de gap menor.</p>
+
+      <div class="spec">
+        <div class="space-row"><span class="type-meta"><strong>4 px</strong>--s-1</span><div><div class="space-bar" style="width:4px"></div></div><span style="font:500 12px var(--font-body);color:var(--ink-3)">só dentro de pills/badges densos</span></div>
+        <div class="space-row"><span class="type-meta"><strong>8 px</strong>--s-2</span><div><div class="space-bar" style="width:8px"></div></div><span style="font:500 12px var(--font-body);color:var(--ink-3)">label → input · ícone → texto</span></div>
+        <div class="space-row"><span class="type-meta"><strong>12 px</strong>--s-3</span><div><div class="space-bar" style="width:12px"></div></div><span style="font:500 12px var(--font-body);color:var(--ink-3)">gap padrão entre items de lista densa</span></div>
+        <div class="space-row"><span class="type-meta"><strong>16 px</strong>--s-4</span><div><div class="space-bar" style="width:16px"></div></div><span style="font:500 12px var(--font-body);color:var(--ink-3)">grid de cards · padding interno mínimo</span></div>
+        <div class="space-row"><span class="type-meta"><strong>20 px</strong>--s-5</span><div><div class="space-bar" style="width:20px"></div></div><span style="font:500 12px var(--font-body);color:var(--ink-3)">card padding · separação de blocos</span></div>
+        <div class="space-row"><span class="type-meta"><strong>24 px</strong>--s-6</span><div><div class="space-bar" style="width:24px"></div></div><span style="font:500 12px var(--font-body);color:var(--ink-3)">gap entre seções · respiro</span></div>
+        <div class="space-row"><span class="type-meta"><strong>32 px</strong>--s-8</span><div><div class="space-bar" style="width:32px"></div></div><span style="font:500 12px var(--font-body);color:var(--ink-3)">page padding mobile · header → conteúdo</span></div>
+        <div class="space-row"><span class="type-meta"><strong>48 px</strong>--s-12</span><div><div class="space-bar" style="width:48px"></div></div><span style="font:500 12px var(--font-body);color:var(--ink-3)">gap entre seções gigantes · hero → grid</span></div>
+        <div class="space-row"><span class="type-meta"><strong>72 px</strong>--s-18</span><div><div class="space-bar" style="width:72px"></div></div><span style="font:500 12px var(--font-body);color:var(--ink-3)">só em landing/onboarding</span></div>
+      </div>
+    </section>
+
+    <!-- ========== COMPONENTES ========== -->
+    <section id="componentes">
+      <span class="eyebrow">§ 5</span>
+      <h2 class="doc-h2">componentes · specs e demo</h2>
+
+      <h3 class="doc-h3">botão · 4 variantes</h3>
+      <div class="demo">
+        <button class="btn-primary">aprovar</button>
+        <button class="btn-tinted">enviar agora</button>
+        <button class="btn-ghost">cancelar</button>
+        <button class="btn-danger">recusar</button>
+      </div>
+      <div class="spec">
+        <div class="spec-row"><dt>primary</dt><dd>fundo <code>--ink</code>, texto <code>--bg</code>, raio <code>--r-pill</code>, padding <code>12px 22px</code>, font <code>600 14/1</code> body</dd></div>
+        <div class="spec-row"><dt>tinted</dt><dd>fundo <code>--lavender-ink</code> (ou ink da família ativa) · pra ações que precisam de mais peso visual sem ser destrutivas</dd></div>
+        <div class="spec-row"><dt>ghost</dt><dd>fundo transparente, borda <code>--line</code>, texto <code>--ink-2</code> · cancelar, voltar, secundário</dd></div>
+        <div class="spec-row"><dt>danger</dt><dd>borda <code>--coral</code>, texto <code>--coral-ink</code>, fundo transparente · ações destrutivas (recusar, excluir)</dd></div>
+        <div class="spec-row"><dt>focus ring</dt><dd><code>box-shadow: var(--shadow-focus)</code> · 3px <code>--brand-50</code></dd></div>
+        <div class="spec-row"><dt>hit target</dt><dd>mínimo 44 × 44 px (mobile). UI desktop pode ser 36 px de altura</dd></div>
+      </div>
+
+      <h3 class="doc-h3">card</h3>
+      <div class="demo">
+        <article style="background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:20px;width:280px">
+          <div class="eyebrow" style="margin-bottom:6px;color:var(--blue-ink)">HBDF · UTI · sex 8 mai</div>
+          <div style="font-family:var(--font-display);font-weight:500;font-size:22px;letter-spacing:-0.005em;color:var(--ink)">noite · 19h → 07h</div>
+          <div style="font:500 13px/1.4 var(--font-body);color:var(--ink-3);margin-top:8px">12h · R$ 2.200</div>
+        </article>
+        <article style="background:var(--blue-surface);border-left:4px solid var(--blue);border-radius:14px;padding:20px;width:280px">
+          <div class="eyebrow" style="margin-bottom:6px;color:var(--blue-ink)">colorido · família do hospital</div>
+          <div style="font-family:var(--font-display);font-weight:500;font-size:22px;letter-spacing:-0.005em;color:var(--ink)">noite · 19h → 07h</div>
+          <div style="font:500 13px/1.4 var(--font-body);color:var(--ink-3);margin-top:8px">12h · R$ 2.200</div>
+        </article>
+      </div>
+      <div class="spec">
+        <div class="spec-row"><dt>raio</dt><dd><code>--r-lg</code> (14px) padrão · <code>--r-xl</code> (18px) pra cards grandes/heros</dd></div>
+        <div class="spec-row"><dt>padding</dt><dd>20 px desktop · 16 px mobile</dd></div>
+        <div class="spec-row"><dt>tinted variant</dt><dd>fundo <code>--{cor}-surface</code>, borda esquerda 4px <code>--{cor}</code> · usar quando o card representa algo de uma família (hospital, conflito, alerta)</dd></div>
+        <div class="spec-row"><dt>hover (interativo)</dt><dd><code>border-color: var(--ink)</code> ou <code>box-shadow: var(--shadow-md)</code> · transition <code>140ms ease</code></dd></div>
+      </div>
+
+      <h3 class="doc-h3">pill / badge</h3>
+      <div class="demo">
+        <span class="pill" style="background:var(--sage-surface);color:var(--sage-ink)">aprovado</span>
+        <span class="pill" style="background:var(--sand-surface);color:var(--sand-ink)">aguardando</span>
+        <span class="pill" style="background:var(--coral-surface);color:var(--coral-ink)">conflito</span>
+        <span class="pill" style="background:var(--lavender-surface);color:var(--lavender-ink)">novo</span>
+      </div>
+      <div class="spec">
+        <div class="spec-row"><dt>shape</dt><dd>raio <code>999px</code>, padding <code>6 × 12 px</code></dd></div>
+        <div class="spec-row"><dt>type</dt><dd><code>600 11/1</code> body · UPPERCASE · tracking <code>0.06em</code></dd></div>
+        <div class="spec-row"><dt>par cor/fundo</dt><dd>sempre <code>--{nome}-ink</code> sobre <code>--{nome}-surface</code> · contraste já validado</dd></div>
+      </div>
+
+      <h3 class="doc-h3">input</h3>
+      <div class="demo">
+        <input class="input" placeholder="nome do hospital" />
+        <input class="input" value="HBDF" />
+      </div>
+      <div class="spec">
+        <div class="spec-row"><dt>altura</dt><dd>44 px · padding <code>12 × 14 px</code></dd></div>
+        <div class="spec-row"><dt>fundo</dt><dd><code>--bg</code> (em fundo alt), <code>--bg-alt</code> (em fundo bg)</dd></div>
+        <div class="spec-row"><dt>borda</dt><dd><code>--line</code> · raio <code>--r-md</code> (10px)</dd></div>
+        <div class="spec-row"><dt>foco</dt><dd>borda <code>--lavender-ink</code> + <code>box-shadow: var(--shadow-focus)</code></dd></div>
+        <div class="spec-row"><dt>label</dt><dd>eyebrow style 8 px acima · placeholder NÃO substitui label</dd></div>
+      </div>
+
+      <h3 class="doc-h3">drawer / painel</h3>
+      <div class="spec">
+        <div class="spec-row"><dt>posição</dt><dd>desktop: lateral direita 480 px · mobile: bottom sheet full width</dd></div>
+        <div class="spec-row"><dt>fundo</dt><dd><code>--bg</code> · sombra <code>--shadow-lg</code> · sem overlay escuro · usar overlay <code>rgba(58,46,42,0.18)</code> só pra modais críticos</dd></div>
+        <div class="spec-row"><dt>raio</dt><dd>desktop: <code>--r-xl</code> (18px) só nos cantos do lado interno · mobile: cantos superiores</dd></div>
+        <div class="spec-row"><dt>animação</dt><dd>entrada <code>colo-drawer-in 220ms ease</code> · saída espelhada</dd></div>
+        <div class="spec-row"><dt>fechar</dt><dd>X canto superior direito · ESC · clique fora · todos os 3 funcionam sempre</dd></div>
+      </div>
+
+      <h3 class="doc-h3">FAB · ações primárias mobile</h3>
+      <div class="spec">
+        <div class="spec-row"><dt>posição</dt><dd>bottom-right · 24 px da borda · sticky · acima da tab bar quando houver</dd></div>
+        <div class="spec-row"><dt>shape</dt><dd>56 × 56 px círculo · sombra <code>--shadow-md</code> · fundo <code>--ink</code> · ícone <code>--bg</code></dd></div>
+        <div class="spec-row"><dt>tap</dt><dd>abre menu radial com 4 opções (plantão, consulta, aula, pessoal)</dd></div>
+      </div>
+    </section>
+
+    <!-- ========== COPY ========== -->
+    <section id="copy">
+      <span class="eyebrow">§ 6</span>
+      <h2 class="doc-h2">copy · regras de voz</h2>
+      <p class="lede">
+        Tom: amigo médico que escuta. Calmo, direto, sem ser frio. Brasileiro, informal mas competente. Usa minúsculas em UI, capitaliza em conteúdo editorial.
+      </p>
+
+      <div class="quote">
+        Se a frase soa como notificação de banco ou erro de SaaS genérico, reescreve.
+      </div>
+
+      <h3 class="doc-h3">capitalização</h3>
+      <div class="spec">
+        <div class="spec-row"><dt>UI / labels</dt><dd>minúsculas · <code>aprovações · cadastrar hospital · sincronizar agenda</code></dd></div>
+        <div class="spec-row"><dt>nomes próprios</dt><dd>capitalizados · HBDF, HSL, Dra. Elisa, UTI Pediátrica</dd></div>
+        <div class="spec-row"><dt>conteúdo editorial</dt><dd>frases iniciam maiúscula · onboarding, comunicados, dicas</dd></div>
+        <div class="spec-row"><dt>números</dt><dd>sempre algarismos em UI · "3 dias", "12h", "R$ 2.200" · escrita por extenso só em prosa</dd></div>
+      </div>
+
+      <h3 class="doc-h3">vocabulário Colo</h3>
+      <div class="copy-grid">
+        <div class="copy-card do">
+          <div class="label">use</div>
+          <div class="ex">"você tem 4 dias até sexta"</div>
+        </div>
+        <div class="copy-card dont">
+          <div class="label">evite</div>
+          <div class="ex">"4 dias restantes"</div>
+        </div>
+
+        <div class="copy-card do">
+          <div class="label">use</div>
+          <div class="ex">"respira · você ainda tem tempo"</div>
+        </div>
+        <div class="copy-card dont">
+          <div class="label">evite</div>
+          <div class="ex">"Você está atrasada para esta tarefa"</div>
+        </div>
+
+        <div class="copy-card do">
+          <div class="label">use</div>
+          <div class="ex">"chegou um pedido pra você olhar"</div>
+        </div>
+        <div class="copy-card dont">
+          <div class="label">evite</div>
+          <div class="ex">"Você tem 1 nova solicitação pendente"</div>
+        </div>
+
+        <div class="copy-card do">
+          <div class="label">use</div>
+          <div class="ex">"sem conexão · vai sincronizar quando voltar"</div>
+        </div>
+        <div class="copy-card dont">
+          <div class="label">evite</div>
+          <div class="ex">"Erro: não foi possível conectar ao servidor"</div>
+        </div>
+
+        <div class="copy-card do">
+          <div class="label">use</div>
+          <div class="ex">"dois plantões na mesma noite"</div>
+        </div>
+        <div class="copy-card dont">
+          <div class="label">evite</div>
+          <div class="ex">"Conflito de agenda detectado (#427)"</div>
+        </div>
+
+        <div class="copy-card do">
+          <div class="label">use</div>
+          <div class="ex">"como resolver · 3 caminhos"</div>
+        </div>
+        <div class="copy-card dont">
+          <div class="label">evite</div>
+          <div class="ex">"Selecione uma das opções abaixo"</div>
+        </div>
+      </div>
+
+      <h3 class="doc-h3">termos canônicos</h3>
+      <div class="spec">
+        <div class="spec-row"><dt>plantão</dt><dd>nunca "shift", "turno", "expediente"</dd></div>
+        <div class="spec-row"><dt>escala</dt><dd>nunca "calendário", "agenda do mês" pra falar do que o hospital monta</dd></div>
+        <div class="spec-row"><dt>colega</dt><dd>nunca "usuário", "membro do time", "profissional" (fora de contexto admin)</dd></div>
+        <div class="spec-row"><dt>cooperativa / CLT / PJ</dt><dd>termos específicos · não usar "tipo de contrato" genérico</dd></div>
+        <div class="spec-row"><dt>passar / ceder / trocar</dt><dd>3 verbos com significado distinto. NÃO confundir.</dd></div>
+        <div class="spec-row"><dt>sincronizar</dt><dd>preferido sobre "importar" · sugere bidirecional</dd></div>
+      </div>
+
+      <h3 class="doc-h3">erros e estados ruins</h3>
+      <div class="spec">
+        <div class="spec-row"><dt>nunca</dt><dd>palavras: erro, falha, inválido, proibido, cancelado, suspenso</dd></div>
+        <div class="spec-row"><dt>sempre</dt><dd>explicar o que aconteceu + o que ela pode fazer agora · em 2 frases curtas</dd></div>
+        <div class="spec-row"><dt>tom</dt><dd>"algo travou aqui" > "ocorreu um erro" · "vamos tentar de novo?" &gt; "Tente novamente"</dd></div>
+      </div>
+    </section>
+
+    <!-- ========== PRINCÍPIOS ========== -->
+    <section id="principios">
+      <span class="eyebrow">§ 7</span>
+      <h2 class="doc-h2">princípios · quando você tem dúvida</h2>
+
+      <div class="grid-2">
+        <div class="principio">
+          <span class="num">01</span>
+          <h4>colo, não dashboard</h4>
+          <p>Se a tela parece uma cabine de avião, voltou pra prancheta. Médica abre o app cansada. Cada elemento que ela vê precisa ter motivo de existir.</p>
+        </div>
+        <div class="principio">
+          <span class="num">02</span>
+          <h4>uma decisão por tela</h4>
+          <p>Cada tela tem 1 ação principal. As outras são suporte ou contexto. Se aparecer "qual eu clico primeiro?" é porque tem 2 primárias.</p>
+        </div>
+        <div class="principio">
+          <span class="num">03</span>
+          <h4>respiração antes de densidade</h4>
+          <p>Whitespace é conteúdo. Antes de adicionar algo, perguntar se vale o ruído. Cada coluna nova é um ataque ao espaço.</p>
+        </div>
+        <div class="principio">
+          <span class="num">04</span>
+          <h4>cor diz o que importa</h4>
+          <p>Cinza = neutro. Coral = atenção. Sage = ok. Lavender = brand/destaque. Se tudo é colorido, nada é. Cor é grifa, não decoração.</p>
+        </div>
+        <div class="principio">
+          <span class="num">05</span>
+          <h4>tempo é o eixo, não a navegação</h4>
+          <p>Ela quer saber "quando?". Não "onde?". A hierarquia visual prioriza tempo (próximo plantão, dias até sexta) sobre estrutura (categorias, abas).</p>
+        </div>
+        <div class="principio">
+          <span class="num">06</span>
+          <h4>números são pessoas</h4>
+          <p>"48h" é uma médica cansada. "R$ 2.200" é o aluguel. Nunca exibir métrica fria sem contexto humano · ao menos uma label que lembra do que é.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== ANTI ========== -->
+    <section id="anti">
+      <span class="eyebrow">§ 8</span>
+      <h2 class="doc-h2">anti-padrões · não faça</h2>
+
+      <div class="anti-grid">
+        <div class="anti"><strong>gradiente roxo-rosa</strong><span>Aplicação não é app de meditação genérico. Use só washes lisos das famílias.</span></div>
+        <div class="anti"><strong>emoji em UI</strong><span>Não temos vocabulário de emoji. Em comunicados editoriais é ok, na UI nunca.</span></div>
+        <div class="anti"><strong>card com left-border colorido + icone redondo + título grande + barra de progresso + 4 pills</strong><span>Slop. Decida o que é importante e mostre só isso.</span></div>
+        <div class="anti"><strong>"Erro 500: ocorreu um problema"</strong><span>Se você não pode explicar o que aconteceu em humanês, pergunte ao designer/PM.</span></div>
+        <div class="anti"><strong>alertas vermelhos pra coisa não destrutiva</strong><span>Coral é conflito real. Atrasou 5min num plantão é sand, no máximo.</span></div>
+        <div class="anti"><strong>animação de mais de 280ms</strong><span>Apps lentos cansam. Tudo abre/fecha em 180–240ms · sem bounce, sem spring agressivo.</span></div>
+        <div class="anti"><strong>botão "OK" / "Cancelar"</strong><span>Sempre o verbo da ação · "aprovar troca" / "voltar pra agenda" · nunca confirma genérica.</span></div>
+        <div class="anti"><strong>Inter / Roboto / Helvetica</strong><span>Fraunces + Nunito + Caveat. Fim. Mudar tipografia é mudar o produto.</span></div>
+      </div>
+    </section>
+
+    <footer style="margin-top:120px;padding-top:32px;border-top:1px solid var(--line);font:500 12px/1.5 var(--font-body);color:var(--ink-3)">
+      Colo Ritmo · documento vivo · v1.0 · maio/2026 · qualquer mudança aqui passa por design+produto antes do PR.
+    </footer>
+  </main>
+</body>
+</html>

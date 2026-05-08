@@ -1,0 +1,36 @@
+{
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.api.tsbuildinfo",
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "module": "ESNext",
+    "types": ["node", "web-push"],
+    "skipLibCheck": true,
+
+    "moduleResolution": "bundler",
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    }
+  },
+  "include": [
+    "api/**/*.ts",
+    "src/types/index.ts",
+    "src/lib/dates.ts",
+    "src/lib/cadeias.ts",
+    "src/lib/conflitos.ts",
+    "src/lib/remuneracao.ts",
+    "src/lib/ics.ts",
+    "src/lib/geo.ts",
+    "src/lib/hmac.ts"
+  ]
+}
