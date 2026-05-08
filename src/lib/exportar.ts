@@ -1,5 +1,5 @@
 import type { BlocoPlantao, Hospital } from '@/types';
-import { DOWS_LONG, MESES, diaSemanaBR, fmtHora, fromISO } from './dates.js';
+import { DOWS_LONG, diaSemanaBR, fmtHora, fromISO } from './dates.js';
 
 /**
  * exportar.ts · transforma plantões propostos em saídas pra

@@ -31,7 +31,7 @@ interface JanelaPreviewProps {
  * — quando ela vê dia inteiro de plantão depois de noturno, ela enxerga
  * que aquilo não é descanso.
  */
-export function JanelaPreview({ blocos, hospitais, novoBloco, raioDias = 1 }: JanelaPreviewProps) {
+export function JanelaPreview({ blocos, hospitais: _h, novoBloco, raioDias = 1 }: JanelaPreviewProps) {
   const espelho = useMemo(
     () => espelhoDescanso(blocos, novoBloco, raioDias),
     [blocos, novoBloco, raioDias],
