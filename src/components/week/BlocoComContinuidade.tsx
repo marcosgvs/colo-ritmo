@@ -10,8 +10,8 @@ interface BlocoComContinuidadeProps {
 
 /**
  * Wrapper que adiciona a indicação visual de continuidade noturna:
- *   _seg='inicio' → faixa serrilhada no rodapé + badge "entra na madrugada"
- *   _seg='fim'    → faixa serrilhada no topo  + badge "vem de ontem"
+ *   _seg='inicio' → faixa serrilhada no rodapé + seta pra baixo
+ *   _seg='fim'    → faixa serrilhada no topo  + seta pra cima
  */
 export function BlocoComContinuidade({ b, density, onClick }: BlocoComContinuidadeProps) {
   const seg = b._seg;
@@ -42,22 +42,21 @@ export function BlocoComContinuidade({ b, density, onClick }: BlocoComContinuida
             }}
           />
           <div
+            aria-label="entra na madrugada"
+            title="entra na madrugada"
             style={{
               position: 'absolute',
               bottom: 4,
               right: 6,
               display: 'inline-flex',
               alignItems: 'center',
-              gap: 4,
+              justifyContent: 'center',
+              width: 16,
+              height: 16,
               background: corInk,
               color: 'var(--bg)',
-              font: '600 9px/1 var(--font-body)',
-              padding: '4px 7px 4px 6px',
-              borderRadius: 6,
-              letterSpacing: '0.04em',
-              textTransform: 'lowercase',
+              borderRadius: 999,
               pointerEvents: 'none',
-              whiteSpace: 'nowrap',
               boxShadow: '0 1px 3px rgba(45,42,50,0.15)',
             }}
           >
@@ -73,7 +72,6 @@ export function BlocoComContinuidade({ b, density, onClick }: BlocoComContinuida
             >
               <path d="M6 9l6 6 6-6" />
             </svg>
-            entra na madrugada
           </div>
         </>
       )}
@@ -96,22 +94,21 @@ export function BlocoComContinuidade({ b, density, onClick }: BlocoComContinuida
             }}
           />
           <div
+            aria-label="vem de ontem"
+            title="vem de ontem"
             style={{
               position: 'absolute',
               top: 4,
               right: 6,
               display: 'inline-flex',
               alignItems: 'center',
-              gap: 4,
+              justifyContent: 'center',
+              width: 16,
+              height: 16,
               background: corInk,
               color: 'var(--bg)',
-              font: '600 9px/1 var(--font-body)',
-              padding: '4px 7px 4px 6px',
-              borderRadius: 6,
-              letterSpacing: '0.04em',
-              textTransform: 'lowercase',
+              borderRadius: 999,
               pointerEvents: 'none',
-              whiteSpace: 'nowrap',
               boxShadow: '0 1px 3px rgba(45,42,50,0.15)',
             }}
           >
@@ -127,7 +124,6 @@ export function BlocoComContinuidade({ b, density, onClick }: BlocoComContinuida
             >
               <path d="M18 15l-6-6-6 6" />
             </svg>
-            vem de ontem
           </div>
         </>
       )}

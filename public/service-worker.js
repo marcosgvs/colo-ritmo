@@ -7,15 +7,14 @@
  *   1. Receber web push e mostrar notificação (titulo, corpo, ações).
  *   2. Reabrir/focar a aba da agenda quando o user clica.
  *   3. Cache do app shell · estratégia diferenciada por tipo:
- *      - HTML/JS/CSS · stale-while-revalidate (UI sempre disponível)
- *      - assets/* (logos, svgs) · cache-first (imutáveis)
+ *      - HTML/SPA · network-first (UI sempre fresh, cache é só fallback offline)
+ *      - /assets/* (build com hash imutável) · cache-first
  *      - /api/* · network-only (sempre fresh)
  *
- * Versão do cache muda em cada deploy (build hash). Caches antigos são
- * limpos no activate.
+ * Bump em VERSAO força limpeza de caches anteriores no activate.
  */
 
-const VERSAO = 'colo-ritmo-v1';
+const VERSAO = 'colo-ritmo-v2';
 const CACHE_SHELL = `${VERSAO}-shell`;
 const CACHE_ASSETS = `${VERSAO}-assets`;
 
@@ -84,9 +83,22 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // HTML / SPA shell · stale-while-revalidate
-  event.respondWith(staleWhileRevalidate(request, CACHE_SHELL));
+  // HTML / SPA shell · network-first (sempre tenta rede; cache é só fallback offline)
+  event.respondWith(networkFirst(request, CACHE_SHELL));
 });
+
+async function networkFirst(request, cacheName) {
+  const cache = await caches.open(cacheName);
+  try {
+    const resp = await fetch(request);
+    if (resp.ok) cache.put(request, resp.clone());
+    return resp;
+  } catch (err) {
+    const cached = await cache.match(request);
+    if (cached) return cached;
+    throw err;
+  }
+}
 
 async function cacheFirst(request, cacheName) {
   const cache = await caches.open(cacheName);
@@ -100,19 +112,6 @@ async function cacheFirst(request, cacheName) {
     if (cached) return cached;
     throw err;
   }
-}
-
-async function staleWhileRevalidate(request, cacheName) {
-  const cache = await caches.open(cacheName);
-  const cached = await cache.match(request);
-  const fetchAndUpdate = fetch(request)
-    .then((resp) => {
-      if (resp.ok) cache.put(request, resp.clone());
-      return resp;
-    })
-    .catch(() => null);
-
-  return cached ?? (await fetchAndUpdate) ?? Response.error();
 }
 
 self.addEventListener('push', (event) => {
