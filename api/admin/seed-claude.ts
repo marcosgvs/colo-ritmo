@@ -85,12 +85,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       userId = created.user.id;
     }
 
-    // 2. profile
+    // 2. profile · preserva role admin se já existe
+    const { data: existeProfile } = await adm
+      .from('user_profiles')
+      .select('role')
+      .eq('user_id', userId)
+      .maybeSingle();
+    const rolePreservada =
+      existeProfile?.role === 'admin' ? 'admin' : 'medico';
     const { error: errProfile } = await adm.from('user_profiles').upsert(
       {
         user_id: userId,
         nome: body.nome ?? 'Claude',
-        role: 'medico',
+        role: rolePreservada,
         tipo_usuario: 'medica',
       },
       { onConflict: 'user_id' },

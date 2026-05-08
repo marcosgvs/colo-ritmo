@@ -30,6 +30,7 @@ const Detalhe = lazy(() => import('@/views/Detalhe').then((m) => ({ default: m.D
 const Usuario = lazy(() => import('@/views/Usuario').then((m) => ({ default: m.Usuario })));
 const Inbox = lazy(() => import('@/views/Inbox').then((m) => ({ default: m.Inbox })));
 const Auditoria = lazy(() => import('@/views/Auditoria').then((m) => ({ default: m.Auditoria })));
+const Time = lazy(() => import('@/views/Time').then((m) => ({ default: m.Time })));
 
 import type { NavKey } from '@/components/shell';
 
@@ -363,7 +364,7 @@ function ViewSwitch({
       return <Auditoria />;
 
     case 'time':
-      return <em style={{ color: 'var(--ink-3)' }}>tela `time` chega na próxima iteração.</em>;
+      return <Time />;
 
     default:
       return null;

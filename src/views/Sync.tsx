@@ -7,7 +7,7 @@ import {
   gerarICS,
   parsearICS,
 } from '@/lib/data';
-import { Eyebrow, Hand, Mono, Pill } from '@/components/atoms';
+import { Eyebrow, Hand, MonthPicker, Mono, Pill } from '@/components/atoms';
 import { EmptyState } from '@/components/empty';
 import { PageHead } from './_PageHead';
 
@@ -160,12 +160,7 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, icsToken, nomeUser 
                 </select>
               </Field>
               <Field label="mês">
-                <input
-                  type="month"
-                  value={mes}
-                  onChange={(e) => setMes(e.target.value)}
-                  style={inputStyle}
-                />
+                <MonthPicker value={mes} onChange={setMes} />
               </Field>
             </div>
 

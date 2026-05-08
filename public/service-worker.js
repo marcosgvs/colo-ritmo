@@ -6,10 +6,20 @@
  * Responsabilidades:
  *   1. Receber web push e mostrar notificação (titulo, corpo, ações).
  *   2. Reabrir/focar a aba da agenda quando o user clica.
- *   3. Não cacheia nada (Sessão 4 lida com offline).
+ *   3. Cache do app shell · estratégia diferenciada por tipo:
+ *      - HTML/JS/CSS · stale-while-revalidate (UI sempre disponível)
+ *      - assets/* (logos, svgs) · cache-first (imutáveis)
+ *      - /api/* · network-only (sempre fresh)
  *
- * Fica em /service-worker.js no path raiz pra ter scope='/'.
+ * Versão do cache muda em cada deploy (build hash). Caches antigos são
+ * limpos no activate.
  */
+
+const VERSAO = 'colo-ritmo-v1';
+const CACHE_SHELL = `${VERSAO}-shell`;
+const CACHE_ASSETS = `${VERSAO}-assets`;
+
+const SHELL_INICIAL = ['/', '/colo-ritmo-mark.svg'];
 
 const NOTIF_DEFAULT = {
   titulo: 'Colo Ritmo',
@@ -19,19 +29,97 @@ const NOTIF_DEFAULT = {
 };
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(self.skipWaiting());
+  event.waitUntil(
+    (async () => {
+      const cache = await caches.open(CACHE_SHELL);
+      try {
+        await cache.addAll(SHELL_INICIAL);
+      } catch (_) {
+        // mesmo se algum item falhar (404 antes do build), não bloqueia
+      }
+      await self.skipWaiting();
+    })(),
+  );
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(
+    (async () => {
+      // limpa caches de versões anteriores
+      const keys = await caches.keys();
+      await Promise.all(
+        keys
+          .filter((k) => !k.startsWith(VERSAO))
+          .map((k) => caches.delete(k)),
+      );
+      await self.clients.claim();
+    })(),
+  );
 });
+
+self.addEventListener('fetch', (event) => {
+  const { request } = event;
+  if (request.method !== 'GET') return;
+
+  const url = new URL(request.url);
+
+  // Mesmo origem só. Ignora extensões de browser e cross-origin.
+  if (url.origin !== self.location.origin) return;
+
+  // /api/* nunca cacheia · sempre rede
+  if (url.pathname.startsWith('/api/')) return;
+
+  // /assets/* (build hashed) · cache-first imutável
+  if (url.pathname.startsWith('/assets/')) {
+    event.respondWith(cacheFirst(request, CACHE_ASSETS));
+    return;
+  }
+
+  // Logos e estáticos públicos · cache-first
+  if (
+    url.pathname.startsWith('/colo-ritmo') ||
+    url.pathname === '/service-worker.js'
+  ) {
+    event.respondWith(cacheFirst(request, CACHE_ASSETS));
+    return;
+  }
+
+  // HTML / SPA shell · stale-while-revalidate
+  event.respondWith(staleWhileRevalidate(request, CACHE_SHELL));
+});
+
+async function cacheFirst(request, cacheName) {
+  const cache = await caches.open(cacheName);
+  const cached = await cache.match(request);
+  if (cached) return cached;
+  try {
+    const resp = await fetch(request);
+    if (resp.ok) cache.put(request, resp.clone());
+    return resp;
+  } catch (err) {
+    if (cached) return cached;
+    throw err;
+  }
+}
+
+async function staleWhileRevalidate(request, cacheName) {
+  const cache = await caches.open(cacheName);
+  const cached = await cache.match(request);
+  const fetchAndUpdate = fetch(request)
+    .then((resp) => {
+      if (resp.ok) cache.put(request, resp.clone());
+      return resp;
+    })
+    .catch(() => null);
+
+  return cached ?? (await fetchAndUpdate) ?? Response.error();
+}
 
 self.addEventListener('push', (event) => {
   let data = NOTIF_DEFAULT;
   try {
     if (event.data) data = { ...NOTIF_DEFAULT, ...event.data.json() };
   } catch (_) {
-    // payload pode vir como texto puro — usa default
     if (event.data) data = { ...NOTIF_DEFAULT, corpo: event.data.text() };
   }
 

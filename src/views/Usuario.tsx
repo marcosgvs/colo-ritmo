@@ -3,7 +3,7 @@ import type { Preferencias } from '@/types';
 import { sair } from '@/hooks/useAuth';
 import { usePush } from '@/hooks/usePush';
 import { useSnapshotsShares } from '@/hooks/useSnapshotsShares';
-import { Eyebrow, Hand, Mono, Pill } from '@/components/atoms';
+import { Eyebrow, Hand, MonthPicker, Mono, Pill } from '@/components/atoms';
 import { PageHead } from './_PageHead';
 
 interface UsuarioProps {
@@ -278,12 +278,7 @@ export function Usuario({ email, userId, preferencias, onSalvarPreferencias }: U
               </button>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <input
-                  type="month"
-                  value={shareMes}
-                  onChange={(e) => setShareMes(e.target.value)}
-                  style={input}
-                />
+                <MonthPicker value={shareMes} onChange={setShareMes} />
                 <input
                   value={shareLabel}
                   onChange={(e) => setShareLabel(e.target.value)}
