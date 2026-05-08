@@ -93,6 +93,14 @@ export function App() {
     setAdicionando(null);
   };
 
+  const adicionarBlocoPersistente = (b: Bloco) => {
+    userState.setState({ blocos: [...userState.state.blocos, b] });
+  };
+
+  const removerBloco = (id: number | string) => {
+    userState.setState({ blocos: userState.state.blocos.filter((b) => b.id !== id) });
+  };
+
   const aplicarTrocaCeder = (reg: RegistroTroca) => {
     if (reg.modo === 'ceder') {
       // Marca o plantão original como cedido (anota com quem) · mantém na agenda.
@@ -240,6 +248,8 @@ export function App() {
                   email={auth.user?.email ?? (preview.ativo ? `preview · ${preview.as}` : null)}
                   onSelectBloco={setSelecionado}
                   adicionarBlocos={adicionarBlocos}
+                  criarBloco={adicionarBlocoPersistente}
+                  removerBloco={removerBloco}
                   salvarHospital={salvarHospital}
                   removerHospital={removerHospital}
                   salvarPreferencias={salvarPreferencias}
@@ -282,6 +292,8 @@ interface ViewSwitchProps {
   email: string | null;
   onSelectBloco: (b: Bloco) => void;
   adicionarBlocos: (novos: BlocoPlantao[]) => void;
+  criarBloco: (b: Bloco) => void;
+  removerBloco: (id: number | string) => void;
   salvarHospital: (id: string, h: Hospital) => void;
   removerHospital: (id: string) => void;
   salvarPreferencias: (p: Preferencias) => void;
@@ -295,6 +307,8 @@ function ViewSwitch({
   email,
   onSelectBloco,
   adicionarBlocos,
+  criarBloco,
+  removerBloco,
   salvarHospital,
   removerHospital,
   salvarPreferencias,
@@ -382,7 +396,8 @@ function ViewSwitch({
           hospitais={state.hospitais}
           preferencias={state.preferencias}
           mesISO={mesISO}
-          onAdicionarSugestoes={adicionarBlocos}
+          onAdicionarBloco={criarBloco}
+          onRemoverBloco={removerBloco}
         />
       );
 

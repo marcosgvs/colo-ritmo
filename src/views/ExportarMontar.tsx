@@ -1,21 +1,23 @@
 import { useState } from 'react';
-import type { BlocoPlantao, HospitaisMap } from '@/types';
+import type { Bloco, BlocoPlantao, HospitaisMap } from '@/types';
 import {
   agruparPorHospital,
   copiarTexto,
   download,
   downloadString,
   fmtMesAnoExtenso,
-  gerarPDF,
   montarCSV,
   montarMensagem,
   nomeArquivo,
 } from '@/lib/data';
+import { gerarPdfMes } from '@/lib/pdfMes';
 import { Eyebrow, Hand, Mono, Pill } from '@/components/atoms';
 
 interface ExportarMontarProps {
   plantoesSugeridos: BlocoPlantao[];
   hospitais: HospitaisMap;
+  /** Todos os blocos (pra puxar bloqueios do mês no PDF visual). */
+  blocosTodos: Bloco[];
   mesISO: string;
   nomeMedico: string;
   onFechar: () => void;
@@ -53,13 +55,19 @@ function salvarNomesChefes(map: EstadoChefe) {
 export function ExportarMontar({
   plantoesSugeridos,
   hospitais,
+  blocosTodos,
   mesISO,
   nomeMedico,
   onFechar,
 }: ExportarMontarProps) {
   const [chefes, setChefes] = useState<EstadoChefe>(carregarNomesChefes());
   const [aviso, setAviso] = useState<string | null>(null);
+  const [gerandoPdfId, setGerandoPdfId] = useState<string | null>(null);
   const grupos = agruparPorHospital(plantoesSugeridos, hospitais);
+
+  const bloqueiosDoMes = blocosTodos.filter(
+    (b) => b.tipo === 'bloqueio' && b.data.startsWith(mesISO),
+  );
 
   function atualizarChefe(hospId: string, nome: string) {
     const novo = { ...chefes, [hospId]: nome };
@@ -217,11 +225,14 @@ export function ExportarMontar({
                   </button>
                   <button
                     type="button"
+                    disabled={gerandoPdfId === hospital.id}
                     onClick={async () => {
+                      setGerandoPdfId(hospital.id);
                       try {
-                        const blob = await gerarPDF({
+                        const blob = await gerarPdfMes({
                           hospital,
                           plantoes,
+                          bloqueios: bloqueiosDoMes,
                           mesISO,
                           nomeMedico,
                           nomeChefe: chefe.trim() || undefined,
@@ -231,11 +242,17 @@ export function ExportarMontar({
                       } catch (err) {
                         console.error(err);
                         flash('falha ao gerar PDF');
+                      } finally {
+                        setGerandoPdfId(null);
                       }
                     }}
-                    style={btnSecundario}
+                    style={{
+                      ...btnSecundario,
+                      opacity: gerandoPdfId === hospital.id ? 0.6 : 1,
+                      cursor: gerandoPdfId === hospital.id ? 'wait' : 'pointer',
+                    }}
                   >
-                    baixar PDF
+                    {gerandoPdfId === hospital.id ? 'gerando…' : 'baixar PDF'}
                   </button>
                   <button
                     type="button"

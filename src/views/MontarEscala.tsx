@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { Bloco, BlocoPlantao, HospitaisMap, Preferencias } from '@/types';
-import { analisarMesAnterior, calcRemuneracaoMes } from '@/lib/data';
+import type { Bloco, BlocoBloqueio, HospitaisMap, Preferencias } from '@/types';
+import { analisarMesAnterior, fmtDate } from '@/lib/data';
 import {
   compararLentes,
   type ComparativoLentes,
   type Lente,
   type SugestaoSolver,
 } from '@/lib/solver';
-import { Eyebrow, Hand, Mono, Pill } from '@/components/atoms';
+import { Eyebrow, Hand, Mono, MonthPicker, Pill } from '@/components/atoms';
 import { CalendarioMes } from '@/components/calendario';
 import { EmptyState } from '@/components/empty';
 import { PageHead } from './_PageHead';
@@ -18,7 +18,8 @@ interface MontarEscalaProps {
   hospitais: HospitaisMap;
   preferencias: Preferencias;
   mesISO: string;
-  onAdicionarSugestoes?: (b: BlocoPlantao[]) => void;
+  onAdicionarBloco?: (b: Bloco) => void;
+  onRemoverBloco?: (id: number | string) => void;
 }
 
 const ROTULO_LENTE: Record<Lente, string> = {
@@ -34,89 +35,141 @@ const RECADO_LENTE: Record<Lente, string> = {
 };
 
 /**
- * Montar Escala v2 · roda o solver com 3 lentes (descansar / equilibrar
- * / ganhar) e mostra um diagnóstico do mês anterior pra ajudar a
- * escolher. Ela compara, escolhe uma lente, e leva pro chefe.
+ * Montar Escala v3 · setup wizard antes de gerar.
+ *
+ * Passos:
+ *   1. setup · mês alvo + hospitais a incluir + meta financeira + bloqueios
+ *   2. gerar 3 cenários · solver roda com 3 lentes
+ *   3. comparar · escolhe a lente, vê o calendário
+ *   4. exportar pra cada chefe (mensagem · PDF visual · CSV)
+ *
+ * Sem "aplicar essa proposta" — é sugestão pro chefe, não escala oficial.
+ * Quando o chefe responder com a oficial, ela sincroniza pelo calendar feed.
  */
 export function MontarEscala({
   blocos,
   hospitais,
   preferencias,
   mesISO,
-  onAdicionarSugestoes,
+  onAdicionarBloco,
+  onRemoverBloco,
 }: MontarEscalaProps) {
   const semHospitais = Object.keys(hospitais).length === 0;
-  const resumo = calcRemuneracaoMes(blocos, hospitais, mesISO);
-  const pctMetaAtual = preferencias.metaMensal
-    ? Math.min(100, Math.round((resumo.total.liquido / preferencias.metaMensal) * 100))
-    : null;
 
-  const diagnostico = useMemo(
-    () => analisarMesAnterior(blocos, hospitais, mesISO, preferencias),
-    [blocos, hospitais, mesISO, preferencias],
+  // Setup state
+  const [mesAlvo, setMesAlvo] = useState(mesISO);
+  const [hospitaisIncluidos, setHospitaisIncluidos] = useState<Set<string>>(
+    () => new Set(Object.keys(hospitais)),
+  );
+  const [metaInput, setMetaInput] = useState<string>(
+    String(preferencias.metaMensal ?? 0),
   );
 
+  // Resultado da geração
   const [comparativo, setComparativo] = useState<ComparativoLentes | null>(null);
-  const [lente, setLente] = useState<Lente>(diagnostico.lenteSugerida);
+  const [lente, setLente] = useState<Lente>('equilibrar');
   const [exportandoAberto, setExportandoAberto] = useState(false);
+
+  const diagnostico = useMemo(
+    () => analisarMesAnterior(blocos, hospitais, mesAlvo, preferencias),
+    [blocos, hospitais, mesAlvo, preferencias],
+  );
 
   useEffect(() => {
     setLente(diagnostico.lenteSugerida);
   }, [diagnostico.lenteSugerida]);
 
+  // Quando setup muda, joga fora resultado anterior pra forçar re-gerar
+  useEffect(() => {
+    setComparativo(null);
+  }, [mesAlvo, hospitaisIncluidos, metaInput]);
+
+  const hospitaisAtivos = useMemo(() => {
+    const out: HospitaisMap = {};
+    for (const id of hospitaisIncluidos) {
+      const h = hospitais[id];
+      if (h) out[id] = h;
+    }
+    return out;
+  }, [hospitais, hospitaisIncluidos]);
+
+  const preferenciasParaSolver = useMemo<Preferencias>(() => {
+    const meta = Number(metaInput.replace(/\D/g, '')) || 0;
+    return { ...preferencias, metaMensal: meta };
+  }, [preferencias, metaInput]);
+
+  const bloqueiosDoMes = useMemo(
+    () =>
+      blocos.filter(
+        (b): b is BlocoBloqueio => b.tipo === 'bloqueio' && b.data.startsWith(mesAlvo),
+      ),
+    [blocos, mesAlvo],
+  );
+
   const sugestao: SugestaoSolver | null = comparativo ? comparativo[lente] : null;
 
-  const rodar = () => {
-    const c = compararLentes({ blocos, hospitais, preferencias, mes: mesISO });
+  function toggleHospital(id: string) {
+    setHospitaisIncluidos((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function gerar() {
+    const c = compararLentes({
+      blocos,
+      hospitais: hospitaisAtivos,
+      preferencias: preferenciasParaSolver,
+      mes: mesAlvo,
+    });
     setComparativo(c);
     setLente(diagnostico.lenteSugerida);
-  };
+  }
 
-  const aceitar = () => {
-    if (!sugestao || !onAdicionarSugestoes) return;
-    onAdicionarSugestoes(sugestao.blocos);
-    setComparativo(null);
-  };
+  const podeGerar = hospitaisIncluidos.size > 0;
 
   return (
     <>
       <PageHead
         eyebrow="planejar mês"
         titulo="montar a escala do mês."
-        hand="3 cenários · escolhe um e leva pro chefe."
-        direita={
-          !semHospitais && (
-            <button
-              type="button"
-              onClick={rodar}
-              style={{
-                font: '600 13px/1 var(--font-body)',
-                padding: '12px 22px',
-                borderRadius: 999,
-                border: 'none',
-                background: 'var(--lavender-ink)',
-                color: 'var(--bg)',
-                cursor: 'pointer',
-              }}
-            >
-              {comparativo ? 'rodar de novo' : 'sugerir mês'}
-            </button>
-          )
-        }
+        hand="defina o setup, gere 3 cenários e leve pro chefe da equipe."
       />
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'minmax(0, 1fr) 320px',
-          gap: 32,
-          alignItems: 'flex-start',
-        }}
-      >
-        <section style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {!semHospitais && <DiagnosticoCard diagnostico={diagnostico} />}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {!semHospitais && (
+          <SetupCard
+            mesAlvo={mesAlvo}
+            onMesAlvo={setMesAlvo}
+            hospitais={hospitais}
+            hospitaisIncluidos={hospitaisIncluidos}
+            onToggleHospital={toggleHospital}
+            metaInput={metaInput}
+            onMetaInput={setMetaInput}
+            metaPreferencia={preferencias.metaMensal}
+            bloqueios={bloqueiosDoMes}
+            onAdicionarBloco={onAdicionarBloco}
+            onRemoverBloco={onRemoverBloco}
+            onGerar={gerar}
+            podeGerar={podeGerar}
+            jaTemResultado={!!comparativo}
+          />
+        )}
 
-          {comparativo && (
+        {semHospitais && (
+          <EmptyState
+            eyebrow="solver"
+            titulo="cadastra um hospital primeiro."
+            recado="o solver precisa saber regras e valores antes de sugerir."
+          />
+        )}
+
+        {comparativo && (
+          <>
+            <DiagnosticoCard diagnostico={diagnostico} />
+
             <Card
               titulo="3 cenários"
               eyebrow={`lente sugerida · ${ROTULO_LENTE[diagnostico.lenteSugerida]}`}
@@ -140,288 +193,346 @@ export function MontarEscala({
                 ))}
               </div>
             </Card>
-          )}
 
-          <Card titulo="por hospital" eyebrow="cards do mês">
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
-                gap: 12,
-              }}
-            >
-              {Object.values(hospitais).map((h) => {
-                const r = resumo.porHospital[h.id];
-                const qt = r?.plantoes ?? 0;
-                const sugAqui = sugestao?.blocos.filter((b) => b.hospitalId === h.id).length ?? 0;
-                const maxMes = h.regras?.maxPorMes ?? null;
-                return (
-                  <div
-                    key={h.id}
-                    style={{
-                      background: `var(--${h.cor}-surface)`,
-                      borderLeft: `4px solid var(--${h.cor})`,
-                      borderRadius: 14,
-                      padding: '16px 18px',
-                    }}
-                  >
-                    <Eyebrow color={`var(--${h.cor}-ink)`}>{h.abrev}</Eyebrow>
-                    <p
-                      style={{
-                        fontFamily: 'var(--font-display)',
-                        fontWeight: 500,
-                        fontSize: 20,
-                        letterSpacing: '-0.005em',
-                        margin: '6px 0 0',
-                      }}
-                    >
-                      {qt}
-                      {sugAqui > 0 && (
-                        <span style={{ color: 'var(--lavender-ink)', fontSize: 16 }}>
-                          {' '}+{sugAqui}
-                        </span>
-                      )}
-                      {maxMes !== null && (
-                        <span style={{ color: 'var(--ink-3)', fontWeight: 400, fontSize: 16 }}>
-                          /{maxMes}
-                        </span>
-                      )}
-                    </p>
-                    <Mono style={{ display: 'block', color: 'var(--ink-3)' }}>
-                      máx · R$ {(h.valorPlantao ?? 0).toLocaleString('pt-BR')}/plantão
-                    </Mono>
-                    {maxMes !== null && qt + sugAqui > maxMes && (
-                      <Pill kind="err" style={{ marginTop: 10 }}>
-                        passou do máx
-                      </Pill>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </Card>
-
-          {sugestao && (
-            <Card
-              titulo={
-                sugestao.blocos.length === 1
-                  ? '1 plantão sugerido'
-                  : `${sugestao.blocos.length} plantões sugeridos`
-              }
-              eyebrow={`lente · ${ROTULO_LENTE[lente]}`}
-            >
-              {sugestao.blocos.length === 0 ? (
-                <EmptyState
-                  titulo="nenhuma sugestão pra essa lente."
-                  recado="hospitais cheios, dias evitados batem ou regras estão apertadas demais."
+            {sugestao && sugestao.blocos.length > 0 && (
+              <Card titulo="prévia do mês" eyebrow={`lente · ${ROTULO_LENTE[lente]}`}>
+                <CalendarioMes
+                  refIso={`${mesAlvo}-15`}
+                  blocos={blocos}
+                  hospitais={hospitais}
+                  marcadores={sugestao.blocos}
                 />
-              ) : (
-                <>
-                  <div style={{ marginBottom: 14 }}>
-                    <CalendarioMes
-                      refIso={`${mesISO}-15`}
-                      blocos={blocos}
-                      hospitais={hospitais}
-                      marcadores={sugestao.blocos}
-                    />
-                  </div>
-
-                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                    <button
-                      type="button"
-                      onClick={aceitar}
-                      disabled={!onAdicionarSugestoes}
-                      style={{
-                        font: '600 13px/1 var(--font-body)',
-                        padding: '12px 22px',
-                        borderRadius: 999,
-                        border: 'none',
-                        background: 'var(--sage-ink)',
-                        color: 'var(--bg)',
-                        cursor: 'pointer',
-                        opacity: onAdicionarSugestoes ? 1 : 0.5,
-                      }}
-                    >
-                      aplicar essa proposta
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setExportandoAberto(true)}
-                      style={{
-                        font: '600 13px/1 var(--font-body)',
-                        padding: '12px 22px',
-                        borderRadius: 999,
-                        border: 'none',
-                        background: 'var(--lavender-ink)',
-                        color: 'var(--bg)',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      exportar pra cada chefe
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setComparativo(null)}
-                      style={{
-                        font: '600 13px/1 var(--font-body)',
-                        padding: '12px 22px',
-                        borderRadius: 999,
-                        border: '1px solid var(--line)',
-                        background: 'transparent',
-                        color: 'var(--ink-2)',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      descartar
-                    </button>
-                  </div>
-                </>
-              )}
-
-              {sugestao.resumo.motivosPulados.length > 0 && (
-                <div style={{ marginTop: 18, paddingTop: 14, borderTop: '1px dashed var(--line-2)' }}>
-                  <Eyebrow>dias pulados (top 8)</Eyebrow>
-                  <ul
+                <div style={{ display: 'flex', gap: 10, marginTop: 16, flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => setExportandoAberto(true)}
                     style={{
-                      margin: '8px 0 0',
-                      padding: '0 0 0 18px',
-                      font: '400 12px/1.5 var(--font-mono)',
-                      color: 'var(--ink-3)',
+                      font: '600 13px/1 var(--font-body)',
+                      padding: '12px 22px',
+                      borderRadius: 999,
+                      border: 'none',
+                      background: 'var(--ink)',
+                      color: 'var(--bg)',
+                      cursor: 'pointer',
                     }}
                   >
-                    {sugestao.resumo.motivosPulados.map((m, i) => (
-                      <li key={i}>{m}</li>
-                    ))}
-                  </ul>
+                    exportar pra cada chefe
+                  </button>
                 </div>
-              )}
-            </Card>
-          )}
-
-          <Card titulo="suas preferências" eyebrow="o solver usou isso">
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <LinhaPref rotulo="dias preferidos">{preferencias.diasPreferidos.join(', ')}</LinhaPref>
-              <LinhaPref rotulo="dias a evitar">{preferencias.diasEvitar.join(', ')}</LinhaPref>
-              <LinhaPref rotulo="hospitais favoritos">
-                {preferencias.hospitaisPreferidos.join(', ')}
-              </LinhaPref>
-              <LinhaPref rotulo="máx/semana">{preferencias.maxPlantoesPorSemana} plantões</LinhaPref>
-              <LinhaPref rotulo="janela">{preferencias.janelaPreferida}</LinhaPref>
-              <LinhaPref rotulo="evitar 24h corrido">
-                {preferencias.evitar24hCorrido ? 'sim' : 'não'}
-              </LinhaPref>
-            </div>
-            <Hand color="var(--ink-2)" size={16} style={{ display: 'block', marginTop: 14 }}>
-              ajusta em "usuário" se algo aqui não te serve.
-            </Hand>
-          </Card>
-
-          {semHospitais && (
-            <EmptyState
-              eyebrow="solver"
-              titulo="cadastra um hospital primeiro."
-              recado="o solver precisa saber regras e valores antes de sugerir."
-            />
-          )}
-        </section>
-
-        <aside
-          style={{
-            background: 'var(--bg)',
-            border: '1px solid var(--line)',
-            borderRadius: 16,
-            padding: '18px 20px',
-            boxShadow: 'var(--shadow-sm)',
-          }}
-        >
-          <Eyebrow>respiração esperada</Eyebrow>
-          {sugestao && sugestao.blocos.length > 0 ? (
-            <>
-              <p
-                style={{
-                  fontFamily: 'var(--font-display)',
-                  fontWeight: 500,
-                  fontSize: 28,
-                  letterSpacing: '-0.015em',
-                  margin: '6px 0 4px',
-                  color:
-                    sugestao.resumo.recuperacoesInvadidas > 0 ||
-                    sugestao.resumo.diasSeguidosMax >= 3
-                      ? 'var(--coral-ink)'
-                      : 'var(--sage-ink)',
-                }}
-              >
-                {Math.floor(sugestao.resumo.maiorDescansoContinuo)}h
-              </p>
-              <Mono style={{ color: 'var(--ink-3)' }}>
-                {sugestao.resumo.diasSeguidosMax} dias seguidos máx
-                {sugestao.resumo.recuperacoesInvadidas > 0 &&
-                  ` · ${sugestao.resumo.recuperacoesInvadidas} invasão`}
-              </Mono>
-            </>
-          ) : (
-            <Mono style={{ color: 'var(--ink-3)', display: 'block', marginTop: 6 }}>
-              roda o mês pra ver
-            </Mono>
-          )}
-
-          <div style={{ marginTop: 18 }}>
-            <Eyebrow>plantões</Eyebrow>
-            <p
-              style={{
-                fontFamily: 'var(--font-display)',
-                fontWeight: 500,
-                fontSize: 22,
-                letterSpacing: '-0.005em',
-                margin: '4px 0 0',
-                color: 'var(--ink-2)',
-              }}
-            >
-              {sugestao
-                ? `${resumo.total.bruto > 0 ? Object.values(resumo.porHospital).reduce((s, r) => s + r.plantoes, 0) : 0} + ${sugestao.blocos.length}`
-                : Object.values(resumo.porHospital).reduce((s, r) => s + r.plantoes, 0)}
-            </p>
-            <Mono style={{ color: 'var(--ink-3)' }}>
-              já marcados {sugestao ? '+ sugestões' : ''}
-            </Mono>
-          </div>
-
-          <div style={{ marginTop: 18 }}>
-            <Eyebrow>valor estimado</Eyebrow>
-            <p
-              style={{
-                fontFamily: 'var(--font-display)',
-                fontWeight: 500,
-                fontSize: 22,
-                letterSpacing: '-0.005em',
-                margin: '4px 0 0',
-                color: sugestao ? 'var(--lavender-ink)' : 'var(--ink-2)',
-              }}
-            >
-              R$ {((sugestao?.resumo.receitaEstimada ?? resumo.total.liquido)).toLocaleString('pt-BR')}
-            </p>
-            {sugestao?.resumo.metaPct !== null && sugestao?.resumo.metaPct !== undefined && (
-              <Mono style={{ color: 'var(--ink-3)' }}>
-                {sugestao.resumo.metaPct}% da meta
-              </Mono>
+                {sugestao.resumo.motivosPulados.length > 0 && (
+                  <div
+                    style={{
+                      marginTop: 18,
+                      paddingTop: 14,
+                      borderTop: '1px dashed var(--line-2)',
+                    }}
+                  >
+                    <Eyebrow>dias pulados (top 8)</Eyebrow>
+                    <ul
+                      style={{
+                        margin: '8px 0 0',
+                        padding: '0 0 0 18px',
+                        font: '400 12px/1.5 var(--font-mono)',
+                        color: 'var(--ink-3)',
+                      }}
+                    >
+                      {sugestao.resumo.motivosPulados.map((m, i) => (
+                        <li key={i}>{m}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </Card>
             )}
-            {!sugestao && pctMetaAtual !== null && (
-              <Mono style={{ color: 'var(--ink-3)' }}>{pctMetaAtual}% da meta hoje</Mono>
+
+            {sugestao && sugestao.blocos.length === 0 && (
+              <EmptyState
+                titulo="nenhuma sugestão pra essa lente."
+                recado="hospitais cheios, dias evitados batem ou regras estão apertadas demais."
+              />
             )}
-          </div>
-        </aside>
+          </>
+        )}
       </div>
 
       {exportandoAberto && sugestao && (
         <ExportarMontar
           plantoesSugeridos={sugestao.blocos}
-          hospitais={hospitais}
-          mesISO={mesISO}
+          hospitais={hospitaisAtivos}
+          blocosTodos={blocos}
+          mesISO={mesAlvo}
           nomeMedico={preferencias.nome}
           onFechar={() => setExportandoAberto(false)}
         />
       )}
     </>
+  );
+}
+
+interface SetupCardProps {
+  mesAlvo: string;
+  onMesAlvo: (m: string) => void;
+  hospitais: HospitaisMap;
+  hospitaisIncluidos: Set<string>;
+  onToggleHospital: (id: string) => void;
+  metaInput: string;
+  onMetaInput: (v: string) => void;
+  metaPreferencia: number;
+  bloqueios: BlocoBloqueio[];
+  onAdicionarBloco?: (b: Bloco) => void;
+  onRemoverBloco?: (id: number | string) => void;
+  onGerar: () => void;
+  podeGerar: boolean;
+  jaTemResultado: boolean;
+}
+
+function SetupCard({
+  mesAlvo,
+  onMesAlvo,
+  hospitais,
+  hospitaisIncluidos,
+  onToggleHospital,
+  metaInput,
+  onMetaInput,
+  metaPreferencia,
+  bloqueios,
+  onAdicionarBloco,
+  onRemoverBloco,
+  onGerar,
+  podeGerar,
+  jaTemResultado,
+}: SetupCardProps) {
+  const [bloqueioOpen, setBloqueioOpen] = useState(false);
+  const [bloqData, setBloqData] = useState(`${mesAlvo}-15`);
+  const [bloqMotivo, setBloqMotivo] = useState('');
+
+  function adicionarBloqueio() {
+    if (!onAdicionarBloco || !bloqData) return;
+    const novo: BlocoBloqueio = {
+      id: `bloq-${Date.now()}`,
+      tipo: 'bloqueio',
+      data: bloqData,
+      horaInicio: 0,
+      duracao: 24,
+      motivo: bloqMotivo || undefined,
+    };
+    onAdicionarBloco(novo);
+    setBloqMotivo('');
+    setBloqueioOpen(false);
+  }
+
+  return (
+    <Card titulo="setup do mês" eyebrow="defina antes de gerar">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+        <Field label="mês alvo">
+          <MonthPicker value={mesAlvo} onChange={onMesAlvo} janela={12} />
+        </Field>
+
+        <Field label="hospitais a incluir">
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {Object.values(hospitais).map((h) => {
+              const on = hospitaisIncluidos.has(h.id);
+              return (
+                <button
+                  key={h.id}
+                  type="button"
+                  onClick={() => onToggleHospital(h.id)}
+                  style={{
+                    font: '600 13px/1 var(--font-body)',
+                    padding: '10px 16px',
+                    borderRadius: 999,
+                    border: on ? `2px solid var(--${h.cor}-ink)` : '1px solid var(--line)',
+                    background: on ? `var(--${h.cor}-surface)` : 'var(--bg)',
+                    color: on ? `var(--${h.cor}-ink)` : 'var(--ink-3)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {on ? '✓ ' : ''}
+                  {h.abrev}
+                </button>
+              );
+            })}
+          </div>
+        </Field>
+
+        <Field label="meta financeira deste mês">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ font: '500 14px/1.4 var(--font-body)', color: 'var(--ink-3)' }}>R$</span>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={metaInput}
+              onChange={(e) => onMetaInput(e.target.value.replace(/[^\d]/g, ''))}
+              placeholder="22000"
+              style={{
+                padding: '10px 14px',
+                borderRadius: 'var(--r-md)',
+                border: '1px solid var(--line)',
+                background: 'var(--bg)',
+                font: '500 14px/1.4 var(--font-body)',
+                color: 'var(--ink)',
+                outline: 'none',
+                width: 160,
+              }}
+            />
+            <Mono style={{ color: 'var(--ink-3)' }}>
+              só pra esse mês · padrão R$ {metaPreferencia.toLocaleString('pt-BR')}
+            </Mono>
+          </div>
+        </Field>
+
+        <Field label="bloqueios deste mês">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {bloqueios.length === 0 && !bloqueioOpen && (
+              <Mono style={{ color: 'var(--ink-3)' }}>nenhum bloqueio cadastrado</Mono>
+            )}
+            {bloqueios.map((b) => (
+              <div
+                key={b.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '8px 12px',
+                  background: 'var(--bg-alt)',
+                  borderRadius: 'var(--r-md)',
+                }}
+              >
+                <span style={{ font: '500 13px/1.3 var(--font-body)', color: 'var(--ink-2)' }}>
+                  {fmtDate(b.data)} {b.motivo ? `· ${b.motivo}` : ''}
+                </span>
+                {onRemoverBloco && (
+                  <button
+                    type="button"
+                    onClick={() => onRemoverBloco(b.id)}
+                    aria-label="remover"
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: 'var(--ink-3)',
+                      font: '500 18px/1 var(--font-body)',
+                    }}
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            ))}
+
+            {bloqueioOpen ? (
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '160px 1fr auto auto',
+                  gap: 8,
+                  alignItems: 'center',
+                  marginTop: 4,
+                }}
+              >
+                <input
+                  type="date"
+                  value={bloqData}
+                  onChange={(e) => setBloqData(e.target.value)}
+                  style={{
+                    padding: '10px 12px',
+                    borderRadius: 'var(--r-md)',
+                    border: '1px solid var(--line)',
+                    background: 'var(--bg)',
+                    font: '500 13px/1.4 var(--font-body)',
+                    color: 'var(--ink)',
+                    outline: 'none',
+                  }}
+                />
+                <input
+                  type="text"
+                  value={bloqMotivo}
+                  onChange={(e) => setBloqMotivo(e.target.value)}
+                  placeholder="aniversário · viagem · descanso"
+                  style={{
+                    padding: '10px 12px',
+                    borderRadius: 'var(--r-md)',
+                    border: '1px solid var(--line)',
+                    background: 'var(--bg)',
+                    font: '500 13px/1.4 var(--font-body)',
+                    color: 'var(--ink)',
+                    outline: 'none',
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={adicionarBloqueio}
+                  style={{
+                    font: '600 12px/1 var(--font-body)',
+                    padding: '10px 14px',
+                    borderRadius: 999,
+                    border: 'none',
+                    background: 'var(--sage-ink)',
+                    color: 'var(--bg)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  salvar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBloqueioOpen(false)}
+                  style={{
+                    font: '600 12px/1 var(--font-body)',
+                    padding: '10px 14px',
+                    borderRadius: 999,
+                    border: '1px solid var(--line)',
+                    background: 'transparent',
+                    color: 'var(--ink-3)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  cancelar
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setBloqueioOpen(true)}
+                style={{
+                  alignSelf: 'flex-start',
+                  font: '600 12px/1 var(--font-body)',
+                  padding: '8px 14px',
+                  borderRadius: 999,
+                  border: '1px dashed var(--line-2)',
+                  background: 'transparent',
+                  color: 'var(--ink-2)',
+                  cursor: 'pointer',
+                  marginTop: 4,
+                }}
+              >
+                + adicionar bloqueio
+              </button>
+            )}
+          </div>
+        </Field>
+
+        <button
+          type="button"
+          onClick={onGerar}
+          disabled={!podeGerar}
+          style={{
+            font: '600 14px/1 var(--font-body)',
+            padding: '14px 28px',
+            borderRadius: 999,
+            border: 'none',
+            background: 'var(--lavender-ink)',
+            color: 'var(--bg)',
+            cursor: podeGerar ? 'pointer' : 'not-allowed',
+            opacity: podeGerar ? 1 : 0.5,
+            alignSelf: 'flex-start',
+            marginTop: 4,
+          }}
+        >
+          {jaTemResultado ? 'gerar de novo' : 'gerar 3 cenários'}
+        </button>
+      </div>
+    </Card>
   );
 }
 
@@ -626,18 +737,11 @@ function Card({
   );
 }
 
-function LinhaPref({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div
-      style={{
-        display: 'flex',
-        gap: 12,
-        padding: '6px 0',
-        borderBottom: '1px dashed var(--line-2)',
-      }}
-    >
-      <Eyebrow style={{ width: 160, flexShrink: 0 }}>{rotulo}</Eyebrow>
-      <span style={{ font: '500 14px/1.4 var(--font-body)', color: 'var(--ink)' }}>{children}</span>
-    </div>
+    <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <Eyebrow>{label}</Eyebrow>
+      {children}
+    </label>
   );
 }
