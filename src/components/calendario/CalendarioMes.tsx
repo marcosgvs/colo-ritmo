@@ -147,7 +147,7 @@ export function CalendarioMes({
                     padding: 8,
                     borderRight: '1px solid var(--line)',
                     background: isHoje ? 'var(--lavender-surface)' : 'transparent',
-                    opacity: noMes ? 0.45 : 1,
+                    opacity: noMes ? 1 : 0.45,
                     display: 'flex',
                     flexDirection: 'column',
                     gap: 6,
