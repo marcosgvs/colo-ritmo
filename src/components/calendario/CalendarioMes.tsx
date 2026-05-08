@@ -19,6 +19,10 @@ interface CalendarioMesProps {
   /** Marcadores extras visuais (ex: blocos sugeridos). */
   marcadores?: Bloco[];
   onSelectBloco?: (b: Bloco) => void;
+  /** Click em marcador sugerido (ex: pra remover do mês proposto). */
+  onSelectMarcador?: (b: Bloco) => void;
+  /** Click em dia vazio (ex: pra adicionar plantão proposto). */
+  onSelectDia?: (iso: string) => void;
   /** Default false; se true, a coluna "soma" some. */
   semSoma?: boolean;
 }
@@ -35,6 +39,8 @@ export function CalendarioMes({
   hospitais: _h,
   marcadores = [],
   onSelectBloco,
+  onSelectMarcador,
+  onSelectDia,
   semSoma = false,
 }: CalendarioMesProps) {
   const semanas = useMemo(() => calcularSemanas(refIso), [refIso]);
@@ -142,17 +148,20 @@ export function CalendarioMes({
               const bloqueio = (blocosPorDia.get(iso) ?? []).find(
                 (b) => b.tipo === 'bloqueio',
               );
+              const diaClicavel =
+                onSelectDia && noMes && !bloqueio && items.length === 0 && sugItems.length === 0;
               return (
                 <div
                   key={iso}
+                  onClick={diaClicavel ? () => onSelectDia!(iso) : undefined}
+                  role={diaClicavel ? 'button' : undefined}
+                  tabIndex={diaClicavel ? 0 : undefined}
                   style={{
                     minHeight: 96,
                     padding: 8,
                     borderRight: '1px solid var(--line)',
                     background: isHoje
                       ? 'var(--lavender-surface)'
-                      : bloqueio
-                      ? 'transparent'
                       : 'transparent',
                     backgroundImage: bloqueio
                       ? 'repeating-linear-gradient(135deg, rgba(58,46,42,0.06) 0 6px, transparent 6px 14px)'
@@ -162,6 +171,7 @@ export function CalendarioMes({
                     flexDirection: 'column',
                     gap: 6,
                     position: 'relative',
+                    cursor: diaClicavel ? 'pointer' : 'default',
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
@@ -216,6 +226,7 @@ export function CalendarioMes({
                         abrev={hosp.abrev}
                         duracao={p.duracao}
                         sugerido
+                        onClick={onSelectMarcador ? () => onSelectMarcador(p) : undefined}
                       />
                     );
                   })}
