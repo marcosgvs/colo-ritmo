@@ -22,6 +22,7 @@ schemas-legacy/README.md
 schemas-legacy/import-v1.schema.json
 !schemas-legacy/v19-notificacoes.sql
 !schemas-legacy/v20-shares-parceiro.sql
+!schemas-legacy/v21-triggers-notif.sql
 
 # editor / OS
 .DS_Store
