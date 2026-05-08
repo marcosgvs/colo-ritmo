@@ -29,6 +29,7 @@ const MontarEscala = lazy(() => import('@/views/MontarEscala').then((m) => ({ de
 const Detalhe = lazy(() => import('@/views/Detalhe').then((m) => ({ default: m.Detalhe })));
 const Usuario = lazy(() => import('@/views/Usuario').then((m) => ({ default: m.Usuario })));
 const Inbox = lazy(() => import('@/views/Inbox').then((m) => ({ default: m.Inbox })));
+const Auditoria = lazy(() => import('@/views/Auditoria').then((m) => ({ default: m.Auditoria })));
 
 import type { NavKey } from '@/components/shell';
 
@@ -153,7 +154,14 @@ export function App() {
                   bloco={detalheBloco}
                   hospitais={userState.state.hospitais}
                   voltar={() => setDetalheBloco(null)}
-                  onTrocar={() => setActive('trocas')}
+                  onTrocar={() => {
+                    setDetalheBloco(null);
+                    setActive('trocas');
+                  }}
+                  onCeder={() => {
+                    setDetalheBloco(null);
+                    setActive('trocas');
+                  }}
                 />
               </Suspense>
             </Shell>
@@ -334,6 +342,7 @@ function ViewSwitch({
           hospitais={state.hospitais}
           preferencias={state.preferencias}
           mesISO={mesISO}
+          onAdicionarSugestoes={adicionarBlocos}
         />
       );
 
@@ -349,6 +358,9 @@ function ViewSwitch({
 
     case 'inbox':
       return <Inbox />;
+
+    case 'auditoria':
+      return <Auditoria />;
 
     case 'time':
       return <em style={{ color: 'var(--ink-3)' }}>tela `time` chega na próxima iteração.</em>;

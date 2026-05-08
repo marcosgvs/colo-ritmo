@@ -12,6 +12,17 @@ interface ConflitosProps {
   onSelectBloco: (b: Bloco) => void;
 }
 
+const LABEL_TIPO: Record<TipoConflito, string> = {
+  sobreposicao: 'sobreposição',
+  sem_descanso: 'sem descanso',
+  limite_cfm: 'limite cfm',
+  max_semana: 'máx. semana',
+};
+
+function labelTipo(t: TipoConflito): string {
+  return LABEL_TIPO[t];
+}
+
 const COPY_TIPO: Record<TipoConflito, { titulo: string; recado: string }> = {
   sobreposicao: {
     titulo: 'dois plantões sobrepostos',
@@ -78,7 +89,7 @@ export function Conflitos({ blocos, hospitais, onSelectBloco }: ConflitosProps) 
                 <div>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
                     <Pill kind="err" dot={false}>
-                      {c.tipo.replace('_', ' ')}
+                      {labelTipo(c.tipo)}
                     </Pill>
                     {hospA && (
                       <Eyebrow color={`var(--${hospA.cor}-ink)`}>{hospA.abrev}</Eyebrow>

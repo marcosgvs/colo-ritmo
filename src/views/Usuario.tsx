@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { Preferencias } from '@/types';
 import { sair } from '@/hooks/useAuth';
 import { usePush } from '@/hooks/usePush';
+import { useSnapshotsShares } from '@/hooks/useSnapshotsShares';
 import { Eyebrow, Hand, Mono, Pill } from '@/components/atoms';
 import { PageHead } from './_PageHead';
 
@@ -14,8 +15,13 @@ interface UsuarioProps {
 
 export function Usuario({ email, userId, preferencias, onSalvarPreferencias }: UsuarioProps) {
   const push = usePush(userId);
+  const snapshotsShares = useSnapshotsShares(userId);
   const [draft, setDraft] = useState(preferencias);
   const sujo = JSON.stringify(draft) !== JSON.stringify(preferencias);
+  const [criandoShare, setCriandoShare] = useState(false);
+  const [shareMes, setShareMes] = useState(() => new Date().toISOString().slice(0, 7));
+  const [shareLabel, setShareLabel] = useState('');
+  const [shareDias, setShareDias] = useState(30);
 
   return (
     <>
@@ -199,6 +205,202 @@ export function Usuario({ email, userId, preferencias, onSalvarPreferencias }: U
                   </Mono>
                 )}
               </>
+            )}
+          </Card>
+
+          <Card titulo="snapshots" eyebrow="histórico do user_state">
+            {snapshotsShares.snapshots.length === 0 ? (
+              <Mono style={{ color: 'var(--ink-3)', display: 'block' }}>
+                {snapshotsShares.carregando ? 'carregando…' : 'sem snapshots ainda · cron diário gera'}
+              </Mono>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 200, overflowY: 'auto' }}>
+                {snapshotsShares.snapshots.slice(0, 8).map((s) => (
+                  <div
+                    key={s.id}
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '8px 10px',
+                      background: 'var(--bg-alt)',
+                      borderRadius: 'var(--r-sm)',
+                      gap: 8,
+                    }}
+                  >
+                    <Mono style={{ color: 'var(--ink-2)', fontSize: 11 }}>
+                      {new Date(s.data_snap).toLocaleDateString('pt-BR')}
+                    </Mono>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (!confirm('restaurar esse snapshot? sobrescreve a agenda atual.')) return;
+                        const r = await snapshotsShares.restaurarSnapshot(s.id);
+                        if (!r.ok) alert('erro: ' + r.erro);
+                      }}
+                      style={{
+                        font: '600 11px/1 var(--font-body)',
+                        padding: '6px 10px',
+                        borderRadius: 999,
+                        border: '1px solid var(--line)',
+                        background: 'transparent',
+                        color: 'var(--ink-2)',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      restaurar
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <Hand color="var(--ink-3)" size={14} style={{ display: 'block', marginTop: 12 }}>
+              backups automáticos · 30 dias retidos
+            </Hand>
+          </Card>
+
+          <Card titulo="compartilhar mês" eyebrow="link público read-only">
+            {!criandoShare ? (
+              <button
+                type="button"
+                onClick={() => setCriandoShare(true)}
+                style={{
+                  font: '600 13px/1 var(--font-body)',
+                  padding: '11px 18px',
+                  borderRadius: 999,
+                  border: '1px solid var(--line)',
+                  background: 'transparent',
+                  color: 'var(--ink)',
+                  cursor: 'pointer',
+                }}
+              >
+                criar novo link
+              </button>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <input
+                  type="month"
+                  value={shareMes}
+                  onChange={(e) => setShareMes(e.target.value)}
+                  style={input}
+                />
+                <input
+                  value={shareLabel}
+                  onChange={(e) => setShareLabel(e.target.value)}
+                  placeholder="rótulo (ex: pra mãe)"
+                  style={input}
+                />
+                <input
+                  type="number"
+                  value={shareDias}
+                  onChange={(e) => setShareDias(Number(e.target.value))}
+                  min={1}
+                  max={365}
+                  style={input}
+                />
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const r = await snapshotsShares.criarShare(shareMes, shareLabel || shareMes, shareDias);
+                      if (r.ok) {
+                        setCriandoShare(false);
+                        setShareLabel('');
+                      } else {
+                        alert('erro: ' + r.erro);
+                      }
+                    }}
+                    style={{
+                      font: '600 12px/1 var(--font-body)',
+                      padding: '9px 14px',
+                      borderRadius: 999,
+                      border: 'none',
+                      background: 'var(--ink)',
+                      color: 'var(--bg)',
+                      cursor: 'pointer',
+                      flex: 1,
+                    }}
+                  >
+                    criar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCriandoShare(false)}
+                    style={{
+                      font: '600 12px/1 var(--font-body)',
+                      padding: '9px 14px',
+                      borderRadius: 999,
+                      border: '1px solid var(--line)',
+                      background: 'transparent',
+                      color: 'var(--ink-2)',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    cancelar
+                  </button>
+                </div>
+              </div>
+            )}
+            {snapshotsShares.shares.length > 0 && (
+              <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {snapshotsShares.shares.map((s) => (
+                  <div
+                    key={s.token}
+                    style={{
+                      padding: '8px 10px',
+                      background: 'var(--bg-alt)',
+                      borderRadius: 'var(--r-sm)',
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+                      <span style={{ font: '500 13px/1.3 var(--font-body)' }}>{s.label}</span>
+                      <Pill kind="lavender">{s.mes}</Pill>
+                    </div>
+                    <Mono style={{ color: 'var(--ink-3)', fontSize: 10, display: 'block', marginTop: 4 }}>
+                      expira {new Date(s.expires_at).toLocaleDateString('pt-BR')}
+                    </Mono>
+                    <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const url = `${window.location.origin}/share/${s.token}`;
+                          navigator.clipboard?.writeText(url);
+                        }}
+                        style={{
+                          font: '600 11px/1 var(--font-body)',
+                          padding: '5px 10px',
+                          borderRadius: 999,
+                          border: '1px solid var(--line)',
+                          background: 'transparent',
+                          color: 'var(--ink-2)',
+                          cursor: 'pointer',
+                          flex: 1,
+                        }}
+                      >
+                        copiar link
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!confirm('revogar esse link?')) return;
+                          await snapshotsShares.revogarShare(s.token);
+                        }}
+                        style={{
+                          font: '600 11px/1 var(--font-body)',
+                          padding: '5px 10px',
+                          borderRadius: 999,
+                          border: '1px solid var(--coral)',
+                          background: 'transparent',
+                          color: 'var(--coral-ink)',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        revogar
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
           </Card>
 

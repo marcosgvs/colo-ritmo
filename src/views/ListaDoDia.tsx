@@ -40,9 +40,10 @@ export function ListaDoDia({ blocos, hospitais: _h, onSelectBloco }: ListaDoDiaP
         hand={
           blocosHoje.length === 0
             ? 'janela tranquila — vale aproveitar pra dormir adiantado'
-            : `${blocosHoje.filter((b) => b.tipo === 'plantao').length} plantão${
-                blocosHoje.filter((b) => b.tipo === 'plantao').length !== 1 ? 'ões' : ''
-              } · respira fundo`
+            : (() => {
+                const n = blocosHoje.filter((b) => b.tipo === 'plantao').length;
+                return `${n === 1 ? '1 plantão' : `${n} plantões`} · respira fundo`;
+              })()
         }
       />
 

@@ -33,6 +33,16 @@ export interface RegrasHospital {
   maxPorMes: number;
 }
 
+export interface EnderecoHospital {
+  cep: string;
+  logradouro: string;
+  bairro: string;
+  cidade: string;
+  uf: string;
+  lat?: number;
+  lng?: number;
+}
+
 export interface Hospital {
   id: string;
   nome: string;
@@ -45,6 +55,7 @@ export interface Hospital {
   adicionalNoite: number;
   setores: string[];
   regras: RegrasHospital;
+  endereco?: EnderecoHospital;
 }
 
 export type HospitaisMap = Record<string, Hospital>;

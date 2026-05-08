@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import type { CorFamilia, Hospital, HospitaisMap, TipoHospital } from '@/types';
-import { Eyebrow, Mono, Pill } from '@/components/atoms';
+import type { CorFamilia, EnderecoHospital, Hospital, HospitaisMap, TipoHospital } from '@/types';
+import { buscarCep, geocodificar } from '@/lib/geo';
+import { Eyebrow, Hand, Mono, Pill } from '@/components/atoms';
 import { EmptyState } from '@/components/empty';
 import { PageHead } from './_PageHead';
 
@@ -294,6 +295,14 @@ function HospitalForm({ inicial, coresUsadas, onSalvar, onCancelar, onRemover }:
           />
         </Field>
 
+        <div style={{ gridColumn: '1 / -1' }}>
+          <BlocoEndereco
+            endereco={draft.endereco}
+            onChange={(end) => setDraft((d) => ({ ...d, endereco: end }))}
+            nomeHospital={draft.nome}
+          />
+        </div>
+
         <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 10, marginTop: 14 }}>
           <button
             type="submit"
@@ -370,5 +379,176 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       <Eyebrow>{label}</Eyebrow>
       {children}
     </label>
+  );
+}
+
+interface BlocoEnderecoProps {
+  endereco: EnderecoHospital | undefined;
+  onChange: (e: EnderecoHospital | undefined) => void;
+  nomeHospital: string;
+}
+
+function BlocoEndereco({ endereco, onChange, nomeHospital }: BlocoEnderecoProps) {
+  const [estado, setEstado] = useState<'parado' | 'buscando-cep' | 'buscando-geo' | 'erro'>('parado');
+  const [erro, setErro] = useState<string | null>(null);
+
+  const e: EnderecoHospital = endereco ?? {
+    cep: '', logradouro: '', bairro: '', cidade: '', uf: '',
+  };
+
+  function setCampo<K extends keyof EnderecoHospital>(k: K, v: EnderecoHospital[K]) {
+    onChange({ ...e, [k]: v });
+  }
+
+  async function lookupCep() {
+    if (!e.cep || e.cep.replace(/\D/g, '').length !== 8) return;
+    setEstado('buscando-cep');
+    setErro(null);
+    try {
+      const r = await buscarCep(e.cep);
+      if (!r) {
+        setEstado('erro');
+        setErro('cep não encontrado');
+        return;
+      }
+      onChange({
+        ...e,
+        cep: r.cepFormatado,
+        logradouro: r.logradouro,
+        bairro: r.bairro,
+        cidade: r.cidade,
+        uf: r.uf,
+      });
+      setEstado('parado');
+    } catch (err) {
+      setEstado('erro');
+      setErro((err as Error).message);
+    }
+  }
+
+  async function lookupGeo() {
+    const query = [nomeHospital, e.logradouro, e.bairro, e.cidade, e.uf]
+      .filter(Boolean).join(', ');
+    if (!query) return;
+    setEstado('buscando-geo');
+    setErro(null);
+    try {
+      const r = await geocodificar(query);
+      if (!r) {
+        setEstado('erro');
+        setErro('endereço não encontrado no openstreetmap');
+        return;
+      }
+      onChange({ ...e, lat: r.lat, lng: r.lng });
+      setEstado('parado');
+    } catch (err) {
+      setEstado('erro');
+      setErro((err as Error).message);
+    }
+  }
+
+  return (
+    <div
+      style={{
+        background: 'var(--bg-alt)',
+        borderRadius: 'var(--r-md)',
+        padding: '16px 18px',
+        marginTop: 6,
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+        <Eyebrow>endereço (opcional)</Eyebrow>
+        <Mono style={{ color: 'var(--ink-3)', fontSize: 11 }}>
+          ajuda no cálculo de deslocamento
+        </Mono>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 12, marginTop: 10 }}>
+        <Field label="cep">
+          <div style={{ display: 'flex', gap: 6 }}>
+            <input
+              value={e.cep}
+              onChange={(ev) => setCampo('cep', ev.target.value)}
+              onBlur={lookupCep}
+              placeholder="70335-000"
+              style={{ ...input, flex: 1 }}
+            />
+            <button
+              type="button"
+              onClick={lookupCep}
+              disabled={estado === 'buscando-cep'}
+              style={{
+                font: '600 12px/1 var(--font-body)',
+                padding: '0 14px',
+                borderRadius: 'var(--r-md)',
+                border: '1px solid var(--line)',
+                background: 'var(--bg)',
+                color: 'var(--ink-2)',
+                cursor: 'pointer',
+              }}
+            >
+              {estado === 'buscando-cep' ? '…' : 'buscar'}
+            </button>
+          </div>
+        </Field>
+        <Field label="logradouro">
+          <input
+            value={e.logradouro}
+            onChange={(ev) => setCampo('logradouro', ev.target.value)}
+            placeholder="SMHN Quadra 1, Conjunto A"
+            style={input}
+          />
+        </Field>
+        <Field label="bairro">
+          <input
+            value={e.bairro}
+            onChange={(ev) => setCampo('bairro', ev.target.value)}
+            style={input}
+          />
+        </Field>
+        <Field label="cidade · uf">
+          <div style={{ display: 'flex', gap: 6 }}>
+            <input
+              value={e.cidade}
+              onChange={(ev) => setCampo('cidade', ev.target.value)}
+              style={{ ...input, flex: 2 }}
+            />
+            <input
+              value={e.uf}
+              onChange={(ev) => setCampo('uf', ev.target.value.toUpperCase().slice(0, 2))}
+              maxLength={2}
+              style={{ ...input, flex: 1, textAlign: 'center' }}
+            />
+          </div>
+        </Field>
+      </div>
+
+      <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          onClick={lookupGeo}
+          disabled={estado === 'buscando-geo' || (!e.logradouro && !nomeHospital)}
+          style={{
+            font: '600 12px/1 var(--font-body)',
+            padding: '8px 14px',
+            borderRadius: 999,
+            border: '1px solid var(--line)',
+            background: 'var(--bg)',
+            color: 'var(--ink-2)',
+            cursor: 'pointer',
+          }}
+        >
+          {estado === 'buscando-geo' ? 'consultando…' : 'buscar coordenadas'}
+        </button>
+        {e.lat !== undefined && e.lng !== undefined && (
+          <Hand color="var(--sage-ink)" size={14}>
+            geo: {e.lat.toFixed(4)}, {e.lng.toFixed(4)}
+          </Hand>
+        )}
+        {erro && (
+          <Mono style={{ color: 'var(--coral-ink)' }}>{erro}</Mono>
+        )}
+      </div>
+    </div>
   );
 }

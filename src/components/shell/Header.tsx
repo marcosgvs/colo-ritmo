@@ -16,7 +16,8 @@ export type NavKey =
   | 'sync'
   | 'conflitos'
   | 'usuario'
-  | 'inbox';
+  | 'inbox'
+  | 'auditoria';
 
 interface NavItem {
   key: NavKey;
@@ -33,6 +34,7 @@ export const NAV_ITEMS: NavItem[] = [
   { key: 'montar',     label: 'montar',      icon: 'sparkle',  roles: ['medica'] },
   { key: 'trocas',     label: 'trocas',      icon: 'swap',     roles: ['medica', 'admin'] },
   { key: 'inbox',      label: 'inbox',       icon: 'list',     roles: ['admin'] },
+  { key: 'auditoria',  label: 'auditoria',   icon: 'radar',    roles: ['admin'] },
   { key: 'hospitais',  label: 'hospitais',   icon: 'hospital', roles: ['medica'] },
   { key: 'financeiro', label: 'financeiro',  icon: 'coin',     roles: ['medica'] },
   { key: 'sync',       label: 'sincronizar', icon: 'sync',     roles: ['medica'] },

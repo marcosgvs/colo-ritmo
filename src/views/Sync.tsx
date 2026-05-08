@@ -205,7 +205,7 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, icsToken, nomeUser 
             )}
           </Card>
 
-          <Card titulo="ou colar um ics" eyebrow="useful pra google calendar / apple">
+          <Card titulo="ou colar um ics" eyebrow="útil pra google · apple">
             <textarea
               value={icsTexto}
               onChange={(e) => setIcsTexto(e.target.value)}
@@ -241,7 +241,11 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, icsToken, nomeUser 
 
           {resultado && (
             <Card
-              titulo={`${resultado.blocos.length} plantão${resultado.blocos.length !== 1 ? 'ões' : ''} prontos pra somar`}
+              titulo={
+                resultado.blocos.length === 1
+                  ? '1 plantão pronto pra somar'
+                  : `${resultado.blocos.length} plantões prontos pra somar`
+              }
               eyebrow="revisa antes de salvar"
             >
               {resultado.avisos.length > 0 && (
@@ -337,7 +341,7 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, icsToken, nomeUser 
         </div>
 
         <aside style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <Card titulo="exportar" eyebrow="colar no google / apple calendar">
+          <Card titulo="exportar" eyebrow="google · apple">
             <p style={{ font: '400 13px/1.5 var(--font-body)', color: 'var(--ink-2)', margin: '0 0 12px' }}>
               gera um .ics com sua agenda atual.
             </p>

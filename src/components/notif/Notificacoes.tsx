@@ -149,6 +149,14 @@ const KIND: Record<Notificacao['tipo'], 'info' | 'err' | 'lavender' | 'ok' | 'wa
   limite: 'warn',
 };
 
+const LABEL: Record<Notificacao['tipo'], string> = {
+  troca: 'troca',
+  conflito: 'conflito',
+  sugestao: 'sugestão',
+  aprovacao: 'aprovação',
+  limite: 'limite',
+};
+
 function Item({ n, onMarcarLida }: { n: Notificacao; onMarcarLida: (id: string) => void }) {
   return (
     <button
@@ -167,7 +175,7 @@ function Item({ n, onMarcarLida }: { n: Notificacao; onMarcarLida: (id: string) 
       }}
     >
       <span style={{ alignSelf: 'flex-start' }}>
-        <Pill kind={KIND[n.tipo]}>{n.tipo}</Pill>
+        <Pill kind={KIND[n.tipo]}>{LABEL[n.tipo]}</Pill>
       </span>
       <div style={{ flex: 1 }}>
         <p style={{ font: '600 13px/1.3 var(--font-body)', color: 'var(--ink)', margin: 0 }}>
