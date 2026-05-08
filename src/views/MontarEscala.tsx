@@ -154,6 +154,7 @@ export function MontarEscala({
                 const r = resumo.porHospital[h.id];
                 const qt = r?.plantoes ?? 0;
                 const sugAqui = sugestao?.blocos.filter((b) => b.hospitalId === h.id).length ?? 0;
+                const maxMes = h.regras?.maxPorMes ?? null;
                 return (
                   <div
                     key={h.id}
@@ -180,14 +181,16 @@ export function MontarEscala({
                           {' '}+{sugAqui}
                         </span>
                       )}
-                      <span style={{ color: 'var(--ink-3)', fontWeight: 400, fontSize: 16 }}>
-                        /{h.regras.maxPorMes}
-                      </span>
+                      {maxMes !== null && (
+                        <span style={{ color: 'var(--ink-3)', fontWeight: 400, fontSize: 16 }}>
+                          /{maxMes}
+                        </span>
+                      )}
                     </p>
                     <Mono style={{ display: 'block', color: 'var(--ink-3)' }}>
                       máx · R$ {(h.valorPlantao ?? 0).toLocaleString('pt-BR')}/plantão
                     </Mono>
-                    {qt + sugAqui > h.regras.maxPorMes && (
+                    {maxMes !== null && qt + sugAqui > maxMes && (
                       <Pill kind="err" style={{ marginTop: 10 }}>
                         passou do máx
                       </Pill>

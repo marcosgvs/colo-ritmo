@@ -170,7 +170,7 @@ function escolherHospital(
 
   for (const id of ranqueado) {
     const hosp = hospitais[id];
-    if (!hosp) continue;
+    if (!hosp || !hosp.regras) continue;
     const usadoMes = limites.porHospitalMes.get(id) ?? 0;
     if (usadoMes >= hosp.regras.maxPorMes) continue;
     const limiteSemana = Math.max(1, hosp.regras.maxPorSemana - cfg.margemMaxSemana);
