@@ -3,7 +3,6 @@ import type { Bloco, HospitaisMap, Mode } from '@/types';
 import {
   adicionaDia,
   cargaSemanal,
-  fmtDate,
   fromISO,
   HOJE,
   inicioDaSemana,
@@ -28,10 +27,7 @@ export function Semana({ blocos, hospitais: _h, mode, loading, erro, onSelectBlo
   const semanaIso = useMemo(() => semanaDe(refIso), [refIso]);
   const inicio = semanaIso[0]!;
   const fim = semanaIso[6]!;
-  const carga = cargaSemanal(
-    blocos.filter((b) => semanaIso.includes(b.data)),
-  );
-
+  const carga = cargaSemanal(blocos.filter((b) => semanaIso.includes(b.data)));
   const label = formatRangeSemana(inicio, fim);
 
   return (
@@ -53,52 +49,72 @@ export function Semana({ blocos, hospitais: _h, mode, loading, erro, onSelectBlo
         </div>
       )}
 
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'flex-end',
-          justifyContent: 'space-between',
-          gap: 24,
-          flexWrap: 'wrap',
-          marginBottom: 24,
-        }}
-      >
-        <div>
-          <Eyebrow>semana · {label}</Eyebrow>
-          <h1
-            style={{
-              fontFamily: 'var(--font-display)',
-              fontWeight: 500,
-              fontSize: 'clamp(28px, 3.5vw, 40px)',
-              letterSpacing: '-0.02em',
-              margin: '8px 0 0',
-              color: 'var(--ink)',
-            }}
-          >
-            sua semana.
-          </h1>
-          <Hand color="var(--lavender-ink)" size={20} style={{ display: 'block', marginTop: 8 }}>
-            {loading ? 'carregando seus plantões…' : `${carga}h previstas`}
-          </Hand>
-        </div>
-        <NavSemana refIso={refIso} setRefIso={setRefIso} />
+      <div style={{ marginBottom: 24 }}>
+        <Eyebrow>semana · {label}</Eyebrow>
+        <h1
+          style={{
+            fontFamily: 'var(--font-display)',
+            fontWeight: 500,
+            fontSize: 'clamp(28px, 3.5vw, 40px)',
+            letterSpacing: '-0.02em',
+            margin: '8px 0 0',
+            color: 'var(--ink)',
+          }}
+        >
+          sua semana.
+        </h1>
+        <Hand color="var(--lavender-ink)" size={20} style={{ display: 'block', marginTop: 8 }}>
+          {loading ? 'carregando seus plantões…' : `${carga}h previstas`}
+        </Hand>
       </div>
 
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'minmax(0, 1fr) 320px',
-          gap: 32,
+          gridTemplateColumns: 'minmax(0, 1fr) 1px 320px',
+          gap: 24,
           alignItems: 'flex-start',
         }}
       >
-        <WeekGrid
-          blocos={blocos}
-          density={24}
-          semanaIso={semanaIso}
-          hojeIso={HOJE}
-          onSelectBloco={onSelectBloco}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 12,
+              padding: '0 4px',
+            }}
+          >
+            <span
+              style={{
+                font: '700 11px/1 var(--font-body)',
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                color: 'var(--ink-3)',
+              }}
+            >
+              {label}
+            </span>
+            <NavSemana refIso={refIso} setRefIso={setRefIso} />
+          </div>
+          <WeekGrid
+            blocos={blocos}
+            density={24}
+            semanaIso={semanaIso}
+            hojeIso={HOJE}
+            onSelectBloco={onSelectBloco}
+          />
+        </div>
+
+        <div
+          style={{
+            alignSelf: 'stretch',
+            background: 'var(--line)',
+            width: 1,
+          }}
         />
+
         <Rail blocos={blocos} mode={mode} />
       </div>
     </>
@@ -127,10 +143,7 @@ function NavSemana({ refIso, setRefIso }: NavSemanaProps) {
         border: '1px solid var(--line)',
       }}
     >
-      <NavBtn
-        aria="semana anterior"
-        onClick={() => setRefIso(adicionaDia(seg, -7))}
-      >
+      <NavBtn aria="semana anterior" onClick={() => setRefIso(adicionaDia(seg, -7))}>
         ‹
       </NavBtn>
       <button
@@ -151,10 +164,7 @@ function NavSemana({ refIso, setRefIso }: NavSemanaProps) {
       >
         hoje
       </button>
-      <NavBtn
-        aria="semana próxima"
-        onClick={() => setRefIso(adicionaDia(seg, 7))}
-      >
+      <NavBtn aria="semana próxima" onClick={() => setRefIso(adicionaDia(seg, 7))}>
         ›
       </NavBtn>
     </div>
@@ -193,6 +203,3 @@ function formatRangeSemana(inicio: string, fim: string): string {
   }
   return `${dIni.getDate()} ${mesIni} – ${dFim.getDate()} ${mesFim} ${dFim.getFullYear()}`;
 }
-
-// Mantém referência usada implicitamente pra evitar tree-shake removing
-void fmtDate;

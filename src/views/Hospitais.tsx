@@ -191,9 +191,23 @@ function HospitalForm({ inicial, coresUsadas, onSalvar, onCancelar, onRemover }:
       />
 
       <form
-        onSubmit={(e) => {
+        onSubmit={async (e) => {
           e.preventDefault();
-          if (valido) onSalvar(draft);
+          if (!valido) return;
+          // Tenta auto-localizar pelo nome se ainda sem coordenadas.
+          const semGeo =
+            !draft.endereco || draft.endereco.lat === undefined || draft.endereco.lng === undefined;
+          if (semGeo && draft.nome.trim()) {
+            const r = await geocodificar(draft.nome.trim());
+            if (r) {
+              const e2 = draft.endereco ?? {
+                cep: '', logradouro: '', bairro: '', cidade: '', uf: '',
+              };
+              onSalvar({ ...draft, endereco: { ...e2, lat: r.lat, lng: r.lng } });
+              return;
+            }
+          }
+          onSalvar(draft);
         }}
         style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18, maxWidth: 720 }}
       >

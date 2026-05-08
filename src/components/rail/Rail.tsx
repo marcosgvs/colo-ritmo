@@ -124,7 +124,7 @@ function ProximoCard({ b, mode }: ProximoCardProps) {
         {hosp.nome}
       </div>
       <Mono style={{ display: 'block', marginTop: 4 }}>
-        {b.setor} · {fmtRange(b.horaInicio, b.duracao)} · {b.duracao}h
+        {fmtRange(b.horaInicio, b.duracao)} · {b.duracao}h
       </Mono>
       {mode === 'medica' && (
         <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>

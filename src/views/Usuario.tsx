@@ -48,6 +48,15 @@ export function Usuario({ email, userId, preferencias, onSalvarPreferencias }: U
                 style={input}
               />
             </Field>
+            <Field label="telefone">
+              <input
+                type="tel"
+                value={draft.telefone ?? ''}
+                onChange={(e) => setDraft({ ...draft, telefone: e.target.value })}
+                placeholder="(61) 9 9999-9999"
+                style={input}
+              />
+            </Field>
             {email && (
               <div style={{ marginTop: 12 }}>
                 <Eyebrow>email</Eyebrow>

@@ -25,12 +25,12 @@ const TITULO: Record<AddTipo, string> = {
 };
 
 const HAND_HINT: Record<AddTipo, string> = {
-  plantao: 'um turno · cor da família do hospital',
-  sono: 'janela protegida · sage',
-  bloqueio: 'sem agenda · listra cream',
-  consulta: 'consultório/ambulatório · borda coral',
-  estudo: 'curso, congresso, aula · azul',
-  pessoal: 'fora da medicina · sand',
+  plantao: 'um turno',
+  sono: 'janela protegida',
+  bloqueio: 'sem agenda',
+  consulta: 'consultório ou ambulatório',
+  estudo: 'curso, congresso, aula',
+  pessoal: 'fora da medicina',
   outros: 'qualquer outro evento',
 };
 

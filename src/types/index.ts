@@ -145,6 +145,7 @@ export type Bloco =
 
 export interface Preferencias {
   nome: string;
+  telefone?: string;
   metaMensal: number;
   diasPreferidos: string[];
   diasEvitar: string[];

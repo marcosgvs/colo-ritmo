@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
 import type { Bloco, BlocoPlantao, HospitaisMap, Preferencias } from '@/types';
-import { calcRemuneracaoMes, fmtDate, fmtRange, getHospital } from '@/lib/data';
+import { calcRemuneracaoMes } from '@/lib/data';
 import { sugerirPlantoes, type SugestaoSolver } from '@/lib/solver';
 import { Eyebrow, Hand, Mono, Pill } from '@/components/atoms';
+import { CalendarioMes } from '@/components/calendario';
 import { EmptyState } from '@/components/empty';
 import { PageHead } from './_PageHead';
 
@@ -150,35 +151,13 @@ export function MontarEscala({
                 />
               ) : (
                 <>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
-                    {sugestao.blocos.slice(0, 12).map((b) => {
-                      const hosp = getHospital(b.hospitalId);
-                      const cor = hosp?.cor ?? 'lavender';
-                      return (
-                        <div
-                          key={String(b.id)}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 12,
-                            padding: '10px 12px',
-                            background: `var(--${cor}-surface)`,
-                            borderLeft: `3px solid var(--${cor})`,
-                            borderRadius: 'var(--r-sm)',
-                          }}
-                        >
-                          <Mono style={{ width: 110 }}>{fmtDate(b.data)}</Mono>
-                          <Mono>{fmtRange(b.horaInicio, b.duracao)}</Mono>
-                          <span style={{ flex: 1 }} />
-                          <Eyebrow color={`var(--${cor}-ink)`}>{hosp?.abrev}</Eyebrow>
-                        </div>
-                      );
-                    })}
-                    {sugestao.blocos.length > 12 && (
-                      <Mono style={{ color: 'var(--ink-3)' }}>
-                        + {sugestao.blocos.length - 12} blocos
-                      </Mono>
-                    )}
+                  <div style={{ marginBottom: 14 }}>
+                    <CalendarioMes
+                      refIso={`${mesISO}-15`}
+                      blocos={blocos}
+                      hospitais={hospitais}
+                      marcadores={sugestao.blocos}
+                    />
                   </div>
 
                   <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>

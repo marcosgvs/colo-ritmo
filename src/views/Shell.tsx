@@ -66,7 +66,7 @@ export function Shell({
 
       <main
         style={{
-          maxWidth: 1320,
+          maxWidth: 1640,
           margin: '0 auto',
           padding: '32px 28px 120px',
         }}
