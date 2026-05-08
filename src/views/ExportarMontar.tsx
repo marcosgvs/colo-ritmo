@@ -64,10 +64,7 @@ export function ExportarMontar({
   const [aviso, setAviso] = useState<string | null>(null);
   const [gerandoPdfId, setGerandoPdfId] = useState<string | null>(null);
   const grupos = agruparPorHospital(plantoesSugeridos, hospitais);
-
-  const bloqueiosDoMes = blocosTodos.filter(
-    (b) => b.tipo === 'bloqueio' && b.data.startsWith(mesISO),
-  );
+  void blocosTodos; // mantido na prop pra retrocompat · PDF não usa bloqueios
 
   function atualizarChefe(hospId: string, nome: string) {
     const novo = { ...chefes, [hospId]: nome };
@@ -232,7 +229,6 @@ export function ExportarMontar({
                         const blob = await gerarPdfMes({
                           hospital,
                           plantoes,
-                          bloqueios: bloqueiosDoMes,
                           mesISO,
                           nomeMedico,
                           nomeChefe: chefe.trim() || undefined,

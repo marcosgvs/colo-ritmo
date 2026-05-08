@@ -139,6 +139,9 @@ export function CalendarioMes({
               const sugItems = (marcadoresPorDia.get(iso) ?? []).filter(
                 (b): b is BlocoPlantao => b.tipo === 'plantao',
               );
+              const bloqueio = (blocosPorDia.get(iso) ?? []).find(
+                (b) => b.tipo === 'bloqueio',
+              );
               return (
                 <div
                   key={iso}
@@ -146,11 +149,19 @@ export function CalendarioMes({
                     minHeight: 96,
                     padding: 8,
                     borderRight: '1px solid var(--line)',
-                    background: isHoje ? 'var(--lavender-surface)' : 'transparent',
+                    background: isHoje
+                      ? 'var(--lavender-surface)'
+                      : bloqueio
+                      ? 'transparent'
+                      : 'transparent',
+                    backgroundImage: bloqueio
+                      ? 'repeating-linear-gradient(135deg, rgba(58,46,42,0.06) 0 6px, transparent 6px 14px)'
+                      : undefined,
                     opacity: noMes ? 1 : 0.45,
                     display: 'flex',
                     flexDirection: 'column',
                     gap: 6,
+                    position: 'relative',
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
@@ -171,6 +182,17 @@ export function CalendarioMes({
                       </Hand>
                     )}
                   </div>
+                  {bloqueio && bloqueio.tipo === 'bloqueio' && (
+                    <div
+                      style={{
+                        font: '500 10px/1.2 var(--font-body)',
+                        color: 'var(--ink-3)',
+                        fontStyle: 'italic',
+                      }}
+                    >
+                      bloq{bloqueio.motivo ? ` · ${bloqueio.motivo}` : ''}
+                    </div>
+                  )}
                   {items.slice(0, 2).map((p) => {
                     const hosp = getHospital(p.hospitalId);
                     if (!hosp) return null;
@@ -264,7 +286,6 @@ function Bloquinho({ cor, abrev, duracao, sugerido, onClick }: BloquinhoProps) {
     >
       <span>{abrev}</span>
       <span style={{ color: 'var(--ink-3)', fontWeight: 400 }}>· {duracao}h</span>
-      {sugerido && <span style={{ marginLeft: 'auto', fontSize: 9 }}>·sug</span>}
     </button>
   );
 }
