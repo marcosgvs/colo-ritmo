@@ -15,7 +15,13 @@ dist-ssr
 # secrets de setup · privados, não precisam viver no repo
 V2-CREDENTIALS.md
 V2-NEXT-SESSION.md
-schemas-legacy
+
+# schemas-legacy: ignora SQLs antigos da v1, mas versiona migrações novas v19+
+schemas-legacy/*.sql
+schemas-legacy/README.md
+schemas-legacy/import-v1.schema.json
+!schemas-legacy/v19-notificacoes.sql
+!schemas-legacy/v20-shares-parceiro.sql
 
 # editor / OS
 .DS_Store
