@@ -15,6 +15,7 @@ import { Login } from '@/views/Login';
 import { Shell } from '@/views/Shell';
 import { Semana } from '@/views/Semana';
 import { AdicionarBloco } from '@/views/AdicionarBloco';
+import { TrocaCederModal, type RegistroTroca } from '@/views/TrocaCederModal';
 import type { AddTipo } from '@/components/shell';
 
 const Onboarding = lazy(() => import('@/views/Onboarding').then((m) => ({ default: m.Onboarding })));
@@ -62,6 +63,7 @@ export function App() {
   const [detalheBloco, setDetalheBloco] = useState<Bloco | null>(null);
   const [pulouOnboarding, setPulouOnboarding] = useState(false);
   const [adicionando, setAdicionando] = useState<AddTipo | null>(null);
+  const [trocaCeder, setTrocaCeder] = useState<{ modo: 'trocar' | 'ceder'; bloco: BlocoPlantao } | null>(null);
 
   // Cookie de preview força o mode (Marcos vendo como X sem login real).
   useEffect(() => {
@@ -89,6 +91,41 @@ export function App() {
   const adicionarBloco = (b: Bloco) => {
     userState.setState({ blocos: [...userState.state.blocos, b] });
     setAdicionando(null);
+  };
+
+  const aplicarTrocaCeder = (reg: RegistroTroca) => {
+    if (reg.modo === 'ceder') {
+      // Marca o plantão original como cedido (anota com quem) · mantém na agenda.
+      const proximos = userState.state.blocos.map((b) => {
+        if (b.id !== reg.plantaoId || b.tipo !== 'plantao') return b;
+        return {
+          id: b.id,
+          tipo: 'cedido' as const,
+          hospitalId: b.hospitalId,
+          data: b.data,
+          horaInicio: b.horaInicio,
+          duracao: b.duracao,
+          cedidoPara: reg.quem,
+        };
+      });
+      userState.setState({ blocos: proximos });
+    } else {
+      // Trocou: o plantão original some, e entra o que ele recebeu em troca.
+      const filtrados = userState.state.blocos.filter((b) => b.id !== reg.plantaoId);
+      const novo: Bloco = {
+        id: `troca-${Date.now()}`,
+        tipo: 'plantao',
+        hospitalId: reg.recebidoHospitalId ?? '',
+        data: reg.recebidoEmISO ?? '',
+        horaInicio: reg.recebidoHora ?? 0,
+        duracao: reg.recebidoDuracao ?? 0,
+        setor: '',
+        viaTroca: true,
+        trocaInfo: `${reg.quem} · ${reg.recebidoEmISO ?? ''}`,
+      };
+      userState.setState({ blocos: [...filtrados, novo] });
+    }
+    setTrocaCeder(null);
   };
 
   const salvarHospital = (id: string, h: Hospital) => {
@@ -180,13 +217,15 @@ export function App() {
                 setDetalheBloco(b);
                 setSelecionado(null);
               }}
-              onTrocar={() => {
+              onTrocar={(b) => {
+                if (b.tipo !== 'plantao') return;
                 setSelecionado(null);
-                setActive('trocas');
+                setTrocaCeder({ modo: 'trocar', bloco: b });
               }}
-              onCeder={() => {
+              onCeder={(b) => {
+                if (b.tipo !== 'plantao') return;
                 setSelecionado(null);
-                setActive('trocas');
+                setTrocaCeder({ modo: 'ceder', bloco: b });
               }}
               onAdd={(t) => setAdicionando(t)}
               notificacoes={notif.notificacoes}
@@ -197,7 +236,6 @@ export function App() {
                   active={active}
                   userState={userState}
                   mode={mode}
-                  setMode={setMode}
                   userId={userId}
                   email={auth.user?.email ?? (preview.ativo ? `preview · ${preview.as}` : null)}
                   onSelectBloco={setSelecionado}
@@ -219,6 +257,17 @@ export function App() {
               onCancelar={() => setAdicionando(null)}
             />
           )}
+
+          {trocaCeder && (
+            <TrocaCederModal
+              modo={trocaCeder.modo}
+              bloco={trocaCeder.bloco}
+              outrosPlantoes={userState.state.blocos}
+              hospitais={userState.state.hospitais}
+              onCancelar={() => setTrocaCeder(null)}
+              onConfirmar={(reg) => aplicarTrocaCeder(reg)}
+            />
+          )}
         </>
       )}
     </HandVariantContext.Provider>
@@ -229,7 +278,6 @@ interface ViewSwitchProps {
   active: NavKey;
   userState: ReturnType<typeof useUserState>;
   mode: Mode;
-  setMode: (m: Mode) => void;
   userId: string | null;
   email: string | null;
   onSelectBloco: (b: Bloco) => void;
@@ -243,7 +291,6 @@ function ViewSwitch({
   active,
   userState,
   mode,
-  setMode,
   userId,
   email,
   onSelectBloco,
@@ -258,26 +305,18 @@ function ViewSwitch({
   switch (active) {
     case 'agenda':
       return (
-        <>
-          <ModeBar mode={mode} setMode={setMode} email={email} />
-          <Semana
-            blocos={state.blocos}
-            hospitais={state.hospitais}
-            mode={mode}
-            loading={status === 'carregando'}
-            erro={erro}
-            onSelectBloco={onSelectBloco}
-          />
-        </>
+        <Semana
+          blocos={state.blocos}
+          hospitais={state.hospitais}
+          mode={mode}
+          loading={status === 'carregando'}
+          erro={erro}
+          onSelectBloco={onSelectBloco}
+        />
       );
 
     case 'mes':
-      return (
-        <>
-          <ModeBar mode={mode} setMode={setMode} email={email} />
-          <Mes blocos={state.blocos} hospitais={state.hospitais} onSelectBloco={onSelectBloco} />
-        </>
-      );
+      return <Mes blocos={state.blocos} hospitais={state.hospitais} onSelectBloco={onSelectBloco} />;
 
     case 'lista':
       return (
@@ -369,67 +408,6 @@ function ViewSwitch({
     default:
       return null;
   }
-}
-
-interface ModeBarProps {
-  mode: Mode;
-  setMode: (m: Mode) => void;
-  email: string | null;
-}
-
-function ModeBar({ mode, setMode, email }: ModeBarProps) {
-  return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'flex-end',
-        gap: 12,
-        marginBottom: 18,
-      }}
-    >
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 4,
-          background: 'var(--bg-alt)',
-          borderRadius: 999,
-          padding: 4,
-          border: '1px solid var(--line)',
-        }}
-      >
-        {(['medica', 'parceiro', 'admin'] as Mode[]).map((m) => {
-          const ativa = mode === m;
-          return (
-            <button
-              key={m}
-              type="button"
-              onClick={() => setMode(m)}
-              style={{
-                font: '600 11px/1 var(--font-body)',
-                padding: '7px 12px',
-                borderRadius: 999,
-                border: 'none',
-                cursor: 'pointer',
-                background: ativa ? 'var(--bg)' : 'transparent',
-                color: ativa ? 'var(--ink)' : 'var(--ink-2)',
-                boxShadow: ativa ? 'var(--shadow-sm)' : 'none',
-                textTransform: 'lowercase',
-              }}
-            >
-              {m === 'medica' ? 'médica' : m}
-            </button>
-          );
-        })}
-      </div>
-      {email && (
-        <span style={{ font: '500 12px/1 var(--font-body)', color: 'var(--ink-3)' }}>
-          {email}
-        </span>
-      )}
-    </div>
-  );
 }
 
 function Boot() {

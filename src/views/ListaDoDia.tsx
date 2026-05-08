@@ -169,7 +169,7 @@ function ItemLinha({
   const cor = hosp?.cor ?? null;
   const titulo =
     b.tipo === 'plantao' && hosp
-      ? `${hosp.abrev} · ${b.setor}`
+      ? hosp.abrev
       : b.tipo === 'sono'
         ? 'sono protegido'
         : b.tipo === 'bloqueio'

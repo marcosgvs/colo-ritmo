@@ -12,7 +12,6 @@ import {
   semanaDe,
 } from '@/lib/data';
 import { Eyebrow, Hand, Mono, Pill } from '@/components/atoms';
-import { PageHead } from './_PageHead';
 
 interface MesProps {
   blocos: Bloco[];
@@ -31,7 +30,7 @@ const MESES_LONG = [
  * editor, só visualização. Pra editar, abre Drawer.
  */
 export function Mes({ blocos, hospitais, onSelectBloco }: MesProps) {
-  const [refIso] = useState<string>(HOJE);
+  const [refIso, setRefIso] = useState<string>(HOJE);
 
   const semanas = useMemo(() => {
     const inicio = inicioDoMes(refIso);
@@ -79,11 +78,36 @@ export function Mes({ blocos, hospitais, onSelectBloco }: MesProps) {
 
   return (
     <>
-      <PageHead
-        eyebrow={`${mesNome} · ${ano}`}
-        titulo={`o mês todo de cima.`}
-        hand={`${cargaDoMes}h previstas no mês — média de ${(cargaDoMes / 4).toFixed(0)}h/sem`}
-      />
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'flex-end',
+          justifyContent: 'space-between',
+          gap: 24,
+          flexWrap: 'wrap',
+          marginBottom: 24,
+        }}
+      >
+        <div>
+          <Eyebrow>{`${mesNome} · ${ano}`}</Eyebrow>
+          <h1
+            style={{
+              fontFamily: 'var(--font-display)',
+              fontWeight: 500,
+              fontSize: 'clamp(28px, 3.5vw, 40px)',
+              letterSpacing: '-0.02em',
+              margin: '8px 0 0',
+              color: 'var(--ink)',
+            }}
+          >
+            o mês todo de cima.
+          </h1>
+          <Hand color="var(--lavender-ink)" size={20} style={{ display: 'block', marginTop: 8 }}>
+            {`${cargaDoMes}h previstas — média de ${semanas.length > 0 ? (cargaDoMes / semanas.length).toFixed(0) : 0}h/sem`}
+          </Hand>
+        </div>
+        <NavMes refIso={refIso} setRefIso={setRefIso} />
+      </div>
 
       <div
         style={{
@@ -260,6 +284,81 @@ export function Mes({ blocos, hospitais, onSelectBloco }: MesProps) {
     </>
   );
 }
+
+interface NavMesProps {
+  refIso: string;
+  setRefIso: (iso: string) => void;
+}
+
+function NavMes({ refIso, setRefIso }: NavMesProps) {
+  const ehAtual = refIso.slice(0, 7) === HOJE.slice(0, 7);
+
+  function ajusta(deltaMeses: number) {
+    const d = fromISO(refIso);
+    d.setMonth(d.getMonth() + deltaMeses, 1);
+    setRefIso(d.toISOString().slice(0, 10));
+  }
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 6,
+        background: 'var(--bg-alt)',
+        borderRadius: 999,
+        padding: 4,
+        border: '1px solid var(--line)',
+      }}
+    >
+      <button
+        type="button"
+        aria-label="mês anterior"
+        onClick={() => ajusta(-1)}
+        style={navBtnStyle}
+      >
+        ‹
+      </button>
+      <button
+        type="button"
+        onClick={() => setRefIso(HOJE)}
+        disabled={ehAtual}
+        style={{
+          font: '600 12px/1 var(--font-body)',
+          padding: '8px 14px',
+          borderRadius: 999,
+          border: 'none',
+          cursor: ehAtual ? 'default' : 'pointer',
+          background: ehAtual ? 'var(--bg)' : 'transparent',
+          color: ehAtual ? 'var(--ink)' : 'var(--ink-2)',
+          boxShadow: ehAtual ? 'var(--shadow-sm)' : 'none',
+          textTransform: 'lowercase',
+        }}
+      >
+        este mês
+      </button>
+      <button
+        type="button"
+        aria-label="próximo mês"
+        onClick={() => ajusta(1)}
+        style={navBtnStyle}
+      >
+        ›
+      </button>
+    </div>
+  );
+}
+
+const navBtnStyle: React.CSSProperties = {
+  font: '600 14px/1 var(--font-body)',
+  width: 32,
+  height: 32,
+  borderRadius: 999,
+  border: 'none',
+  background: 'transparent',
+  color: 'var(--ink-2)',
+  cursor: 'pointer',
+};
 
 interface ResumoMesProps {
   blocos: Bloco[];

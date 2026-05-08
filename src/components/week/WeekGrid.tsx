@@ -12,18 +12,25 @@ interface WeekGridProps {
   blocos: Bloco[];
   density?: number;
   semanaLabel?: string;
+  /** Lista de 7 dias ISO (segunda → domingo). Default: SEMANA constante. */
+  semanaIso?: readonly string[];
+  /** Dia a ser destacado como hoje. Default: HOJE constante. */
+  hojeIso?: string;
   onSelectBloco?: (b: Bloco) => void;
 }
 
 /**
  * WeekGrid · grade de Semana com 24h por dia. Plantões noturnos viram
  * dois segmentos visuais via expandirBlocos. NowLine só aparece no dia
- * marcado como HOJE.
+ * marcado como hojeIso. Density compactada de 32 → 24 px/h: agenda fica
+ * em ~576px em vez de 768px.
  */
 export function WeekGrid({
   blocos,
-  density = 32,
-  semanaLabel = '4–10 mai 2026',
+  density = 24,
+  semanaLabel,
+  semanaIso = SEMANA,
+  hojeIso = HOJE,
   onSelectBloco,
 }: WeekGridProps) {
   const totalH = VIEW_HORAS * density;
@@ -43,14 +50,14 @@ export function WeekGrid({
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: '64px repeat(7, 1fr)',
+          gridTemplateColumns: '56px repeat(7, 1fr)',
           background: 'var(--bg-alt)',
           borderBottom: '1px solid var(--line)',
         }}
       >
         <div
           style={{
-            padding: '14px 6px',
+            padding: '12px 6px',
             fontFamily: 'var(--font-mono)',
             fontSize: 10,
             color: 'var(--ink-3)',
@@ -59,16 +66,16 @@ export function WeekGrid({
             textTransform: 'uppercase',
           }}
         >
-          {semanaLabel.split(' ')[0]}
+          {semanaLabel?.split(' ')[0] ?? ''}
         </div>
-        {SEMANA.map((d, i) => {
-          const isHoje = d === HOJE;
+        {semanaIso.map((d, i) => {
+          const isHoje = d === hojeIso;
           const dt = new Date(`${d}T12:00:00`);
           return (
             <div
               key={d}
               style={{
-                padding: '12px 8px',
+                padding: '10px 8px',
                 textAlign: 'left',
                 borderLeft: '1px solid var(--line)',
                 background: isHoje ? 'var(--lavender-surface)' : 'transparent',
@@ -80,7 +87,7 @@ export function WeekGrid({
                   letterSpacing: '0.06em',
                   textTransform: 'uppercase',
                   color: isHoje ? 'var(--lavender-ink)' : 'var(--ink-3)',
-                  marginBottom: 6,
+                  marginBottom: 4,
                 }}
               >
                 {DOWS[i]}
@@ -90,7 +97,7 @@ export function WeekGrid({
                   style={{
                     fontFamily: 'var(--font-display)',
                     fontWeight: 500,
-                    fontSize: 22,
+                    fontSize: 20,
                     lineHeight: 1,
                     color: isHoje ? 'var(--lavender-ink)' : 'var(--ink)',
                     letterSpacing: '-0.02em',
@@ -99,7 +106,7 @@ export function WeekGrid({
                   {dt.getDate()}
                 </span>
                 {isHoje && (
-                  <Hand color="var(--lavender-ink)" size={14} style={{ marginBottom: 2 }}>
+                  <Hand color="var(--lavender-ink)" size={13} style={{ marginBottom: 2 }}>
                     hoje
                   </Hand>
                 )}
@@ -112,7 +119,7 @@ export function WeekGrid({
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: '64px repeat(7, 1fr)',
+          gridTemplateColumns: '56px repeat(7, 1fr)',
           position: 'relative',
         }}
       >
@@ -126,6 +133,8 @@ export function WeekGrid({
           {Array.from({ length: VIEW_HORAS }).map((_, i) => {
             const h = VIEW_INICIO + i;
             const major = h % 3 === 0;
+            // No density compacto, só renderiza labels major pra não ficar abafado.
+            if (!major) return null;
             return (
               <div
                 key={i}
@@ -134,11 +143,10 @@ export function WeekGrid({
                   top: i * density,
                   right: 8,
                   fontFamily: 'var(--font-mono)',
-                  fontSize: major ? 10 : 9,
+                  fontSize: 10,
                   color: 'var(--ink-3)',
-                  opacity: major ? 1 : 0.4,
                   lineHeight: 1,
-                  paddingTop: 4,
+                  paddingTop: 3,
                 }}
               >
                 {String(h).padStart(2, '0')}h
@@ -147,12 +155,12 @@ export function WeekGrid({
           })}
         </div>
 
-        {SEMANA.map((d, idx) => (
+        {semanaIso.map((d, idx) => (
           <DayColumn
             key={d}
             blocos={blocosDoDia(expandidos, d)}
             density={density}
-            isHoje={d === HOJE}
+            isHoje={d === hojeIso}
             isLast={idx === 6}
             onSelectBloco={handleSelect}
           />

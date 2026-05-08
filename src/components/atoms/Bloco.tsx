@@ -94,13 +94,11 @@ export function Bloco({ b, density = 48, onClick, compact = false }: BlocoProps)
             }}
           />
         )}
-        <Eyebrow color={`var(--${cor}-ink)`}>
-          {hosp.abrev} · {b.setor}
-        </Eyebrow>
+        <Eyebrow color={`var(--${cor}-ink)`}>{hosp.abrev}</Eyebrow>
         <div style={{ font: '600 13px/1.2 var(--font-body)', color: 'var(--ink)' }}>
           {fmtRange(b.horaInicio, b.duracao)}
         </div>
-        {h > 70 && (
+        {false && h > 70 && (
           <div
             style={{
               fontFamily: 'var(--font-mono)',

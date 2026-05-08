@@ -26,16 +26,21 @@ interface NavItem {
   roles: Mode[];
 }
 
-/** Modo coordenador foi removido v2 (decisão registrada em V2-NEXT-SESSION.md). */
+/**
+ * Modo médico isolado · v2 atual.
+ *
+ * Nav reduzido pro foco do médico individual: agenda, mês, lista,
+ * montar, hospitais, financeiro, sync.
+ *
+ * Funções de equipe (trocas como tela, inbox, time, auditoria) ficam em
+ * standby até a feature de equipe ser ativada — código continua nas
+ * views, só sumiram do nav. Trocas é acessada inline via Detalhe agora.
+ */
 export const NAV_ITEMS: NavItem[] = [
   { key: 'agenda',     label: 'agenda',      icon: 'calendar', roles: ['medica', 'parceiro', 'admin'] },
   { key: 'mes',        label: 'mês',         icon: 'grid',     roles: ['medica', 'parceiro', 'admin'] },
   { key: 'lista',      label: 'lista',       icon: 'list',     roles: ['medica', 'parceiro', 'admin'] },
   { key: 'montar',     label: 'montar',      icon: 'sparkle',  roles: ['medica'] },
-  { key: 'trocas',     label: 'trocas',      icon: 'swap',     roles: ['medica', 'admin'] },
-  { key: 'inbox',      label: 'inbox',       icon: 'list',     roles: ['admin'] },
-  { key: 'time',       label: 'time',        icon: 'people',   roles: ['admin'] },
-  { key: 'auditoria',  label: 'auditoria',   icon: 'radar',    roles: ['admin'] },
   { key: 'hospitais',  label: 'hospitais',   icon: 'hospital', roles: ['medica'] },
   { key: 'financeiro', label: 'financeiro',  icon: 'coin',     roles: ['medica'] },
   { key: 'sync',       label: 'sincronizar', icon: 'sync',     roles: ['medica'] },

@@ -46,7 +46,7 @@ export function BlockDrawer({
       : undefined;
 
   const titulo = (() => {
-    if (bloco.tipo === 'plantao' && hosp) return `${hosp.abrev} · ${bloco.setor}`;
+    if (bloco.tipo === 'plantao' && hosp) return hosp.abrev;
     if (bloco.tipo === 'sono') return 'sono protegido';
     if (bloco.tipo === 'bloqueio') return `bloqueio · ${bloco.motivo ?? 'dia livre'}`;
     if (bloco.tipo === 'cedido' && hosp) return `cedido · ${bloco.cedidoPara}`;
@@ -63,27 +63,29 @@ export function BlockDrawer({
     bloco.tipo === 'plantao' && hosp ? calcRemuneracaoBloco(bloco, hosp) : null;
 
   return (
-    <>
-      <div
-        onClick={onClose}
-        style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(58,46,42,0.18)',
-          zIndex: 50,
-          animation: 'colo-fade-in 180ms ease',
-        }}
-      />
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(58,46,42,0.18)',
+        zIndex: 50,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 20,
+        animation: 'colo-fade-in 180ms ease',
+      }}
+    >
       <aside
         role="dialog"
         aria-modal="true"
+        onClick={(e) => e.stopPropagation()}
         style={{
-          position: 'fixed',
-          top: 0,
-          right: 0,
-          bottom: 0,
-          width: 'min(480px, 100vw)',
+          width: 'min(520px, 100%)',
+          maxHeight: 'calc(100vh - 40px)',
           background: 'var(--bg)',
+          borderRadius: 'var(--r-xl)',
           boxShadow: 'var(--shadow-lg)',
           zIndex: 51,
           padding: '28px 32px',
@@ -91,7 +93,7 @@ export function BlockDrawer({
           flexDirection: 'column',
           gap: 18,
           overflowY: 'auto',
-          animation: 'colo-drawer-in 220ms cubic-bezier(.2,.7,.2,1)',
+          animation: 'colo-drawer-down 220ms cubic-bezier(.2,.7,.2,1)',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -233,7 +235,7 @@ export function BlockDrawer({
           </Mono>
         )}
       </aside>
-    </>
+    </div>
   );
 }
 

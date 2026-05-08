@@ -30,7 +30,7 @@ export function Detalhe({ bloco, hospitais: _h, voltar, onTrocar, onCeder }: Det
 
   const titulo =
     bloco.tipo === 'plantao' && hosp
-      ? `${hosp.abrev} · ${bloco.setor}`
+      ? hosp.abrev
       : bloco.tipo === 'cedido' && hosp
         ? `cedido · ${bloco.cedidoPara}`
         : bloco.tipo;
