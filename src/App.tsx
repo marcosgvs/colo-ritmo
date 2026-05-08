@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
-import type { Bloco, BlocoPlantao, Hospital, Mode, Preferencias } from '@/types';
+import type { Bloco, BlocoPlantao, Hospital, Mode, Preferencias, PropostaSalva } from '@/types';
 import { cargaSemanal } from '@/lib/data';
 import { HandVariantContext } from '@/components/atoms';
 import { useAuth } from '@/hooks/useAuth';
@@ -150,6 +150,10 @@ export function App() {
     userState.setState({ preferencias: p });
   };
 
+  const atualizarPropostas = (propostas: PropostaSalva[]) => {
+    userState.setState({ propostas });
+  };
+
   const concluirOnboarding = (dados: {
     hospitais: Hospital[];
     preferencias: Partial<Preferencias>;
@@ -253,6 +257,7 @@ export function App() {
                   salvarHospital={salvarHospital}
                   removerHospital={removerHospital}
                   salvarPreferencias={salvarPreferencias}
+                  atualizarPropostas={atualizarPropostas}
                 />
               </Suspense>
             </Shell>
@@ -297,6 +302,7 @@ interface ViewSwitchProps {
   salvarHospital: (id: string, h: Hospital) => void;
   removerHospital: (id: string) => void;
   salvarPreferencias: (p: Preferencias) => void;
+  atualizarPropostas: (propostas: PropostaSalva[]) => void;
 }
 
 function ViewSwitch({
@@ -312,6 +318,7 @@ function ViewSwitch({
   salvarHospital,
   removerHospital,
   salvarPreferencias,
+  atualizarPropostas,
 }: ViewSwitchProps) {
   const { state, status, erro } = userState;
   const mesISO = new Date().toISOString().slice(0, 7);
@@ -398,6 +405,8 @@ function ViewSwitch({
           mesISO={mesISO}
           onAdicionarBloco={criarBloco}
           onRemoverBloco={removerBloco}
+          propostas={state.propostas}
+          onAtualizarPropostas={atualizarPropostas}
         />
       );
 

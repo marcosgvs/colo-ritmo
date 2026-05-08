@@ -1,12 +1,20 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { Bloco, BlocoBloqueio, BlocoPlantao, HospitaisMap, Preferencias } from '@/types';
-import { analisarMesAnterior, fmtDate, fmtRange } from '@/lib/data';
+import type {
+  Bloco,
+  BlocoBloqueio,
+  BlocoPlantao,
+  HospitaisMap,
+  Preferencias,
+  PropostaSalva,
+} from '@/types';
+import { analisarMesAnterior, fmtDate, fmtMesAnoExtenso, fmtRange } from '@/lib/data';
 import {
   compararLentes,
   type ComparativoLentes,
   type Lente,
   type SugestaoSolver,
 } from '@/lib/solver';
+import { novoIdProposta, removerProposta as removerPropostaLista } from '@/lib/propostas';
 import { Eyebrow, Hand, Mono, MonthPicker, Pill } from '@/components/atoms';
 import { CalendarioMes } from '@/components/calendario';
 import { EmptyState } from '@/components/empty';
@@ -20,6 +28,8 @@ interface MontarEscalaProps {
   mesISO: string;
   onAdicionarBloco?: (b: Bloco) => void;
   onRemoverBloco?: (id: number | string) => void;
+  propostas: PropostaSalva[];
+  onAtualizarPropostas: (lista: PropostaSalva[]) => void;
 }
 
 const ROTULO_LENTE: Record<Lente, string> = {
@@ -53,6 +63,8 @@ export function MontarEscala({
   mesISO,
   onAdicionarBloco,
   onRemoverBloco,
+  propostas,
+  onAtualizarPropostas,
 }: MontarEscalaProps) {
   const semHospitais = Object.keys(hospitais).length === 0;
 
@@ -72,11 +84,21 @@ export function MontarEscala({
 
   // UX
   const [setupColapsado, setSetupColapsado] = useState(false);
+  const [historicoAberto, setHistoricoAberto] = useState(false);
 
   // Editor de proposta · clone mutável da sugestão da lente atual
   const [sugestaoEditavel, setSugestaoEditavel] = useState<BlocoPlantao[] | null>(null);
-  const [adicionarEm, setAdicionarEm] = useState<string | null>(null);
+  const [editorPlantao, setEditorPlantao] = useState<
+    | { modo: 'adicionar'; dataISO: string }
+    | { modo: 'editar'; bloco: BlocoPlantao }
+    | null
+  >(null);
   const [previewAberto, setPreviewAberto] = useState(false);
+
+  // Id da proposta ativa · setado quando reabre do drawer ou ao primeiro export
+  const [propostaAtivaId, setPropostaAtivaId] = useState<string | null>(null);
+  // Modo "reaberta": mostra prévia editável sem precisar do solver rodar
+  const [propostaReaberta, setPropostaReaberta] = useState<PropostaSalva | null>(null);
 
   const diagnostico = useMemo(
     () => analisarMesAnterior(blocos, hospitais, mesAlvo, preferencias),
@@ -84,22 +106,29 @@ export function MontarEscala({
   );
 
   useEffect(() => {
+    if (propostaReaberta) return; // proposta reaberta dita a própria lente
     setLente(diagnostico.lenteSugerida);
-  }, [diagnostico.lenteSugerida]);
+  }, [diagnostico.lenteSugerida, propostaReaberta]);
 
-  // Quando setup muda, joga fora resultado anterior pra forçar re-gerar
+  // Quando lente muda, reseta a edição (base mudou) — só se há comparativo
+  // e não estamos em proposta reaberta (que tem blocos congelados).
   useEffect(() => {
+    if (comparativo && !propostaReaberta) {
+      setSugestaoEditavel(comparativo[lente].blocos.map((b) => ({ ...b })));
+    }
+  }, [comparativo, lente, propostaReaberta]);
+
+  /**
+   * Limpa estado quando setup muda. Chamado explicitamente nos handlers
+   * (toggle hospital, mês, meta) em vez de via useEffect, pra não conflitar
+   * com transições controladas tipo regerar-a-partir-de-proposta-reaberta.
+   */
+  function invalidarSetupAtual() {
+    if (propostaReaberta) return;
     setComparativo(null);
     setSugestaoEditavel(null);
     setSetupColapsado(false);
-  }, [mesAlvo, hospitaisIncluidos, metaInput]);
-
-  // Quando lente muda, reseta a edição (base mudou)
-  useEffect(() => {
-    if (comparativo) {
-      setSugestaoEditavel(comparativo[lente].blocos.map((b) => ({ ...b })));
-    }
-  }, [comparativo, lente]);
+  }
 
   const hospitaisAtivos = useMemo(() => {
     const out: HospitaisMap = {};
@@ -132,6 +161,17 @@ export function MontarEscala({
       else next.add(id);
       return next;
     });
+    invalidarSetupAtual();
+  }
+
+  function trocarMesAlvo(m: string) {
+    setMesAlvo(m);
+    invalidarSetupAtual();
+  }
+
+  function trocarMeta(v: string) {
+    setMetaInput(v);
+    invalidarSetupAtual();
   }
 
   function gerar() {
@@ -144,17 +184,38 @@ export function MontarEscala({
     setComparativo(c);
     setLente(diagnostico.lenteSugerida);
     setSetupColapsado(true);
+    // Gerar do zero = nova proposta · descarta id reaberto
+    setPropostaAtivaId(null);
+    setPropostaReaberta(null);
   }
 
-  function removerPlantao(b: Bloco) {
-    if (!sugestaoEditavel) return;
-    setSugestaoEditavel(sugestaoEditavel.filter((p) => p.id !== b.id));
+  function abrirEditorMarcador(b: Bloco) {
+    if (b.tipo !== 'plantao') return;
+    setEditorPlantao({ modo: 'editar', bloco: b });
   }
 
-  function adicionarPlantao(novo: BlocoPlantao) {
+  function abrirEditorDia(iso: string) {
+    setEditorPlantao({ modo: 'adicionar', dataISO: iso });
+  }
+
+  function salvarPlantaoEditor(novo: BlocoPlantao) {
+    if (!sugestaoEditavel) {
+      setSugestaoEditavel([novo]);
+    } else {
+      const existente = sugestaoEditavel.find((p) => p.id === novo.id);
+      if (existente) {
+        setSugestaoEditavel(sugestaoEditavel.map((p) => (p.id === novo.id ? novo : p)));
+      } else {
+        setSugestaoEditavel([...sugestaoEditavel, novo]);
+      }
+    }
+    setEditorPlantao(null);
+  }
+
+  function removerPlantaoEditor(id: string | number) {
     if (!sugestaoEditavel) return;
-    setSugestaoEditavel([...sugestaoEditavel, novo]);
-    setAdicionarEm(null);
+    setSugestaoEditavel(sugestaoEditavel.filter((p) => p.id !== id));
+    setEditorPlantao(null);
   }
 
   function resetarEdicao() {
@@ -162,15 +223,51 @@ export function MontarEscala({
     setSugestaoEditavel(comparativo[lente].blocos.map((b) => ({ ...b })));
   }
 
-  const sugestaoOriginal = comparativo ? comparativo[lente].blocos : [];
+  function reabrirProposta(p: PropostaSalva) {
+    setMesAlvo(p.mesISO);
+    setHospitaisIncluidos(new Set(p.hospitaisIncluidos));
+    setMetaInput(String(p.metaUsada));
+    setLente(p.lente);
+    setComparativo(null); // sem 3 lentes · só a salva
+    setSugestaoEditavel(p.blocos.map((b) => ({ ...b })));
+    setSetupColapsado(true);
+    setPropostaAtivaId(p.id);
+    setPropostaReaberta(p);
+    setHistoricoAberto(false);
+  }
+
+  function removerPropostaDoHistorico(id: string) {
+    onAtualizarPropostas(removerPropostaLista(propostas, id));
+    if (propostaAtivaId === id) {
+      setPropostaAtivaId(null);
+      setPropostaReaberta(null);
+    }
+  }
+
+  const sugestaoOriginal = propostaReaberta
+    ? propostaReaberta.blocos
+    : comparativo
+    ? comparativo[lente].blocos
+    : [];
   const houveEdicao =
     sugestaoEditavel !== null &&
     (sugestaoEditavel.length !== sugestaoOriginal.length ||
-      sugestaoEditavel.some((b, i) => b.id !== sugestaoOriginal[i]?.id));
+      sugestaoEditavel.some((b, i) => {
+        const orig = sugestaoOriginal[i];
+        if (!orig) return true;
+        return (
+          b.id !== orig.id ||
+          b.data !== orig.data ||
+          b.horaInicio !== orig.horaInicio ||
+          b.duracao !== orig.duracao ||
+          b.hospitalId !== orig.hospitalId
+        );
+      }));
 
   const blocosFinaisProposta = sugestaoEditavel ?? [];
 
   const podeGerar = hospitaisIncluidos.size > 0;
+  const temPropostaPraMostrar = comparativo !== null || propostaReaberta !== null;
 
   return (
     <>
@@ -192,12 +289,12 @@ export function MontarEscala({
         ) : !semHospitais ? (
           <SetupCard
             mesAlvo={mesAlvo}
-            onMesAlvo={setMesAlvo}
+            onMesAlvo={trocarMesAlvo}
             hospitais={hospitais}
             hospitaisIncluidos={hospitaisIncluidos}
             onToggleHospital={toggleHospital}
             metaInput={metaInput}
-            onMetaInput={setMetaInput}
+            onMetaInput={trocarMeta}
             metaPreferencia={preferencias.metaMensal}
             bloqueios={bloqueiosDoMes}
             onAdicionarBloco={onAdicionarBloco}
@@ -214,53 +311,74 @@ export function MontarEscala({
           />
         )}
 
-        {comparativo && (
+        {temPropostaPraMostrar && (
           <>
-            <DiagnosticoCard diagnostico={diagnostico} />
+            {comparativo && !propostaReaberta && (
+              <>
+                <DiagnosticoCard diagnostico={diagnostico} />
 
-            <Card
-              titulo="3 cenários"
-              eyebrow={`lente sugerida · ${ROTULO_LENTE[diagnostico.lenteSugerida]}`}
-            >
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(3, 1fr)',
-                  gap: 10,
+                <Card
+                  titulo="3 cenários"
+                  eyebrow={`lente sugerida · ${ROTULO_LENTE[diagnostico.lenteSugerida]}`}
+                >
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(3, 1fr)',
+                      gap: 10,
+                    }}
+                  >
+                    {(['descansar', 'equilibrar', 'ganhar'] as const).map((L) => (
+                      <LenteCard
+                        key={L}
+                        lente={L}
+                        sugestao={comparativo[L]}
+                        selecionada={lente === L}
+                        sugerida={diagnostico.lenteSugerida === L}
+                        onSelect={() => setLente(L)}
+                      />
+                    ))}
+                  </div>
+                </Card>
+              </>
+            )}
+
+            {propostaReaberta && (
+              <PropostaReabertaCard
+                proposta={propostaReaberta}
+                onRegerar={() => {
+                  setPropostaReaberta(null);
+                  setPropostaAtivaId(null);
+                  gerar();
                 }}
-              >
-                {(['descansar', 'equilibrar', 'ganhar'] as const).map((L) => (
-                  <LenteCard
-                    key={L}
-                    lente={L}
-                    sugestao={comparativo[L]}
-                    selecionada={lente === L}
-                    sugerida={diagnostico.lenteSugerida === L}
-                    onSelect={() => setLente(L)}
-                  />
-                ))}
-              </div>
-            </Card>
+                onDescartar={() => {
+                  setPropostaReaberta(null);
+                  setPropostaAtivaId(null);
+                  setSugestaoEditavel(null);
+                  setSetupColapsado(false);
+                }}
+              />
+            )}
 
-            {sugestao && (
+            {(sugestao || propostaReaberta) && (
               <Card
                 titulo="prévia do mês"
-                eyebrow={`${blocosFinaisProposta.length} plantões · clica pra editar`}
+                eyebrow={`${blocosFinaisProposta.length} plantões · sugestão pro chefe`}
               >
                 <CalendarioMes
                   refIso={`${mesAlvo}-15`}
                   blocos={blocos}
                   hospitais={hospitais}
                   marcadores={blocosFinaisProposta}
-                  onSelectMarcador={removerPlantao}
-                  onSelectDia={(iso) => setAdicionarEm(iso)}
+                  onSelectMarcador={abrirEditorMarcador}
+                  onSelectDia={abrirEditorDia}
                 />
                 <Hand
-                  color="var(--ink-3)"
+                  color="var(--lavender-ink)"
                   size={14}
                   style={{ display: 'block', marginTop: 10 }}
                 >
-                  clica num plantão sugerido pra remover · num dia livre pra adicionar
+                  clica num plantão sugerido pra editar ou remover · num dia livre pra adicionar
                 </Hand>
 
                 <div
@@ -313,7 +431,7 @@ export function MontarEscala({
                   )}
                 </div>
 
-                {sugestao.resumo.motivosPulados.length > 0 && (
+                {sugestao && sugestao.resumo.motivosPulados.length > 0 && (
                   <div
                     style={{
                       marginTop: 18,
@@ -340,15 +458,36 @@ export function MontarEscala({
             )}
           </>
         )}
+
+        {!semHospitais && propostas.length > 0 && (
+          <HistoricoTrigger
+            quantidade={propostas.length}
+            onAbrir={() => setHistoricoAberto(true)}
+          />
+        )}
       </div>
 
-      {adicionarEm && (
-        <AdicionarPlantaoModal
-          dataISO={adicionarEm}
+      {editorPlantao && (
+        <EditorPlantaoProposta
+          modo={editorPlantao.modo}
+          dataISO={editorPlantao.modo === 'adicionar' ? editorPlantao.dataISO : undefined}
+          blocoExistente={editorPlantao.modo === 'editar' ? editorPlantao.bloco : undefined}
           hospitais={hospitaisAtivos}
-          jaTemNoDia={blocosFinaisProposta.some((b) => b.data === adicionarEm)}
-          onConfirmar={adicionarPlantao}
-          onCancelar={() => setAdicionarEm(null)}
+          jaTemOutroNoDia={blocosFinaisProposta.some((b) => {
+            const dataAlvo =
+              editorPlantao.modo === 'adicionar'
+                ? editorPlantao.dataISO
+                : editorPlantao.bloco.data;
+            const idAlvo = editorPlantao.modo === 'editar' ? editorPlantao.bloco.id : null;
+            return b.data === dataAlvo && b.id !== idAlvo;
+          })}
+          onConfirmar={salvarPlantaoEditor}
+          onRemover={
+            editorPlantao.modo === 'editar'
+              ? () => removerPlantaoEditor(editorPlantao.bloco.id)
+              : undefined
+          }
+          onCancelar={() => setEditorPlantao(null)}
         />
       )}
 
@@ -374,10 +513,420 @@ export function MontarEscala({
           blocosTodos={blocos}
           mesISO={mesAlvo}
           nomeMedico={preferencias.nome}
+          onPrimeiraExportacao={() => {
+            // Cria/atualiza a proposta · garante que tem id ativo
+            if (propostaAtivaId) return propostaAtivaId;
+            const id = novoIdProposta();
+            setPropostaAtivaId(id);
+            return id;
+          }}
+          propostaAtivaId={propostaAtivaId}
+          dadosProposta={{
+            mesISO: mesAlvo,
+            hospitaisIncluidos: [...hospitaisIncluidos],
+            metaUsada: Number(metaInput.replace(/\D/g, '')) || 0,
+            bloqueioIds: bloqueiosDoMes.map((b) => b.id),
+            lente,
+            blocos: blocosFinaisProposta,
+          }}
+          propostas={propostas}
+          onAtualizarPropostas={onAtualizarPropostas}
           onFechar={() => setExportandoAberto(false)}
         />
       )}
+
+      {historicoAberto && (
+        <HistoricoDrawer
+          propostas={propostas}
+          hospitais={hospitais}
+          onAbrir={reabrirProposta}
+          onRemover={removerPropostaDoHistorico}
+          onFechar={() => setHistoricoAberto(false)}
+        />
+      )}
     </>
+  );
+}
+
+function HistoricoTrigger({
+  quantidade,
+  onAbrir,
+}: {
+  quantidade: number;
+  onAbrir: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onAbrir}
+      style={{
+        background: 'var(--bg-alt)',
+        border: '1px dashed var(--line-2)',
+        borderRadius: 14,
+        padding: '14px 18px',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        gap: 12,
+        cursor: 'pointer',
+        textAlign: 'left',
+        font: 'inherit',
+        color: 'inherit',
+      }}
+    >
+      <div>
+        <Eyebrow>histórico</Eyebrow>
+        <p
+          style={{
+            font: '500 14px/1.4 var(--font-body)',
+            color: 'var(--ink-2)',
+            margin: '4px 0 0',
+          }}
+        >
+          minhas propostas · {quantidade} {quantidade === 1 ? 'salva' : 'salvas'}
+        </p>
+      </div>
+      <span
+        style={{
+          font: '600 12px/1 var(--font-body)',
+          padding: '8px 14px',
+          borderRadius: 999,
+          border: '1px solid var(--line)',
+          background: 'var(--bg)',
+          color: 'var(--ink-2)',
+        }}
+      >
+        ver →
+      </span>
+    </button>
+  );
+}
+
+interface PropostaReabertaCardProps {
+  proposta: PropostaSalva;
+  onRegerar: () => void;
+  onDescartar: () => void;
+}
+
+function PropostaReabertaCard({ proposta, onRegerar, onDescartar }: PropostaReabertaCardProps) {
+  const exportada = proposta.exportadaEm
+    ? new Date(proposta.exportadaEm).toLocaleDateString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: '2-digit',
+      })
+    : null;
+  return (
+    <div
+      style={{
+        background: 'var(--lavender-surface)',
+        border: '1px solid var(--lavender-ink)',
+        borderRadius: 16,
+        padding: '14px 18px',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        gap: 12,
+        flexWrap: 'wrap',
+      }}
+    >
+      <div>
+        <Eyebrow color="var(--lavender-ink)">proposta reaberta · {ROTULO_LENTE[proposta.lente]}</Eyebrow>
+        <p
+          style={{
+            font: '500 14px/1.4 var(--font-body)',
+            color: 'var(--ink)',
+            margin: '4px 0 0',
+          }}
+        >
+          {fmtMesAnoExtenso(proposta.mesISO)} · {proposta.blocos.length} plantões
+          {exportada ? ` · enviada em ${exportada}` : ''}
+        </p>
+      </div>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          onClick={onRegerar}
+          style={{
+            font: '600 12px/1 var(--font-body)',
+            padding: '10px 16px',
+            borderRadius: 999,
+            border: '1px solid var(--lavender-ink)',
+            background: 'transparent',
+            color: 'var(--lavender-ink)',
+            cursor: 'pointer',
+          }}
+        >
+          regerar 3 cenários
+        </button>
+        <button
+          type="button"
+          onClick={onDescartar}
+          style={{
+            font: '600 12px/1 var(--font-body)',
+            padding: '10px 16px',
+            borderRadius: 999,
+            border: '1px solid var(--line)',
+            background: 'var(--bg)',
+            color: 'var(--ink-2)',
+            cursor: 'pointer',
+          }}
+        >
+          fechar
+        </button>
+      </div>
+    </div>
+  );
+}
+
+interface HistoricoDrawerProps {
+  propostas: PropostaSalva[];
+  hospitais: HospitaisMap;
+  onAbrir: (p: PropostaSalva) => void;
+  onRemover: (id: string) => void;
+  onFechar: () => void;
+}
+
+function HistoricoDrawer({
+  propostas,
+  hospitais,
+  onAbrir,
+  onRemover,
+  onFechar,
+}: HistoricoDrawerProps) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onFechar();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onFechar]);
+
+  return (
+    <div
+      onClick={onFechar}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(58,46,42,0.22)',
+        zIndex: 65,
+        display: 'flex',
+        justifyContent: 'flex-end',
+        animation: 'colo-fade-in 180ms ease',
+      }}
+    >
+      <aside
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: 'var(--bg)',
+          width: '100%',
+          maxWidth: 480,
+          height: '100%',
+          padding: '28px 32px',
+          overflowY: 'auto',
+          boxShadow: 'var(--shadow-lg)',
+          animation: 'colo-drawer-in 220ms cubic-bezier(.2,.7,.2,1)',
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'baseline',
+            marginBottom: 4,
+          }}
+        >
+          <Eyebrow>histórico</Eyebrow>
+          <button
+            type="button"
+            onClick={onFechar}
+            aria-label="fechar"
+            style={{
+              background: 'var(--bg-alt)',
+              border: '1px solid var(--line)',
+              borderRadius: 999,
+              padding: 6,
+              cursor: 'pointer',
+              color: 'var(--ink-2)',
+            }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
+        </div>
+        <h2
+          style={{
+            fontFamily: 'var(--font-display)',
+            fontWeight: 500,
+            fontSize: 24,
+            letterSpacing: '-0.015em',
+            margin: '4px 0 4px',
+          }}
+        >
+          minhas propostas
+        </h2>
+        <Mono style={{ color: 'var(--ink-3)', display: 'block', marginBottom: 18 }}>
+          últimas {propostas.length} {propostas.length === 1 ? 'salva' : 'salvas'} · clica pra reabrir
+        </Mono>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {propostas.map((p) => (
+            <CardProposta
+              key={p.id}
+              proposta={p}
+              hospitais={hospitais}
+              onAbrir={() => onAbrir(p)}
+              onRemover={() => onRemover(p.id)}
+            />
+          ))}
+        </div>
+      </aside>
+    </div>
+  );
+}
+
+function CardProposta({
+  proposta,
+  hospitais,
+  onAbrir,
+  onRemover,
+}: {
+  proposta: PropostaSalva;
+  hospitais: HospitaisMap;
+  onAbrir: () => void;
+  onRemover: () => void;
+}) {
+  const corLente =
+    proposta.lente === 'descansar'
+      ? 'var(--sage-ink)'
+      : proposta.lente === 'ganhar'
+      ? '#B8884A'
+      : 'var(--lavender-ink)';
+  const exportada = proposta.exportadaEm
+    ? new Date(proposta.exportadaEm).toLocaleDateString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: '2-digit',
+      })
+    : null;
+  const chefes = proposta.exportadaParaChefes ?? {};
+  const chefesEntries = Object.entries(chefes).filter(([, n]) => n.trim());
+
+  return (
+    <div
+      style={{
+        background: 'var(--bg)',
+        border: '1px solid var(--line)',
+        borderRadius: 14,
+        padding: '14px 16px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 8,
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: 999,
+              background: corLente,
+              display: 'inline-block',
+            }}
+          />
+          <span
+            style={{
+              fontFamily: 'var(--font-display)',
+              fontWeight: 500,
+              fontSize: 18,
+              color: 'var(--ink)',
+            }}
+          >
+            {fmtMesAnoExtenso(proposta.mesISO)}
+          </span>
+        </div>
+        <Eyebrow color={corLente}>{ROTULO_LENTE[proposta.lente]}</Eyebrow>
+      </div>
+
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+        {proposta.hospitaisIncluidos.map((id) => {
+          const h = hospitais[id];
+          if (!h) return (
+            <span
+              key={id}
+              style={{
+                font: '500 11px/1 var(--font-mono)',
+                padding: '4px 8px',
+                borderRadius: 999,
+                background: 'var(--bg-alt)',
+                color: 'var(--ink-3)',
+              }}
+            >
+              {id}
+            </span>
+          );
+          return (
+            <span
+              key={id}
+              style={{
+                font: '500 11px/1 var(--font-mono)',
+                padding: '4px 8px',
+                borderRadius: 999,
+                background: `var(--${h.cor}-surface)`,
+                color: `var(--${h.cor}-ink)`,
+              }}
+            >
+              {h.abrev}
+            </span>
+          );
+        })}
+      </div>
+
+      <Mono style={{ color: 'var(--ink-3)', fontSize: 11 }}>
+        {proposta.blocos.length} plantões · {exportada ? `enviada em ${exportada}` : 'rascunho'}
+      </Mono>
+
+      {chefesEntries.length > 0 && (
+        <Mono style={{ color: 'var(--ink-3)', fontSize: 11 }}>
+          enviada pra {chefesEntries.map(([id, nome]) => `${nome} (${hospitais[id]?.abrev ?? id})`).join(' · ')}
+        </Mono>
+      )}
+
+      <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+        <button
+          type="button"
+          onClick={onAbrir}
+          style={{
+            font: '600 12px/1 var(--font-body)',
+            padding: '8px 14px',
+            borderRadius: 999,
+            border: 'none',
+            background: 'var(--ink)',
+            color: 'var(--bg)',
+            cursor: 'pointer',
+          }}
+        >
+          reabrir
+        </button>
+        <button
+          type="button"
+          onClick={onRemover}
+          style={{
+            font: '600 12px/1 var(--font-body)',
+            padding: '8px 14px',
+            borderRadius: 999,
+            border: '1px solid var(--line)',
+            background: 'transparent',
+            color: 'var(--ink-3)',
+            cursor: 'pointer',
+          }}
+        >
+          remover
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -922,38 +1471,54 @@ function SetupChip({ mesAlvo, hospitaisIncluidos, metaInput, bloqueios, onEditar
   );
 }
 
-interface AdicionarPlantaoModalProps {
-  dataISO: string;
+interface EditorPlantaoPropostaProps {
+  /** Modo: 'adicionar' precisa de dataISO; 'editar' precisa de blocoExistente. */
+  modo: 'adicionar' | 'editar';
+  dataISO?: string;
+  blocoExistente?: BlocoPlantao;
   hospitais: HospitaisMap;
-  jaTemNoDia: boolean;
+  jaTemOutroNoDia: boolean;
   onConfirmar: (b: BlocoPlantao) => void;
+  onRemover?: () => void;
   onCancelar: () => void;
 }
 
-function AdicionarPlantaoModal({
+/**
+ * Editor unificado de plantão dentro do builder de proposta. Identidade
+ * visual lavanda + etiqueta "proposta" pra deixar claro que NÃO entra na
+ * agenda real — é só sugestão pro chefe.
+ */
+function EditorPlantaoProposta({
+  modo,
   dataISO,
+  blocoExistente,
   hospitais,
-  jaTemNoDia,
+  jaTemOutroNoDia,
   onConfirmar,
+  onRemover,
   onCancelar,
-}: AdicionarPlantaoModalProps) {
+}: EditorPlantaoPropostaProps) {
   const lista = Object.values(hospitais);
-  const [hospitalId, setHospitalId] = useState(lista[0]?.id ?? '');
-  const [horaInicio, setHoraInicio] = useState(7);
-  const [duracao, setDuracao] = useState(12);
-  const [setor, setSetor] = useState('');
+  const [hospitalId, setHospitalId] = useState(
+    blocoExistente?.hospitalId ?? lista[0]?.id ?? '',
+  );
+  const [data, setData] = useState(blocoExistente?.data ?? dataISO ?? '');
+  const [horaInicio, setHoraInicio] = useState(blocoExistente?.horaInicio ?? 7);
+  const [duracao, setDuracao] = useState(blocoExistente?.duracao ?? 12);
+  const [setor, setSetor] = useState(blocoExistente?.setor ?? '');
 
   const hosp = hospitais[hospitalId];
   const setores = hosp?.setores ?? [];
-  const valido = hospitalId && duracao > 0;
+  const valido = hospitalId && duracao > 0 && data;
 
   function confirmar() {
     if (!valido) return;
+    const id = blocoExistente?.id ?? `prop-${Date.now()}`;
     const novo: BlocoPlantao = {
-      id: `man-${Date.now()}`,
+      id,
       tipo: 'plantao',
       hospitalId,
-      data: dataISO,
+      data,
       horaInicio,
       duracao,
       setor: setor || setores[0] || '',
@@ -967,7 +1532,7 @@ function AdicionarPlantaoModal({
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(58,46,42,0.18)',
+        background: 'rgba(58,46,42,0.22)',
         zIndex: 70,
         display: 'flex',
         alignItems: 'flex-start',
@@ -981,119 +1546,175 @@ function AdicionarPlantaoModal({
         style={{
           background: 'var(--bg)',
           borderRadius: 'var(--r-xl)',
-          padding: '24px 28px',
+          padding: 0,
           width: '100%',
-          maxWidth: 420,
+          maxWidth: 460,
           boxShadow: 'var(--shadow-lg)',
           animation: 'colo-drawer-down 220ms cubic-bezier(.2,.7,.2,1)',
+          overflow: 'hidden',
+          border: '2px solid var(--lavender-ink)',
         }}
       >
-        <Eyebrow>adicionar à proposta</Eyebrow>
-        <h2
+        <div
           style={{
-            fontFamily: 'var(--font-display)',
-            fontWeight: 500,
-            fontSize: 22,
-            margin: '6px 0 4px',
+            background: 'var(--lavender-surface)',
+            padding: '14px 22px 12px',
+            borderBottom: '1px dashed var(--lavender-ink)',
           }}
         >
-          plantão em {fmtDate(dataISO)}
-        </h2>
-        {jaTemNoDia && (
-          <Pill kind="warn" style={{ marginTop: 6 }}>
-            já tem plantão proposto neste dia
-          </Pill>
-        )}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 14 }}>
-          <Field label="hospital">
-            <select
-              value={hospitalId}
-              onChange={(e) => setHospitalId(e.target.value)}
-              style={inputStyle}
-            >
-              {lista.map((h) => (
-                <option key={h.id} value={h.id}>
-                  {h.abrev} · {h.nome}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            <Field label="início">
-              <input
-                type="number"
-                step="0.5"
-                min={0}
-                max={23.5}
-                value={horaInicio}
-                onChange={(e) => setHoraInicio(Number(e.target.value))}
-                style={inputStyle}
-              />
-            </Field>
-            <Field label="duração (h)">
-              <input
-                type="number"
-                step="0.5"
-                min={0.5}
-                max={24}
-                value={duracao}
-                onChange={(e) => setDuracao(Number(e.target.value))}
-                style={inputStyle}
-              />
-            </Field>
-          </div>
-          <Field label="setor">
-            <input
-              value={setor}
-              onChange={(e) => setSetor(e.target.value)}
-              placeholder={setores[0] ?? 'enfermaria'}
-              list="setores-modal"
-              style={inputStyle}
-            />
-            <datalist id="setores-modal">
-              {setores.map((s) => (
-                <option key={s} value={s} />
-              ))}
-            </datalist>
-          </Field>
-          <Mono style={{ color: 'var(--ink-3)', display: 'block' }}>
-            {fmtRange(horaInicio, duracao)} · {duracao}h
+          <Eyebrow color="var(--lavender-ink)">
+            {modo === 'adicionar' ? 'adicionar à proposta' : 'editar plantão da proposta'}
+          </Eyebrow>
+          <h2
+            style={{
+              fontFamily: 'var(--font-display)',
+              fontWeight: 500,
+              fontSize: 22,
+              margin: '4px 0 2px',
+              color: 'var(--ink)',
+            }}
+          >
+            {modo === 'adicionar' ? 'novo plantão sugerido' : 'ajustar plantão sugerido'}
+          </h2>
+          <Mono style={{ color: 'var(--lavender-ink)', display: 'block', fontSize: 11 }}>
+            isto é só uma sugestão pro chefe · não entra na sua agenda
           </Mono>
         </div>
 
-        <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
-          <button
-            type="button"
-            onClick={confirmar}
-            disabled={!valido}
+        <div style={{ padding: '18px 22px 22px' }}>
+          {jaTemOutroNoDia && (
+            <Pill kind="warn" style={{ marginBottom: 10 }}>
+              já tem outro plantão proposto neste dia
+            </Pill>
+          )}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <Field label="hospital">
+              <select
+                value={hospitalId}
+                onChange={(e) => setHospitalId(e.target.value)}
+                style={inputStyle}
+              >
+                {lista.map((h) => (
+                  <option key={h.id} value={h.id}>
+                    {h.abrev} · {h.nome}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="dia">
+              <input
+                type="date"
+                value={data}
+                onChange={(e) => setData(e.target.value)}
+                style={inputStyle}
+              />
+            </Field>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <Field label="início">
+                <input
+                  type="number"
+                  step="0.5"
+                  min={0}
+                  max={23.5}
+                  value={horaInicio}
+                  onChange={(e) => setHoraInicio(Number(e.target.value))}
+                  style={inputStyle}
+                />
+              </Field>
+              <Field label="duração (h)">
+                <input
+                  type="number"
+                  step="0.5"
+                  min={0.5}
+                  max={24}
+                  value={duracao}
+                  onChange={(e) => setDuracao(Number(e.target.value))}
+                  style={inputStyle}
+                />
+              </Field>
+            </div>
+            <Field label="setor">
+              <input
+                value={setor}
+                onChange={(e) => setSetor(e.target.value)}
+                placeholder={setores[0] ?? 'enfermaria'}
+                list="setores-modal-prop"
+                style={inputStyle}
+              />
+              <datalist id="setores-modal-prop">
+                {setores.map((s) => (
+                  <option key={s} value={s} />
+                ))}
+              </datalist>
+            </Field>
+            <Mono style={{ color: 'var(--ink-3)', display: 'block' }}>
+              {data ? fmtDate(data) + ' · ' : ''}
+              {fmtRange(horaInicio, duracao)} · {duracao}h
+            </Mono>
+          </div>
+
+          <div
             style={{
-              font: '600 13px/1 var(--font-body)',
-              padding: '12px 22px',
-              borderRadius: 999,
-              border: 'none',
-              background: 'var(--sage-ink)',
-              color: 'var(--bg)',
-              cursor: valido ? 'pointer' : 'not-allowed',
-              opacity: valido ? 1 : 0.5,
+              display: 'flex',
+              gap: 10,
+              marginTop: 20,
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
             }}
           >
-            adicionar
-          </button>
-          <button
-            type="button"
-            onClick={onCancelar}
-            style={{
-              font: '600 13px/1 var(--font-body)',
-              padding: '12px 22px',
-              borderRadius: 999,
-              border: '1px solid var(--line)',
-              background: 'transparent',
-              color: 'var(--ink-2)',
-              cursor: 'pointer',
-            }}
-          >
-            cancelar
-          </button>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={confirmar}
+                disabled={!valido}
+                style={{
+                  font: '600 13px/1 var(--font-body)',
+                  padding: '12px 22px',
+                  borderRadius: 999,
+                  border: 'none',
+                  background: 'var(--lavender-ink)',
+                  color: 'var(--bg)',
+                  cursor: valido ? 'pointer' : 'not-allowed',
+                  opacity: valido ? 1 : 0.5,
+                }}
+              >
+                {modo === 'adicionar' ? 'adicionar à proposta' : 'salvar alterações'}
+              </button>
+              <button
+                type="button"
+                onClick={onCancelar}
+                style={{
+                  font: '600 13px/1 var(--font-body)',
+                  padding: '12px 22px',
+                  borderRadius: 999,
+                  border: '1px solid var(--line)',
+                  background: 'transparent',
+                  color: 'var(--ink-2)',
+                  cursor: 'pointer',
+                }}
+              >
+                cancelar
+              </button>
+            </div>
+            {modo === 'editar' && onRemover && (
+              <button
+                type="button"
+                onClick={onRemover}
+                style={{
+                  font: '600 12px/1 var(--font-body)',
+                  padding: '10px 16px',
+                  borderRadius: 999,
+                  border: '1px solid var(--coral-ink)',
+                  background: 'transparent',
+                  color: 'var(--coral-ink)',
+                  cursor: 'pointer',
+                }}
+              >
+                remover da proposta
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RealtimeChannel } from '@supabase/supabase-js';
-import type { Bloco, Hospital, Preferencias } from '@/types';
+import type { Bloco, Hospital, Preferencias, PropostaSalva } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { BLOCOS_SEMANA, HOSPITAIS, PREFERENCIAS_ME } from '@/lib/data';
 
@@ -14,6 +14,7 @@ export interface UserStateBlob {
   blocos: Bloco[];
   hospitais?: Record<string, Hospital>;
   preferencias?: Preferencias;
+  propostas?: PropostaSalva[];
   updatedAt?: string;
 }
 
@@ -23,6 +24,7 @@ export interface UserStateValor {
   blocos: Bloco[];
   hospitais: Record<string, Hospital>;
   preferencias: Preferencias;
+  propostas: PropostaSalva[];
 }
 
 export interface UserStateAPI {
@@ -41,6 +43,7 @@ const FALLBACK: UserStateValor = {
   blocos: BLOCOS_SEMANA,
   hospitais: HOSPITAIS,
   preferencias: PREFERENCIAS_ME,
+  propostas: [],
 };
 
 /**
@@ -66,6 +69,7 @@ export function useUserState(userId: string | null): UserStateAPI {
         blocos: valor.blocos,
         hospitais: valor.hospitais,
         preferencias: valor.preferencias,
+        propostas: valor.propostas,
         updatedAt: new Date().toISOString(),
       };
       const { error } = await supabase()
@@ -95,6 +99,7 @@ export function useUserState(userId: string | null): UserStateAPI {
           blocos: next.blocos ?? prev.blocos,
           hospitais: next.hospitais ?? prev.hospitais,
           preferencias: next.preferencias ?? prev.preferencias,
+          propostas: next.propostas ?? prev.propostas,
         };
         pendingRef.current = merged;
         if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -138,6 +143,7 @@ export function useUserState(userId: string | null): UserStateAPI {
             blocos: blob.blocos ?? FALLBACK.blocos,
             hospitais: blob.hospitais ?? FALLBACK.hospitais,
             preferencias: blob.preferencias ?? FALLBACK.preferencias,
+            propostas: blob.propostas ?? [],
           });
         } else {
           // Primeiro acesso · semeia com defaults pra Mariana ver agenda.
@@ -161,14 +167,12 @@ export function useUserState(userId: string | null): UserStateAPI {
           const novoState = (payload.new as { state?: UserStateBlob } | null)?.state;
           if (!novoState || !mounted) return;
           // Só aplica se o updatedAt for mais novo que o nosso local (ignora echo do próprio save).
-          setStateInternal((prev) => {
-            const propostas = {
-              blocos: novoState.blocos ?? prev.blocos,
-              hospitais: novoState.hospitais ?? prev.hospitais,
-              preferencias: novoState.preferencias ?? prev.preferencias,
-            };
-            return propostas;
-          });
+          setStateInternal((prev) => ({
+            blocos: novoState.blocos ?? prev.blocos,
+            hospitais: novoState.hospitais ?? prev.hospitais,
+            preferencias: novoState.preferencias ?? prev.preferencias,
+            propostas: novoState.propostas ?? prev.propostas,
+          }));
         },
       )
       .subscribe();

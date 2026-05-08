@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { Bloco, BlocoPlantao, HospitaisMap } from '@/types';
+import type { Bloco, BlocoPlantao, HospitaisMap, LenteProposta, PropostaSalva } from '@/types';
 import {
   agruparPorHospital,
   copiarTexto,
@@ -11,6 +11,7 @@ import {
   nomeArquivo,
 } from '@/lib/data';
 import { gerarPdfMes } from '@/lib/pdfMes';
+import { registrarChefe, salvarProposta } from '@/lib/propostas';
 import { Eyebrow, Hand, Mono, Pill } from '@/components/atoms';
 
 interface ExportarMontarProps {
@@ -20,6 +21,19 @@ interface ExportarMontarProps {
   blocosTodos: Bloco[];
   mesISO: string;
   nomeMedico: string;
+  /** Garante um id pra proposta antes de salvar · retorna o id (existente ou novo). */
+  onPrimeiraExportacao: () => string;
+  propostaAtivaId: string | null;
+  dadosProposta: {
+    mesISO: string;
+    hospitaisIncluidos: string[];
+    metaUsada: number;
+    bloqueioIds: (string | number)[];
+    lente: LenteProposta;
+    blocos: BlocoPlantao[];
+  };
+  propostas: PropostaSalva[];
+  onAtualizarPropostas: (lista: PropostaSalva[]) => void;
   onFechar: () => void;
 }
 
@@ -58,6 +72,11 @@ export function ExportarMontar({
   blocosTodos,
   mesISO,
   nomeMedico,
+  onPrimeiraExportacao,
+  propostaAtivaId,
+  dadosProposta,
+  propostas,
+  onAtualizarPropostas,
   onFechar,
 }: ExportarMontarProps) {
   const [chefes, setChefes] = useState<EstadoChefe>(carregarNomesChefes());
@@ -70,6 +89,20 @@ export function ExportarMontar({
     const novo = { ...chefes, [hospId]: nome };
     setChefes(novo);
     salvarNomesChefes(novo);
+  }
+
+  /**
+   * Persiste a proposta no histórico. Chamada na primeira exportação de
+   * cada formato. Se já existe um id ativo, atualiza; se não, cria.
+   * Em seguida registra o nome do chefe (se preenchido).
+   */
+  function persistirExportacao(hospitalId: string, nomeChefe: string) {
+    const id = propostaAtivaId ?? onPrimeiraExportacao();
+    const { lista } = salvarProposta(propostas, { ...dadosProposta, id });
+    const final = nomeChefe.trim()
+      ? registrarChefe(lista, id, hospitalId, nomeChefe.trim())
+      : lista;
+    onAtualizarPropostas(final);
   }
 
   function flash(msg: string) {
@@ -213,6 +246,7 @@ export function ExportarMontar({
                         nomeChefe: chefe.trim() || undefined,
                       });
                       const ok = await copiarTexto(txt);
+                      if (ok) persistirExportacao(hospital.id, chefe);
                       flash(ok ? `mensagem do ${hospital.abrev} copiada` : 'falha ao copiar · selecione e copie manual');
                       if (!ok) console.log(txt);
                     }}
@@ -234,6 +268,7 @@ export function ExportarMontar({
                           nomeChefe: chefe.trim() || undefined,
                         });
                         download(blob, nomeArquivo(hospital, mesISO, 'pdf'));
+                        persistirExportacao(hospital.id, chefe);
                         flash(`PDF do ${hospital.abrev} baixado`);
                       } catch (err) {
                         console.error(err);
@@ -261,6 +296,7 @@ export function ExportarMontar({
                         nomeChefe: chefe.trim() || undefined,
                       });
                       downloadString(csv, nomeArquivo(hospital, mesISO, 'csv'), 'text/csv');
+                      persistirExportacao(hospital.id, chefe);
                       flash(`CSV do ${hospital.abrev} baixado`);
                     }}
                     style={btnSecundario}

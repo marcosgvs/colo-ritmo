@@ -160,3 +160,28 @@ export interface CargaSemana {
   h: number;
   nivel: Nivel;
 }
+
+export type LenteProposta = 'descansar' | 'equilibrar' | 'ganhar';
+
+/**
+ * Proposta salva no histórico do Montar.
+ *
+ * É um snapshot do que a médica enviou pro chefe — mês × hospitais ×
+ * lente × blocos finais (após edição manual). Reabrir não roda solver
+ * de novo; mostra exatamente o que foi enviado, com chance de re-exportar.
+ *
+ * `bloqueioIds` é informacional. Se o bloqueio sumiu da agenda, a proposta
+ * reaberta simplesmente não tem ele — não tenta recriar.
+ */
+export interface PropostaSalva {
+  id: string;
+  mesISO: string;
+  hospitaisIncluidos: string[];
+  metaUsada: number;
+  bloqueioIds: (string | number)[];
+  lente: LenteProposta;
+  blocos: BlocoPlantao[];
+  criadaEm: string;
+  exportadaEm?: string;
+  exportadaParaChefes?: Record<string, string>;
+}
