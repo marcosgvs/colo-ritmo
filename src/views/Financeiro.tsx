@@ -26,7 +26,7 @@ export function Financeiro({ blocos, hospitais, metaMensal }: FinanceiroProps) {
     [blocos, hospitais, mesISO],
   );
 
-  const total = resumo.total.liquido;
+  const total = resumo.total.bruto;
   const pct = metaMensal ? Math.min(100, Math.round((total / metaMensal) * 100)) : null;
 
   if (Object.keys(resumo.porHospital).length === 0) {
@@ -54,7 +54,7 @@ export function Financeiro({ blocos, hospitais, metaMensal }: FinanceiroProps) {
             ? pct === 100
               ? 'meta batida · pode tirar o pé do acelerador'
               : `${pct}% da meta · faltam R$ ${(metaMensal - total).toLocaleString('pt-BR')}`
-            : `R$ ${total.toLocaleString('pt-BR')} estimado · valores conferidos no fechamento`
+            : `R$ ${total.toLocaleString('pt-BR')}`
         }
       />
 
@@ -100,7 +100,7 @@ export function Financeiro({ blocos, hospitais, metaMensal }: FinanceiroProps) {
                   </p>
                 </div>
                 <Coluna label="plantões" valor={String(r.plantoes)} />
-                <Coluna label="valor" valor={`R$ ${r.liquido.toLocaleString('pt-BR')}`} destaque />
+                <Coluna label="valor" valor={`R$ ${r.bruto.toLocaleString('pt-BR')}`} destaque />
               </div>
             );
           })}
@@ -116,7 +116,7 @@ export function Financeiro({ blocos, hospitais, metaMensal }: FinanceiroProps) {
               justifyContent: 'space-between',
             }}
           >
-            <Eyebrow>total estimado</Eyebrow>
+            <Eyebrow>total</Eyebrow>
             <span
               style={{
                 fontFamily: 'var(--font-display)',
@@ -145,11 +145,8 @@ export function Financeiro({ blocos, hospitais, metaMensal }: FinanceiroProps) {
         >
           <Eyebrow>como calculo</Eyebrow>
           <p style={{ font: '400 13px/1.5 var(--font-body)', color: 'var(--ink-2)', margin: 0 }}>
-            público usa o valor fixo do plantão; privado é valor/hora × duração.
-            adicional de noturno some quando o plantão cruza 22h–6h.
-          </p>
-          <p style={{ font: '400 13px/1.5 var(--font-body)', color: 'var(--ink-2)', margin: 0 }}>
-            o valor é estimativa: ~94% pra PJ, ~72,5% pra cooperativa/CLT. confere no fechamento real do mês.
+            público é valor fixo mensal · privado é valor/hora × duração.
+            adicional noturno soma quando o plantão cruza 22h–6h.
           </p>
           {metaMensal && (
             <div style={{ marginTop: 4 }}>

@@ -23,6 +23,17 @@ const JANELAS_DEFAULT: Janela[] = [
   { rotulo: 'noite', inicio: 19, duracao: 12 },
 ];
 
+function parseInteiro(s: string): number {
+  const limpo = s.replace(/\D/g, '');
+  return limpo ? parseInt(limpo, 10) : 0;
+}
+
+function parseDecimal(s: string): number {
+  const limpo = s.replace(',', '.').replace(/[^\d.]/g, '');
+  const n = parseFloat(limpo);
+  return isNaN(n) ? 0 : n;
+}
+
 interface HospitaisProps {
   hospitais: HospitaisMap;
   onSalvar: (id: string, h: Hospital) => void;
@@ -391,9 +402,9 @@ function HospitalForm({ inicial, coresUsadas, onSalvar, onCancelar, onRemover }:
         {ehPublico ? (
           <Field label="valor fixo mensal (R$)">
             <input
-              type="number"
-              value={draft.valorFixo ?? 0}
-              onChange={(e) => setCampo('valorFixo', Number(e.target.value))}
+              inputMode="numeric"
+              value={draft.valorFixo ? String(draft.valorFixo) : ''}
+              onChange={(e) => setCampo('valorFixo', parseInteiro(e.target.value))}
               placeholder="contrato CLT · independente das horas"
               style={input}
             />
@@ -401,9 +412,9 @@ function HospitalForm({ inicial, coresUsadas, onSalvar, onCancelar, onRemover }:
         ) : (
           <Field label="valor por hora (R$)">
             <input
-              type="number"
-              value={draft.valorHora ?? 0}
-              onChange={(e) => setCampo('valorHora', Number(e.target.value))}
+              inputMode="numeric"
+              value={draft.valorHora ? String(draft.valorHora) : ''}
+              onChange={(e) => setCampo('valorHora', parseInteiro(e.target.value))}
               placeholder="ex: 150"
               style={input}
             />
@@ -411,41 +422,41 @@ function HospitalForm({ inicial, coresUsadas, onSalvar, onCancelar, onRemover }:
         )}
         <Field label="adicional noturno (R$)">
           <input
-            type="number"
-            value={draft.adicionalNoite}
-            onChange={(e) => setCampo('adicionalNoite', Number(e.target.value))}
+            inputMode="numeric"
+            value={draft.adicionalNoite ? String(draft.adicionalNoite) : ''}
+            onChange={(e) => setCampo('adicionalNoite', parseInteiro(e.target.value))}
             style={input}
           />
         </Field>
         <Field label={ehPublico ? 'máx plantões por semana' : 'máx por semana'}>
           <input
-            type="number"
-            value={draft.regras.maxPorSemana}
-            onChange={(e) => setRegra('maxPorSemana', Number(e.target.value))}
+            inputMode="numeric"
+            value={String(draft.regras.maxPorSemana)}
+            onChange={(e) => setRegra('maxPorSemana', parseInteiro(e.target.value))}
             style={input}
           />
         </Field>
         <Field label="máx por mês">
           <input
-            type="number"
-            value={draft.regras.maxPorMes}
-            onChange={(e) => setRegra('maxPorMes', Number(e.target.value))}
+            inputMode="numeric"
+            value={String(draft.regras.maxPorMes)}
+            onChange={(e) => setRegra('maxPorMes', parseInteiro(e.target.value))}
             style={input}
           />
         </Field>
         <Field label="descanso mínimo (h)">
           <input
-            type="number"
-            value={draft.regras.intervaloMinHoras}
-            onChange={(e) => setRegra('intervaloMinHoras', Number(e.target.value))}
+            inputMode="numeric"
+            value={String(draft.regras.intervaloMinHoras)}
+            onChange={(e) => setRegra('intervaloMinHoras', parseInteiro(e.target.value))}
             style={input}
           />
         </Field>
         <Field label={ehPublico ? 'fins-de-semana obrigatórios / mês' : 'finais de semana mínimos'}>
           <input
-            type="number"
-            value={draft.regras.minFimDeSemana}
-            onChange={(e) => setRegra('minFimDeSemana', Number(e.target.value))}
+            inputMode="numeric"
+            value={String(draft.regras.minFimDeSemana)}
+            onChange={(e) => setRegra('minFimDeSemana', parseInteiro(e.target.value))}
             style={input}
           />
         </Field>
@@ -475,32 +486,53 @@ function HospitalForm({ inicial, coresUsadas, onSalvar, onCancelar, onRemover }:
         </div>
 
         <div style={{ gridColumn: '1 / -1' }}>
-          {enderecoAberto ? (
-            <BlocoEndereco
-              endereco={draft.endereco}
-              onChange={(end) => setDraft((d) => ({ ...d, endereco: end }))}
-              nomeHospital={draft.nome}
-            />
-          ) : (
-            <button
-              type="button"
-              onClick={() => setEnderecoAberto(true)}
+          <button
+            type="button"
+            onClick={() => setEnderecoAberto((v) => !v)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '6px 0',
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              color: 'var(--ink-2)',
+              font: '500 13px/1 var(--font-body)',
+              width: 'fit-content',
+            }}
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
               style={{
-                font: '500 13px/1 var(--font-body)',
-                padding: '10px 14px',
-                borderRadius: 'var(--r-md)',
-                border: '1px dashed var(--line-2)',
-                background: 'transparent',
-                color: 'var(--ink-2)',
-                cursor: 'pointer',
-                width: '100%',
-                textAlign: 'left',
+                transform: enderecoAberto ? 'rotate(90deg)' : 'rotate(0deg)',
+                transition: 'transform 140ms ease',
               }}
             >
-              {draft.endereco?.logradouro
-                ? `endereço · ${draft.endereco.bairro || draft.endereco.cidade || 'preenchido'} (clica pra editar)`
-                : '+ adicionar endereço (opcional · ajuda no cálculo de deslocamento)'}
-            </button>
+              <path d="M9 6l6 6-6 6" />
+            </svg>
+            endereço
+            {!enderecoAberto && draft.endereco?.logradouro && (
+              <Mono style={{ color: 'var(--ink-3)', fontSize: 11, marginLeft: 6 }}>
+                · {draft.endereco.bairro || draft.endereco.cidade || 'preenchido'}
+              </Mono>
+            )}
+          </button>
+          {enderecoAberto && (
+            <div style={{ marginTop: 8 }}>
+              <BlocoEndereco
+                endereco={draft.endereco}
+                onChange={(end) => setDraft((d) => ({ ...d, endereco: end }))}
+                nomeHospital={draft.nome}
+              />
+            </div>
           )}
         </div>
 
@@ -631,22 +663,16 @@ function BlocoJanelas({
               style={input}
             />
             <input
-              type="number"
-              step="0.5"
-              min={0}
-              max={23.5}
-              value={j.inicio}
-              onChange={(e) => setItem(i, { inicio: Number(e.target.value) })}
+              inputMode="decimal"
+              value={String(j.inicio)}
+              onChange={(e) => setItem(i, { inicio: parseDecimal(e.target.value) })}
               placeholder="início"
               style={input}
             />
             <input
-              type="number"
-              step="0.5"
-              min={0.5}
-              max={24}
-              value={j.duracao}
-              onChange={(e) => setItem(i, { duracao: Number(e.target.value) })}
+              inputMode="decimal"
+              value={String(j.duracao)}
+              onChange={(e) => setItem(i, { duracao: parseDecimal(e.target.value) })}
               placeholder="duração (h)"
               style={input}
             />

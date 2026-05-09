@@ -22,6 +22,8 @@ interface BlockDrawerProps {
   onEditar?: (b: Bloco) => void;
   /** Remover tira da agenda. */
   onRemover?: (id: number | string) => void;
+  /** Estica noitinha (5h) pra noite (12h) — comum quando UTI lota. */
+  onEsticarNoite?: (b: Bloco) => void;
 }
 
 const ROTULO_CONFLITO: Record<string, string> = {
@@ -30,6 +32,11 @@ const ROTULO_CONFLITO: Record<string, string> = {
   limite_cfm: 'mais de 60h na semana (CFM)',
   max_semana: 'limite de plantões por semana batido',
 };
+
+/** Noitinha · plantão começando 19h e durando 5h (vai até 00h). */
+function ehNoitinha(b: Bloco): boolean {
+  return b.tipo === 'plantao' && b.horaInicio === 19 && b.duracao === 5;
+}
 
 const TIPOS_EDITAVEIS = new Set([
   'plantao',
@@ -58,6 +65,7 @@ export function BlockDrawer({
   onCeder,
   onEditar,
   onRemover,
+  onEsticarNoite,
 }: BlockDrawerProps) {
   // ESC fecha
   useEffect(() => {
@@ -86,6 +94,8 @@ export function BlockDrawer({
   }, [bloco, blocos, hospitais]);
 
   if (!bloco) return null;
+
+  const emConflito = conflitosRelacionados.length > 0;
 
   const hosp =
     bloco.tipo === 'plantao' || bloco.tipo === 'cedido'
@@ -142,15 +152,13 @@ export function BlockDrawer({
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <Eyebrow color={hosp ? `var(--${hosp.cor}-ink)` : 'var(--ink-3)'}>
+          <Eyebrow color={emConflito ? 'var(--coral-ink)' : hosp ? `var(--${hosp.cor}-ink)` : 'var(--ink-3)'}>
             {fmtDate(bloco.data)}
           </Eyebrow>
           {bloco.tipo === 'plantao' && bloco.viaTroca && (
             <Pill kind="lavender">via troca</Pill>
           )}
-          {bloco.tipo === 'plantao' && bloco.conflito && (
-            <Pill kind="err">conflito</Pill>
-          )}
+          {emConflito && <Pill kind="err">conflito</Pill>}
           <span style={{ flex: 1 }} />
           <button
             type="button"
@@ -171,6 +179,20 @@ export function BlockDrawer({
           </button>
         </div>
 
+        {emConflito && (
+          <BlocoConflito
+            bloco={bloco}
+            outros={conflitosRelacionados}
+            hospitais={hospitais}
+            onEditar={onEditar}
+            onTrocar={onTrocar}
+            onCeder={onCeder}
+            onRemover={onRemover}
+          />
+        )}
+
+        {!emConflito && (
+        <>
         <div>
           <h2
             style={{
@@ -205,101 +227,10 @@ export function BlockDrawer({
         {bloco.tipo === 'plantao' && ehNoturno(bloco) && (
           <Pill kind="info">noturno</Pill>
         )}
-
-        {conflitosRelacionados.length > 0 && (
-          <div
-            style={{
-              background: 'var(--coral-surface)',
-              border: '1px solid var(--coral-ink)',
-              borderRadius: 'var(--r-md)',
-              padding: '14px 16px',
-            }}
-          >
-            <Eyebrow color="var(--coral-ink)">
-              {conflitosRelacionados.length === 1
-                ? 'em conflito com'
-                : `em conflito com ${conflitosRelacionados.length} plantões`}
-            </Eyebrow>
-            <Hand
-              color="var(--coral-ink)"
-              size={14}
-              style={{ display: 'block', marginTop: 4, marginBottom: 12 }}
-            >
-              um dos dois precisa sair · escolhe qual
-            </Hand>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {conflitosRelacionados.map(({ outro, conflito }) => {
-                const hospOutro = getHospital(outro.hospitalId);
-                const cor = hospOutro?.cor ?? 'sand';
-                return (
-                  <div
-                    key={String(outro.id)}
-                    style={{
-                      background: 'var(--bg)',
-                      borderLeft: `4px solid var(--${cor})`,
-                      borderRadius: 10,
-                      padding: '10px 12px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 10,
-                      flexWrap: 'wrap',
-                    }}
-                  >
-                    <div style={{ flex: 1, minWidth: 200 }}>
-                      <Eyebrow color={`var(--${cor}-ink)`}>
-                        {hospOutro?.abrev ?? outro.hospitalId}
-                      </Eyebrow>
-                      <p
-                        style={{
-                          font: '500 14px/1.3 var(--font-body)',
-                          margin: '4px 0 2px',
-                          color: 'var(--ink)',
-                        }}
-                      >
-                        {fmtDate(outro.data)} · {fmtRange(outro.horaInicio, outro.duracao)}
-                      </p>
-                      <Mono style={{ color: 'var(--coral-ink)', fontSize: 11 }}>
-                        {ROTULO_CONFLITO[conflito.tipo] ?? conflito.tipo} · {conflito.detalhe}
-                      </Mono>
-                    </div>
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                      {onEditar && TIPOS_EDITAVEIS.has(outro.tipo) && (
-                        <ConflitoAcao
-                          label="editar"
-                          variant="ghost"
-                          onClick={() => onEditar(outro)}
-                        />
-                      )}
-                      {onTrocar && (
-                        <ConflitoAcao
-                          label="trocar"
-                          variant="ghost"
-                          onClick={() => onTrocar(outro)}
-                        />
-                      )}
-                      {onCeder && (
-                        <ConflitoAcao
-                          label="ceder"
-                          variant="ghost"
-                          onClick={() => onCeder(outro)}
-                        />
-                      )}
-                      {onRemover && (
-                        <ConflitoAcao
-                          label="remover"
-                          variant="coral"
-                          onClick={() => onRemover(outro.id)}
-                        />
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+        </>
         )}
 
-        {bloco.tipo === 'cedido' && (
+        {!emConflito && bloco.tipo === 'cedido' && (
           <Section eyebrow="cedido pra">
             <p style={{ font: '500 16px/1.4 var(--font-body)', margin: 0 }}>{bloco.cedidoPara}</p>
             {bloco.motivo && (
@@ -310,7 +241,7 @@ export function BlockDrawer({
           </Section>
         )}
 
-        {bloco.tipo === 'bloqueio' && bloco.motivo && (
+        {!emConflito && bloco.tipo === 'bloqueio' && bloco.motivo && (
           <Section eyebrow="motivo">
             <Hand color="var(--ink-2)" size={18}>
               {bloco.motivo}
@@ -320,44 +251,66 @@ export function BlockDrawer({
 
         <div style={{ flex: 1 }} />
 
-        <div
-          style={{
-            display: 'flex',
-            gap: 10,
-            flexWrap: 'wrap',
-            alignItems: 'center',
-          }}
-        >
-          {onEditar && TIPOS_EDITAVEIS.has(bloco.tipo) && (
-            <Btn primary onClick={() => onEditar(bloco)}>
-              editar
-            </Btn>
-          )}
-          {bloco.tipo === 'plantao' && onTrocar && (
-            <Btn onClick={() => onTrocar(bloco)}>trocar</Btn>
-          )}
-          {bloco.tipo === 'plantao' && onCeder && (
-            <Btn onClick={() => onCeder(bloco)}>ceder</Btn>
-          )}
-          <span style={{ flex: 1 }} />
-          {onRemover && (
-            <button
-              type="button"
-              onClick={() => onRemover(bloco.id)}
+        {!emConflito && (
+          <>
+            {ehNoitinha(bloco) && onEsticarNoite && (
+              <button
+                type="button"
+                onClick={() => onEsticarNoite(bloco)}
+                style={{
+                  font: '600 13px/1 var(--font-body)',
+                  padding: '12px 18px',
+                  borderRadius: 999,
+                  border: '1px dashed var(--lavender-ink)',
+                  background: 'var(--lavender-surface)',
+                  color: 'var(--lavender-ink)',
+                  cursor: 'pointer',
+                  alignSelf: 'flex-start',
+                }}
+              >
+                virar noite (12h) — plantão lotou
+              </button>
+            )}
+            <div
               style={{
-                font: '600 13px/1 var(--font-body)',
-                padding: '11px 18px',
-                borderRadius: 999,
-                border: '1px solid var(--coral-ink)',
-                background: 'transparent',
-                color: 'var(--coral-ink)',
-                cursor: 'pointer',
+                display: 'flex',
+                gap: 10,
+                flexWrap: 'wrap',
+                alignItems: 'center',
               }}
             >
-              remover
-            </button>
-          )}
-        </div>
+              {onEditar && TIPOS_EDITAVEIS.has(bloco.tipo) && (
+                <Btn primary onClick={() => onEditar(bloco)}>
+                  editar
+                </Btn>
+              )}
+              {bloco.tipo === 'plantao' && onTrocar && (
+                <Btn onClick={() => onTrocar(bloco)}>trocar</Btn>
+              )}
+              {bloco.tipo === 'plantao' && onCeder && (
+                <Btn onClick={() => onCeder(bloco)}>ceder</Btn>
+              )}
+              <span style={{ flex: 1 }} />
+              {onRemover && (
+                <button
+                  type="button"
+                  onClick={() => onRemover(bloco.id)}
+                  style={{
+                    font: '600 13px/1 var(--font-body)',
+                    padding: '11px 18px',
+                    borderRadius: 999,
+                    border: '1px solid var(--coral-ink)',
+                    background: 'transparent',
+                    color: 'var(--coral-ink)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  remover
+                </button>
+              )}
+            </div>
+          </>
+        )}
 
         {hospitais && Object.keys(hospitais).length === 0 && (
           <Mono style={{ color: 'var(--ink-3)', display: 'block' }}>
@@ -409,6 +362,108 @@ function Btn({
     >
       {children}
     </button>
+  );
+}
+
+interface BlocoConflitoProps {
+  bloco: Bloco;
+  outros: Array<{ outro: BlocoPlantao; conflito: Conflito }>;
+  hospitais: HospitaisMap;
+  onEditar?: (b: Bloco) => void;
+  onTrocar?: (b: Bloco) => void;
+  onCeder?: (b: Bloco) => void;
+  onRemover?: (id: number | string) => void;
+}
+
+/**
+ * Layout de conflito · todos os blocos envolvidos aparecem com o mesmo
+ * peso visual. Sem hierarquia "principal vs contraparte" — médico decide
+ * qual sai sem influência da ordem do click.
+ */
+function BlocoConflito({
+  bloco,
+  outros,
+  onEditar,
+  onTrocar,
+  onCeder,
+  onRemover,
+}: BlocoConflitoProps) {
+  const blocoPlantao = bloco.tipo === 'plantao' ? (bloco as BlocoPlantao) : null;
+  // Tipo de conflito do primeiro pra resumir no header
+  const tipoResumo = outros[0]?.conflito.tipo;
+  const detalheResumo = outros[0]?.conflito.detalhe;
+
+  const todos: BlocoPlantao[] = blocoPlantao
+    ? [blocoPlantao, ...outros.map((o) => o.outro)]
+    : outros.map((o) => o.outro);
+
+  return (
+    <div>
+      <Hand
+        color="var(--coral-ink)"
+        size={16}
+        style={{ display: 'block', marginBottom: 4 }}
+      >
+        {ROTULO_CONFLITO[tipoResumo ?? ''] ?? 'plantões em conflito'}
+      </Hand>
+      {detalheResumo && (
+        <Mono style={{ color: 'var(--ink-3)', display: 'block', marginBottom: 14 }}>
+          {detalheResumo} · escolhe o que sai
+        </Mono>
+      )}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {todos.map((p) => {
+          const h = getHospital(p.hospitalId);
+          const cor = h?.cor ?? 'sand';
+          return (
+            <div
+              key={String(p.id)}
+              style={{
+                background: `var(--${cor}-surface)`,
+                borderLeft: `4px solid var(--${cor})`,
+                borderRadius: 12,
+                padding: '14px 16px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 10,
+              }}
+            >
+              <div>
+                <Eyebrow color={`var(--${cor}-ink)`}>{h?.abrev ?? p.hospitalId}</Eyebrow>
+                <p
+                  style={{
+                    fontFamily: 'var(--font-display)',
+                    fontWeight: 500,
+                    fontSize: 18,
+                    margin: '4px 0 2px',
+                    color: 'var(--ink)',
+                  }}
+                >
+                  {h?.nome ?? p.hospitalId}
+                </p>
+                <Mono style={{ color: 'var(--ink-3)', fontSize: 12 }}>
+                  {fmtRange(p.horaInicio, p.duracao)} · {p.duracao}h
+                </Mono>
+              </div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {onEditar && TIPOS_EDITAVEIS.has(p.tipo) && (
+                  <ConflitoAcao label="editar" variant="ghost" onClick={() => onEditar(p)} />
+                )}
+                {onTrocar && (
+                  <ConflitoAcao label="trocar" variant="ghost" onClick={() => onTrocar(p)} />
+                )}
+                {onCeder && (
+                  <ConflitoAcao label="ceder" variant="ghost" onClick={() => onCeder(p)} />
+                )}
+                {onRemover && (
+                  <ConflitoAcao label="remover" variant="coral" onClick={() => onRemover(p.id)} />
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 

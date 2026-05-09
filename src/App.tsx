@@ -124,6 +124,17 @@ export function App() {
     setEditandoBloco(null);
   };
 
+  /** Estica noitinha (5h) pra noite (12h) · caso comum quando UTI lota. */
+  const esticarNoite = (b: Bloco) => {
+    if (b.tipo !== 'plantao') return;
+    userState.setState({
+      blocos: userState.state.blocos.map((x) =>
+        x.id === b.id && x.tipo === 'plantao' ? { ...x, duracao: 12 } : x,
+      ),
+    });
+    setSelecionado(null);
+  };
+
   const removerBlocoEditando = () => {
     if (!editandoBloco) return;
     removerBloco(editandoBloco.id);
@@ -319,6 +330,7 @@ export function App() {
                 removerBloco(id);
                 setSelecionado(null);
               }}
+              onEsticarNoite={esticarNoite}
               onAdd={(t) => setAdicionando(t)}
               notificacoes={notif.notificacoes}
               onMarcarLida={notif.marcarLida}
