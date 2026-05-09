@@ -238,10 +238,6 @@ export function App() {
               hospitais={userState.state.hospitais}
               selecionado={selecionado}
               setSelecionado={setSelecionado}
-              abrirDetalhe={(b) => {
-                setDetalheBloco(b);
-                setSelecionado(null);
-              }}
               onTrocar={(b) => {
                 if (b.tipo !== 'plantao') return;
                 setSelecionado(null);

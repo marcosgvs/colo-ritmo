@@ -38,6 +38,24 @@ const TITULO_EDITAR: Record<AddTipo, string> = {
   outros: 'editar evento',
 };
 
+const ROTULO_TIPO: Record<Exclude<AddTipo, 'plantao'>, string> = {
+  sono: 'sono',
+  bloqueio: 'bloqueio',
+  consulta: 'consulta',
+  estudo: 'estudo',
+  pessoal: 'pessoal',
+  outros: 'outros',
+};
+
+/** Lê o "nome" descritivo de um bloco · varia por tipo (motivo/local/titulo). */
+function nomeDoBloco(b: Bloco): string {
+  if (b.tipo === 'bloqueio') return b.motivo ?? '';
+  if (b.tipo === 'consulta') return b.local ?? '';
+  if (b.tipo === 'estudo' || b.tipo === 'pessoal' || b.tipo === 'outros')
+    return b.titulo ?? '';
+  return '';
+}
+
 const HAND_HINT: Record<AddTipo, string> = {
   plantao: 'um turno',
   sono: 'janela protegida',
@@ -86,6 +104,8 @@ export function AdicionarBloco({
   const hojeISO = dataInicial ?? new Date().toISOString().slice(0, 10);
 
   const hospitaisLista = Object.values(hospitais);
+  // Em modo editar não-plantão, tipo é mutável (select). Plantão sempre fixo.
+  const [tipoAtual, setTipoAtual] = useState<AddTipo>(tipo);
   const [data, setData] = useState(blocoExistente?.data ?? hojeISO);
   const [horaInicio, setHoraInicio] = useState(
     blocoExistente?.horaInicio ?? (tipo === 'plantao' ? 7 : tipo === 'sono' ? 22 : 19),
@@ -96,41 +116,39 @@ export function AdicionarBloco({
   const [hospitalId, setHospitalId] = useState(
     blocoExistente?.tipo === 'plantao' ? blocoExistente.hospitalId : hospitaisLista[0]?.id ?? '',
   );
-  const [titulo, setTitulo] = useState(
-    blocoExistente?.tipo === 'estudo' ||
-      blocoExistente?.tipo === 'pessoal' ||
-      blocoExistente?.tipo === 'outros'
-      ? blocoExistente.titulo ?? ''
-      : '',
-  );
-  const [motivo, setMotivo] = useState(
-    blocoExistente?.tipo === 'bloqueio' ? blocoExistente.motivo ?? '' : '',
-  );
-  const [local, setLocal] = useState(
-    blocoExistente?.tipo === 'consulta' ? blocoExistente.local ?? '' : '',
-  );
+  const [nome, setNome] = useState(blocoExistente ? nomeDoBloco(blocoExistente) : '');
 
   const novoBloco: Bloco = useMemo(() => {
     const id = blocoExistente?.id ?? `manual-${Date.now()}`;
-    if (tipo === 'plantao') {
+    if (tipoAtual === 'plantao') {
       return { id, tipo: 'plantao', hospitalId, data, horaInicio, duracao };
     }
-    if (tipo === 'sono') return { id, tipo: 'sono', data, horaInicio, duracao };
-    if (tipo === 'bloqueio') return { id, tipo: 'bloqueio', data, horaInicio, duracao, motivo };
-    if (tipo === 'consulta') return { id, tipo: 'consulta', data, horaInicio, duracao, local };
-    if (tipo === 'estudo') return { id, tipo: 'estudo', data, horaInicio, duracao, titulo };
-    if (tipo === 'pessoal') return { id, tipo: 'pessoal', data, horaInicio, duracao, titulo };
-    return { id, tipo: 'outros', data, horaInicio, duracao, titulo };
-  }, [tipo, hospitalId, data, horaInicio, duracao, motivo, local, titulo, blocoExistente]);
+    if (tipoAtual === 'sono') return { id, tipo: 'sono', data, horaInicio, duracao };
+    if (tipoAtual === 'bloqueio') return { id, tipo: 'bloqueio', data, horaInicio, duracao, motivo: nome };
+    if (tipoAtual === 'consulta') return { id, tipo: 'consulta', data, horaInicio, duracao, local: nome };
+    if (tipoAtual === 'estudo') return { id, tipo: 'estudo', data, horaInicio, duracao, titulo: nome };
+    if (tipoAtual === 'pessoal') return { id, tipo: 'pessoal', data, horaInicio, duracao, titulo: nome };
+    return { id, tipo: 'outros', data, horaInicio, duracao, titulo: nome };
+  }, [tipoAtual, hospitalId, data, horaInicio, duracao, nome, blocoExistente]);
 
   const conflitos = useMemo(() => {
-    if (tipo !== 'plantao') return [];
+    if (tipoAtual !== 'plantao') return [];
     return detectarConflitos([...blocosAtuais, novoBloco], hospitais).filter((c) =>
       c.a.id === novoBloco.id || c.b?.id === novoBloco.id,
     );
-  }, [tipo, novoBloco, blocosAtuais, hospitais]);
+  }, [tipoAtual, novoBloco, blocosAtuais, hospitais]);
 
-  const podeSalvar = (tipo !== 'plantao' || hospitalId) && duracao > 0;
+  const podeSalvar = (tipoAtual !== 'plantao' || hospitalId) && duracao > 0;
+  const mostraNome = tipoAtual !== 'plantao' && tipoAtual !== 'sono';
+  const placeholderNome =
+    tipoAtual === 'bloqueio'
+      ? 'aniversário · viagem · descanso'
+      : tipoAtual === 'consulta'
+      ? 'consultório centro'
+      : tipoAtual === 'estudo'
+      ? 'curso de UTI neonatal'
+      : 'reunião · jantar · etc';
+  const mostraSelectTipo = modoEditar && tipoAtual !== 'plantao';
 
   return (
     <div
@@ -160,7 +178,7 @@ export function AdicionarBloco({
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-          <Eyebrow>{modoEditar ? `editar · ${tipo}` : tipo}</Eyebrow>
+          <Eyebrow>{modoEditar ? `editar · ${tipoAtual}` : tipoAtual}</Eyebrow>
           <button
             type="button"
             onClick={onCancelar}
@@ -189,13 +207,57 @@ export function AdicionarBloco({
             margin: '8px 0 6px',
           }}
         >
-          {(modoEditar ? TITULO_EDITAR : TITULO_CRIAR)[tipo]}
+          {(modoEditar ? TITULO_EDITAR : TITULO_CRIAR)[tipoAtual]}
         </h2>
         <Hand color="var(--ink-2)" size={16} style={{ display: 'block', marginBottom: 18 }}>
-          {HAND_HINT[tipo]}
+          {HAND_HINT[tipoAtual]}
         </Hand>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        {mostraNome && (
+          <Field label="nome">
+            <input
+              value={nome}
+              onChange={(e) => setNome(e.target.value)}
+              placeholder={placeholderNome}
+              style={input}
+            />
+          </Field>
+        )}
+
+        {mostraSelectTipo && (
+          <Field label="tipo">
+            <select
+              value={tipoAtual}
+              onChange={(e) => setTipoAtual(e.target.value as AddTipo)}
+              style={input}
+            >
+              {(Object.keys(ROTULO_TIPO) as Array<keyof typeof ROTULO_TIPO>).map((t) => (
+                <option key={t} value={t}>
+                  {ROTULO_TIPO[t]}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
+
+        {tipoAtual === 'plantao' && (
+          <Field label="hospital">
+            <select
+              value={hospitalId}
+              onChange={(e) => setHospitalId(e.target.value)}
+              style={input}
+            >
+              {hospitaisLista.length === 0 && <option value="">cadastra um hospital antes</option>}
+              {hospitaisLista.map((h) => (
+                <option key={h.id} value={h.id}>
+                  {h.abrev} · {h.nome}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 12 }}>
           <Field label="data">
             <input
               type="date"
@@ -204,7 +266,7 @@ export function AdicionarBloco({
               style={input}
             />
           </Field>
-          <Field label={tipo === 'bloqueio' ? 'duração (h)' : 'horário'}>
+          <Field label={tipoAtual === 'bloqueio' ? 'duração (h)' : 'horário'}>
             <div style={{ display: 'flex', gap: 8 }}>
               <input
                 type="number"
@@ -230,61 +292,11 @@ export function AdicionarBloco({
           </Field>
         </div>
 
-        {tipo === 'plantao' && (
-          <Field label="hospital">
-            <select
-              value={hospitalId}
-              onChange={(e) => setHospitalId(e.target.value)}
-              style={input}
-            >
-              {hospitaisLista.length === 0 && <option value="">cadastra um hospital antes</option>}
-              {hospitaisLista.map((h) => (
-                <option key={h.id} value={h.id}>
-                  {h.abrev} · {h.nome}
-                </option>
-              ))}
-            </select>
-          </Field>
-        )}
-
-        {tipo === 'bloqueio' && (
-          <Field label="motivo (opcional)">
-            <input
-              value={motivo}
-              onChange={(e) => setMotivo(e.target.value)}
-              placeholder="aniversário · viagem · descanso"
-              style={input}
-            />
-          </Field>
-        )}
-
-        {tipo === 'consulta' && (
-          <Field label="local">
-            <input
-              value={local}
-              onChange={(e) => setLocal(e.target.value)}
-              placeholder="consultório centro"
-              style={input}
-            />
-          </Field>
-        )}
-
-        {(tipo === 'estudo' || tipo === 'pessoal' || tipo === 'outros') && (
-          <Field label="título">
-            <input
-              value={titulo}
-              onChange={(e) => setTitulo(e.target.value)}
-              placeholder={tipo === 'estudo' ? 'curso de UTI neonatal' : 'reunião · jantar · etc'}
-              style={input}
-            />
-          </Field>
-        )}
-
         <Mono style={{ display: 'block', marginTop: 14, color: 'var(--ink-3)' }}>
           {fmtDate(data)} · {fmtRange(horaInicio, duracao)} · {duracao}h
         </Mono>
 
-        {tipo === 'plantao' && hospitalId && (
+        {tipoAtual === 'plantao' && hospitalId && (
           <div style={{ marginTop: 14 }}>
             <JanelaPreview
               blocos={blocosAtuais}

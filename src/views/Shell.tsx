@@ -16,7 +16,6 @@ interface ShellProps {
   hospitais: HospitaisMap;
   selecionado: Bloco | null;
   setSelecionado: (b: Bloco | null) => void;
-  abrirDetalhe?: (b: Bloco) => void;
   onAdd?: (t: AddTipo) => void;
   onTrocar?: (b: Bloco) => void;
   onCeder?: (b: Bloco) => void;
@@ -41,7 +40,6 @@ export function Shell({
   hospitais,
   selecionado,
   setSelecionado,
-  abrirDetalhe,
   onAdd,
   onTrocar,
   onCeder,
@@ -87,7 +85,6 @@ export function Shell({
         onClose={() => setSelecionado(null)}
         onTrocar={onTrocar}
         onCeder={onCeder}
-        onAbrirDetalhe={abrirDetalhe}
         onEditar={onEditar}
         onRemover={onRemover}
       />

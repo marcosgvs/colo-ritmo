@@ -9,10 +9,9 @@ interface BlockDrawerProps {
   onClose: () => void;
   onTrocar?: (b: Bloco) => void;
   onCeder?: (b: Bloco) => void;
-  onAbrirDetalhe?: (b: Bloco) => void;
   /** Editar abre o form com todos os campos preenchidos. */
   onEditar?: (b: Bloco) => void;
-  /** Remover tira da agenda. Caller cuida da confirmação se quiser. */
+  /** Remover tira da agenda. */
   onRemover?: (id: number | string) => void;
 }
 
@@ -40,7 +39,6 @@ export function BlockDrawer({
   onClose,
   onTrocar,
   onCeder,
-  onAbrirDetalhe,
   onEditar,
   onRemover,
 }: BlockDrawerProps) {
@@ -233,54 +231,44 @@ export function BlockDrawer({
 
         <div style={{ flex: 1 }} />
 
-        {bloco.tipo === 'plantao' && (
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            {onAbrirDetalhe && (
-              <Btn primary onClick={() => onAbrirDetalhe(bloco)}>
-                abrir detalhe
-              </Btn>
-            )}
-            {onTrocar && <Btn onClick={() => onTrocar(bloco)}>pedir troca</Btn>}
-            {onCeder && <Btn onClick={() => onCeder(bloco)}>ceder pra alguém</Btn>}
-          </div>
-        )}
-
-        {(onEditar || onRemover) && (
-          <div
-            style={{
-              display: 'flex',
-              gap: 10,
-              flexWrap: 'wrap',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              paddingTop: 10,
-              borderTop: '1px dashed var(--line-2)',
-            }}
-          >
-            {onEditar && TIPOS_EDITAVEIS.has(bloco.tipo) ? (
-              <Btn onClick={() => onEditar(bloco)}>editar</Btn>
-            ) : (
-              <span />
-            )}
-            {onRemover && (
-              <button
-                type="button"
-                onClick={() => onRemover(bloco.id)}
-                style={{
-                  font: '600 12px/1 var(--font-body)',
-                  padding: '10px 16px',
-                  borderRadius: 999,
-                  border: '1px solid var(--coral-ink)',
-                  background: 'transparent',
-                  color: 'var(--coral-ink)',
-                  cursor: 'pointer',
-                }}
-              >
-                remover da agenda
-              </button>
-            )}
-          </div>
-        )}
+        <div
+          style={{
+            display: 'flex',
+            gap: 10,
+            flexWrap: 'wrap',
+            alignItems: 'center',
+          }}
+        >
+          {onEditar && TIPOS_EDITAVEIS.has(bloco.tipo) && (
+            <Btn primary onClick={() => onEditar(bloco)}>
+              editar
+            </Btn>
+          )}
+          {bloco.tipo === 'plantao' && onTrocar && (
+            <Btn onClick={() => onTrocar(bloco)}>trocar</Btn>
+          )}
+          {bloco.tipo === 'plantao' && onCeder && (
+            <Btn onClick={() => onCeder(bloco)}>ceder</Btn>
+          )}
+          <span style={{ flex: 1 }} />
+          {onRemover && (
+            <button
+              type="button"
+              onClick={() => onRemover(bloco.id)}
+              style={{
+                font: '600 13px/1 var(--font-body)',
+                padding: '11px 18px',
+                borderRadius: 999,
+                border: '1px solid var(--coral-ink)',
+                background: 'transparent',
+                color: 'var(--coral-ink)',
+                cursor: 'pointer',
+              }}
+            >
+              remover
+            </button>
+          )}
+        </div>
 
         {hospitais && Object.keys(hospitais).length === 0 && (
           <Mono style={{ color: 'var(--ink-3)', display: 'block' }}>
