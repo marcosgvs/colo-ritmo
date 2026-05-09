@@ -1,6 +1,6 @@
 import type { Bloco, BlocoCedido, BlocoPlantao, Mode, Nivel } from '@/types';
 import type { AnaliseDescanso } from '@/lib/data';
-import { CARGA_MES, cargaSemanal, fmtDate, fmtRange, getHospital } from '@/lib/data';
+import { CARGA_MES, HOJE, cargaSemanal, fmtDate, fmtRange, getHospital } from '@/lib/data';
 import { Eyebrow, Hand, Mono } from '@/components/atoms';
 import { Card } from './Card';
 
@@ -257,7 +257,7 @@ function Row({ dot, children }: RowProps) {
 
 export function Rail({ blocos, mode, analise, blocosDaJanela }: RailProps) {
   const proximos = blocos
-    .filter((b): b is BlocoPlantao => b.tipo === 'plantao')
+    .filter((b): b is BlocoPlantao => b.tipo === 'plantao' && b.data >= HOJE)
     .sort((a, b) => a.data.localeCompare(b.data) || a.horaInicio - b.horaInicio);
   const proximoDestaque = proximos[0];
 

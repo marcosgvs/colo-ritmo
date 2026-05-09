@@ -133,10 +133,15 @@ export function AdicionarBloco({
 
   const conflitos = useMemo(() => {
     if (tipoAtual !== 'plantao') return [];
-    return detectarConflitos([...blocosAtuais, novoBloco], hospitais).filter((c) =>
+    // Em modo editar, remove o bloco original do array antes de detectar —
+    // senão o detector compara o novoBloco contra ele mesmo e gera SOBREPOSICAO falsa.
+    const semOriginal = blocoExistente
+      ? blocosAtuais.filter((b) => b.id !== blocoExistente.id)
+      : blocosAtuais;
+    return detectarConflitos([...semOriginal, novoBloco], hospitais).filter((c) =>
       c.a.id === novoBloco.id || c.b?.id === novoBloco.id,
     );
-  }, [tipoAtual, novoBloco, blocosAtuais, hospitais]);
+  }, [tipoAtual, novoBloco, blocosAtuais, hospitais, blocoExistente]);
 
   const podeSalvar = (tipoAtual !== 'plantao' || hospitalId) && duracao > 0;
   const mostraNome = tipoAtual !== 'plantao' && tipoAtual !== 'sono';
@@ -299,7 +304,11 @@ export function AdicionarBloco({
         {tipoAtual === 'plantao' && hospitalId && (
           <div style={{ marginTop: 14 }}>
             <JanelaPreview
-              blocos={blocosAtuais}
+              blocos={
+                blocoExistente
+                  ? blocosAtuais.filter((b) => b.id !== blocoExistente.id)
+                  : blocosAtuais
+              }
               hospitais={hospitais}
               novoBloco={novoBloco as BlocoPlantao}
             />
