@@ -140,3 +140,30 @@ export function detectarConflitos(
 export function cargaSemanal(blocos: Bloco[]): number {
   return blocos.reduce((s, b) => (b.tipo === 'plantao' ? s + b.duracao : s), 0);
 }
+
+/**
+ * Retorna nova lista de blocos com `conflito: true` marcado nos plantões
+ * que aparecem em qualquer conflito detectado. Idempotente: limpa flags
+ * antes de aplicar. Não muta a entrada.
+ *
+ * Usado pelo App.tsx pra enriquecer `state.blocos` antes de passar pras
+ * views — sem isso, o detector acha conflito mas o calendário não pinta
+ * vermelho nenhum bloquinho.
+ */
+export function marcarConflitos(
+  blocos: Bloco[],
+  hospitais: HospitaisMap,
+): Bloco[] {
+  const conflitos = detectarConflitos(blocos, hospitais);
+  const idsEmConflito = new Set<string | number>();
+  for (const c of conflitos) {
+    idsEmConflito.add(c.a.id);
+    if (c.b) idsEmConflito.add(c.b.id);
+  }
+  return blocos.map((b) => {
+    if (b.tipo !== 'plantao') return b;
+    const deveTer = idsEmConflito.has(b.id);
+    if (b.conflito === deveTer) return b; // sem mudança · evita re-render
+    return { ...b, conflito: deveTer };
+  });
+}

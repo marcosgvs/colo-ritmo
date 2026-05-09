@@ -46,7 +46,7 @@ export {
 export { calcCadeias } from './cadeias.js';
 export type { Cadeia } from './cadeias.js';
 
-export { cargaSemanal, detectarConflitos } from './conflitos.js';
+export { cargaSemanal, detectarConflitos, marcarConflitos } from './conflitos.js';
 export type { Conflito, TipoConflito } from './conflitos.js';
 
 export {

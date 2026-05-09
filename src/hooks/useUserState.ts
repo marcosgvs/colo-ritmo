@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { Bloco, Hospital, PadraoMedica, Preferencias, PropostaSalva } from '@/types';
 import { supabase } from '@/lib/supabase';
-import { BLOCOS_SEMANA, HOSPITAIS, PREFERENCIAS_ME } from '@/lib/data';
+import { BLOCOS_SEMANA, HOSPITAIS, PREFERENCIAS_ME, marcarConflitos } from '@/lib/data';
 
 /**
  * Shape do JSON em `user_state.state`. Mantemos compatibilidade com
@@ -204,5 +204,13 @@ export function useUserState(userId: string | null): UserStateAPI {
     };
   }, [userId, persistir]);
 
-  return { status, erro, state, setState, flushSave };
+  // State enriquecido · blocos com `conflito: true` marcados a partir de
+  // detectarConflitos. Sem isso, o calendário não pinta vermelho os blocos
+  // em sobreposição/sem-descanso (apesar do contador no header somar certo).
+  const stateEnriquecido = useMemo<UserStateValor>(
+    () => ({ ...state, blocos: marcarConflitos(state.blocos, state.hospitais) }),
+    [state],
+  );
+
+  return { status, erro, state: stateEnriquecido, setState, flushSave };
 }
