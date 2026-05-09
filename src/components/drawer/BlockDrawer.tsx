@@ -1,11 +1,20 @@
-import { useEffect } from 'react';
-import type { Bloco, HospitaisMap } from '@/types';
-import { ehNoturno, fmtDate, fmtRange, getHospital } from '@/lib/data';
+import { useEffect, useMemo } from 'react';
+import type { Bloco, BlocoPlantao, HospitaisMap } from '@/types';
+import {
+  detectarConflitos,
+  ehNoturno,
+  fmtDate,
+  fmtRange,
+  getHospital,
+  type Conflito,
+} from '@/lib/data';
 import { Eyebrow, Hand, Mono, Pill } from '@/components/atoms';
 
 interface BlockDrawerProps {
   bloco: Bloco | null;
   hospitais: HospitaisMap;
+  /** Lista completa de blocos · pra resolver conflitos com a contraparte */
+  blocos?: Bloco[];
   onClose: () => void;
   onTrocar?: (b: Bloco) => void;
   onCeder?: (b: Bloco) => void;
@@ -14,6 +23,13 @@ interface BlockDrawerProps {
   /** Remover tira da agenda. */
   onRemover?: (id: number | string) => void;
 }
+
+const ROTULO_CONFLITO: Record<string, string> = {
+  sobreposicao: 'plantões sobrepostos',
+  sem_descanso: 'descanso curto entre plantões',
+  limite_cfm: 'mais de 60h na semana (CFM)',
+  max_semana: 'limite de plantões por semana batido',
+};
 
 const TIPOS_EDITAVEIS = new Set([
   'plantao',
@@ -36,6 +52,7 @@ const TIPOS_EDITAVEIS = new Set([
 export function BlockDrawer({
   bloco,
   hospitais,
+  blocos,
   onClose,
   onTrocar,
   onCeder,
@@ -51,6 +68,22 @@ export function BlockDrawer({
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [bloco, onClose]);
+
+  // Quando o bloco está em conflito, busca contrapartes pra mostrar lado a lado
+  const conflitosRelacionados = useMemo<Array<{ outro: BlocoPlantao; conflito: Conflito }>>(() => {
+    if (!bloco || bloco.tipo !== 'plantao' || !bloco.conflito || !blocos) return [];
+    const todos = detectarConflitos(blocos, hospitais);
+    const meus = todos.filter(
+      (c) => c.a.id === bloco.id || (c.b && c.b.id === bloco.id),
+    );
+    return meus
+      .map((c) => {
+        const outro = c.a.id === bloco.id ? c.b : c.a;
+        if (!outro) return null;
+        return { outro, conflito: c };
+      })
+      .filter((x): x is { outro: BlocoPlantao; conflito: Conflito } => x !== null);
+  }, [bloco, blocos, hospitais]);
 
   if (!bloco) return null;
 
@@ -171,6 +204,86 @@ export function BlockDrawer({
 
         {bloco.tipo === 'plantao' && ehNoturno(bloco) && (
           <Pill kind="info">noturno</Pill>
+        )}
+
+        {conflitosRelacionados.length > 0 && (
+          <div
+            style={{
+              background: 'var(--coral-surface)',
+              border: '1px solid var(--coral-ink)',
+              borderRadius: 'var(--r-md)',
+              padding: '14px 16px',
+            }}
+          >
+            <Eyebrow color="var(--coral-ink)">
+              {conflitosRelacionados.length === 1
+                ? 'em conflito com'
+                : `em conflito com ${conflitosRelacionados.length} plantões`}
+            </Eyebrow>
+            <Hand
+              color="var(--coral-ink)"
+              size={14}
+              style={{ display: 'block', marginTop: 4, marginBottom: 12 }}
+            >
+              um dos dois precisa sair · escolhe qual
+            </Hand>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {conflitosRelacionados.map(({ outro, conflito }) => {
+                const hospOutro = getHospital(outro.hospitalId);
+                const cor = hospOutro?.cor ?? 'sand';
+                return (
+                  <div
+                    key={String(outro.id)}
+                    style={{
+                      background: 'var(--bg)',
+                      borderLeft: `4px solid var(--${cor})`,
+                      borderRadius: 10,
+                      padding: '10px 12px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    <div style={{ flex: 1, minWidth: 160 }}>
+                      <Eyebrow color={`var(--${cor}-ink)`}>
+                        {hospOutro?.abrev ?? outro.hospitalId}
+                      </Eyebrow>
+                      <p
+                        style={{
+                          font: '500 14px/1.3 var(--font-body)',
+                          margin: '4px 0 2px',
+                          color: 'var(--ink)',
+                        }}
+                      >
+                        {fmtDate(outro.data)} · {fmtRange(outro.horaInicio, outro.duracao)}
+                      </p>
+                      <Mono style={{ color: 'var(--coral-ink)', fontSize: 11 }}>
+                        {ROTULO_CONFLITO[conflito.tipo] ?? conflito.tipo} · {conflito.detalhe}
+                      </Mono>
+                    </div>
+                    {onRemover && (
+                      <button
+                        type="button"
+                        onClick={() => onRemover(outro.id)}
+                        style={{
+                          font: '600 12px/1 var(--font-body)',
+                          padding: '8px 14px',
+                          borderRadius: 999,
+                          border: '1px solid var(--coral-ink)',
+                          background: 'transparent',
+                          color: 'var(--coral-ink)',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        remover este
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         )}
 
         {bloco.tipo === 'cedido' && (

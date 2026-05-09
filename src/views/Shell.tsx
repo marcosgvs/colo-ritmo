@@ -82,6 +82,7 @@ export function Shell({
       <BlockDrawer
         bloco={selecionado}
         hospitais={hospitais}
+        blocos={blocos}
         onClose={() => setSelecionado(null)}
         onTrocar={onTrocar}
         onCeder={onCeder}
