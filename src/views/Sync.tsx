@@ -35,10 +35,13 @@ interface Resultado {
   avisos: string[];
   /** Diferenciamos: ICS = só blocos, PDF = blocos + janelas */
   origem: 'ics' | 'pdf';
+  /** Texto bruto que o modelo devolveu quando não conseguimos organizar a resposta. */
+  respostaCrua?: string;
 }
 
 export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, icsToken, nomeUser }: SyncProps) {
   const [hospitalId, setHospitalId] = useState<string>(() => Object.keys(hospitais)[0] ?? '');
+  const [apelidoNaEscala, setApelidoNaEscala] = useState('');
   const [mes, setMes] = useState<string>(() => new Date().toISOString().slice(0, 7));
   const [estado, setEstado] = useState<Estado>('parado');
   const [resultado, setResultado] = useState<Resultado | null>(null);
@@ -77,6 +80,7 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
           ano,
           mes: mesNum,
           nome: nomeUser,
+          apelidoNaEscala: apelidoNaEscala.trim() || undefined,
         }),
       });
       if (!resp.ok) {
@@ -90,12 +94,14 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
         blocos: BlocoPlantao[];
         janelas?: Janela[];
         avisos?: string[];
+        respostaCrua?: string;
       };
       setResultado({
         blocos: json.blocos,
         janelas: json.janelas ?? [],
         avisos: json.avisos ?? [],
         origem: 'pdf',
+        respostaCrua: json.respostaCrua,
       });
       setEstado('pronto');
     } catch (err) {
@@ -163,7 +169,7 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
       <PageHead
         eyebrow="sincronizar agenda"
         titulo="trazer e levar plantões."
-        hand="solta o pdf da escala ou cola um ics — eu organizo."
+        hand="solta o pdf da escala ou cola de outro calendário — eu organizo."
       />
 
       <div
@@ -175,10 +181,10 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
         }}
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <Card titulo="importar pdf da escala" eyebrow="claude lê e devolve em json">
+          <Card titulo="importar pdf da escala">
             <p style={{ font: '400 14px/1.5 var(--font-body)', color: 'var(--ink-2)', margin: '0 0 14px' }}>
-              o modelo extrai linha por linha · se ele tiver dúvida em alguma, vem como aviso e
-              você decide.
+              passo linha por linha pra encontrar seus plantões · se algo ficar duvidoso,
+              marco como aviso pra você revisar antes de salvar.
             </p>
 
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
@@ -194,6 +200,15 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
                     </option>
                   ))}
                 </select>
+              </Field>
+              <Field label="como seu nome aparece na escala">
+                <input
+                  type="text"
+                  value={apelidoNaEscala}
+                  onChange={(e) => setApelidoNaEscala(e.target.value)}
+                  placeholder="ex: Mpinheiro"
+                  style={{ ...inputStyle, minWidth: 200 }}
+                />
               </Field>
               <Field label="mês">
                 <MonthPicker value={mes} onChange={setMes} />
@@ -236,11 +251,11 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
             )}
           </Card>
 
-          <Card titulo="ou colar um ics" eyebrow="útil pra google · apple">
+          <Card titulo="ou colar de outro calendário" eyebrow="útil pra google · apple">
             <textarea
               value={icsTexto}
               onChange={(e) => setIcsTexto(e.target.value)}
-              placeholder="BEGIN:VCALENDAR..."
+              placeholder="cole aqui o conteúdo que veio de outro calendário"
               rows={5}
               style={{
                 ...inputStyle,
@@ -266,7 +281,7 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
                 opacity: !icsTexto.trim() || !hospitalId ? 0.5 : 1,
               }}
             >
-              ler ics
+              importar
             </button>
           </Card>
 
@@ -295,6 +310,36 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
                       <li key={i}>{a}</li>
                     ))}
                   </ul>
+                  {resultado.respostaCrua && (
+                    <details style={{ marginTop: 10 }}>
+                      <summary
+                        style={{
+                          cursor: 'pointer',
+                          font: '500 12px/1.4 var(--font-body)',
+                          color: 'var(--ink-3)',
+                        }}
+                      >
+                        ver o que recebi
+                      </summary>
+                      <pre
+                        style={{
+                          marginTop: 6,
+                          padding: 10,
+                          background: 'var(--bg)',
+                          border: '1px solid var(--line-2)',
+                          borderRadius: 'var(--r-sm)',
+                          font: '400 11px/1.5 var(--font-mono)',
+                          color: 'var(--ink-2)',
+                          whiteSpace: 'pre-wrap',
+                          wordBreak: 'break-word',
+                          maxHeight: 240,
+                          overflowY: 'auto',
+                        }}
+                      >
+                        {resultado.respostaCrua}
+                      </pre>
+                    </details>
+                  )}
                 </div>
               )}
 
@@ -423,7 +468,7 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
         <aside style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <Card titulo="exportar" eyebrow="google · apple">
             <p style={{ font: '400 13px/1.5 var(--font-body)', color: 'var(--ink-2)', margin: '0 0 12px' }}>
-              gera um .ics com sua agenda atual.
+              baixa um arquivo de calendário com sua agenda atual.
             </p>
             <button
               type="button"
@@ -438,7 +483,7 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
                 cursor: 'pointer',
               }}
             >
-              baixar .ics agora
+              baixar agora
             </button>
             {linkICS && (
               <>
