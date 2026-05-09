@@ -268,5 +268,8 @@ function labelSemana(seg: string, dom: string): string {
   const mesSeg = MESES[dSeg.getMonth()];
   const mesDom = MESES[dDom.getMonth()];
   if (mesSeg === mesDom) return `${diaSeg}–${diaDom} ${mesSeg}`;
-  return `${diaSeg} ${mesSeg} – ${diaDom} ${mesDom}`;
+  // Cruza mês · formato compacto dd/mm pra não quebrar linha
+  const mmSeg = String(dSeg.getMonth() + 1).padStart(2, '0');
+  const mmDom = String(dDom.getMonth() + 1).padStart(2, '0');
+  return `${diaSeg}/${mmSeg} – ${diaDom}/${mmDom}`;
 }
