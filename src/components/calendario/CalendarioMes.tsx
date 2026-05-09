@@ -25,6 +25,15 @@ interface CalendarioMesProps {
   onSelectDia?: (iso: string) => void;
   /** Default false; se true, a coluna "soma" some. */
   semSoma?: boolean;
+  /**
+   * Quando true, a célula inteira é hotspot · hover lavanda + ícone de
+   * lápis no canto + click dispara `onSelectDia` mesmo se a célula tem
+   * plantões ou bloqueio. Click num bloquinho ainda dispara
+   * `onSelectMarcador`/`onSelectBloco` (stopPropagation).
+   */
+  cellHotspot?: boolean;
+  /** Coords (x, y) do click usados pra ancorar popover; só com cellHotspot. */
+  onSelectDiaComAnchor?: (iso: string, anchor: { x: number; y: number }) => void;
 }
 
 /**
@@ -42,6 +51,8 @@ export function CalendarioMes({
   onSelectMarcador,
   onSelectDia,
   semSoma = false,
+  cellHotspot = false,
+  onSelectDiaComAnchor,
 }: CalendarioMesProps) {
   const semanas = useMemo(() => calcularSemanas(refIso), [refIso]);
   const mesData = fromISO(refIso);
@@ -148,14 +159,33 @@ export function CalendarioMes({
               const bloqueio = (blocosPorDia.get(iso) ?? []).find(
                 (b) => b.tipo === 'bloqueio',
               );
-              const diaClicavel =
-                onSelectDia && noMes && !bloqueio && items.length === 0 && sugItems.length === 0;
+              const diaClicavelLegado =
+                !cellHotspot &&
+                onSelectDia &&
+                noMes &&
+                !bloqueio &&
+                items.length === 0 &&
+                sugItems.length === 0;
+              const hotspotAtivo = cellHotspot && noMes;
+              const handleCellClick = (e: React.MouseEvent<HTMLDivElement>) => {
+                if (hotspotAtivo) {
+                  if (onSelectDiaComAnchor) {
+                    onSelectDiaComAnchor(iso, { x: e.clientX, y: e.clientY });
+                  } else if (onSelectDia) {
+                    onSelectDia(iso);
+                  }
+                  return;
+                }
+                if (diaClicavelLegado) onSelectDia!(iso);
+              };
+              const interativo = diaClicavelLegado || hotspotAtivo;
               return (
                 <div
                   key={iso}
-                  onClick={diaClicavel ? () => onSelectDia!(iso) : undefined}
-                  role={diaClicavel ? 'button' : undefined}
-                  tabIndex={diaClicavel ? 0 : undefined}
+                  onClick={interativo ? handleCellClick : undefined}
+                  role={interativo ? 'button' : undefined}
+                  tabIndex={interativo ? 0 : undefined}
+                  className={hotspotAtivo ? 'colo-cal-cell-hot' : undefined}
                   style={{
                     minHeight: 96,
                     padding: 8,
@@ -171,9 +201,27 @@ export function CalendarioMes({
                     flexDirection: 'column',
                     gap: 6,
                     position: 'relative',
-                    cursor: diaClicavel ? 'pointer' : 'default',
+                    cursor: interativo ? 'pointer' : 'default',
                   }}
                 >
+                  {hotspotAtivo && (
+                    <span
+                      className="colo-cal-cell-pencil"
+                      aria-hidden
+                      style={{
+                        position: 'absolute',
+                        top: 6,
+                        right: 6,
+                        color: 'var(--lavender-ink)',
+                        display: 'flex',
+                      }}
+                    >
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 20h9" />
+                        <path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+                      </svg>
+                    </span>
+                  )}
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
                     <span
                       style={{
@@ -278,7 +326,11 @@ function Bloquinho({ cor, abrev, duracao, sugerido, onClick }: BloquinhoProps) {
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={(e) => {
+        if (!onClick) return;
+        e.stopPropagation();
+        onClick();
+      }}
       disabled={!onClick}
       style={{
         textAlign: 'left',

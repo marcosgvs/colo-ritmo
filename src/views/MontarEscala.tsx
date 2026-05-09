@@ -95,6 +95,13 @@ export function MontarEscala({
   >(null);
   const [previewAberto, setPreviewAberto] = useState(false);
 
+  // Menu de dia (popover ancorado quando clica numa célula da prévia)
+  const [menuDia, setMenuDia] = useState<
+    | { iso: string; anchor: { x: number; y: number } }
+    | null
+  >(null);
+  const [flashMsg, setFlashMsg] = useState<string | null>(null);
+
   // Id da proposta ativa · setado quando reabre do drawer ou ao primeiro export
   const [propostaAtivaId, setPropostaAtivaId] = useState<string | null>(null);
   // Modo "reaberta": mostra prévia editável sem precisar do solver rodar
@@ -194,8 +201,43 @@ export function MontarEscala({
     setEditorPlantao({ modo: 'editar', bloco: b });
   }
 
-  function abrirEditorDia(iso: string) {
+  function abrirMenuDia(iso: string, anchor: { x: number; y: number }) {
+    setMenuDia({ iso, anchor });
+  }
+
+  function flash(msg: string) {
+    setFlashMsg(msg);
+    window.setTimeout(() => setFlashMsg(null), 2400);
+  }
+
+  function bloquearDia(iso: string) {
+    if (!onAdicionarBloco) return;
+    const novo: BlocoBloqueio = {
+      id: `bloq-${Date.now()}`,
+      tipo: 'bloqueio',
+      data: iso,
+      horaInicio: 0,
+      duracao: 24,
+    };
+    onAdicionarBloco(novo);
+    flash(`${fmtDate(iso)} bloqueado · vai pra agenda`);
+    setMenuDia(null);
+  }
+
+  function desbloquearDia(iso: string) {
+    if (!onRemoverBloco) return;
+    const bloq = blocos.find(
+      (b): b is BlocoBloqueio => b.tipo === 'bloqueio' && b.data === iso,
+    );
+    if (!bloq) return;
+    onRemoverBloco(bloq.id);
+    flash(`${fmtDate(iso)} desbloqueado`);
+    setMenuDia(null);
+  }
+
+  function abrirEditorDoMenu(iso: string) {
     setEditorPlantao({ modo: 'adicionar', dataISO: iso });
+    setMenuDia(null);
   }
 
   function salvarPlantaoEditor(novo: BlocoPlantao) {
@@ -283,7 +325,6 @@ export function MontarEscala({
             mesAlvo={mesAlvo}
             hospitaisIncluidos={hospitaisIncluidos}
             metaInput={metaInput}
-            bloqueios={bloqueiosDoMes}
             onEditar={() => setSetupColapsado(false)}
           />
         ) : !semHospitais ? (
@@ -296,9 +337,6 @@ export function MontarEscala({
             metaInput={metaInput}
             onMetaInput={trocarMeta}
             metaPreferencia={preferencias.metaMensal}
-            bloqueios={bloqueiosDoMes}
-            onAdicionarBloco={onAdicionarBloco}
-            onRemoverBloco={onRemoverBloco}
             onGerar={gerar}
             podeGerar={podeGerar}
             jaTemResultado={!!comparativo}
@@ -371,14 +409,15 @@ export function MontarEscala({
                   hospitais={hospitais}
                   marcadores={blocosFinaisProposta}
                   onSelectMarcador={abrirEditorMarcador}
-                  onSelectDia={abrirEditorDia}
+                  cellHotspot
+                  onSelectDiaComAnchor={abrirMenuDia}
                 />
                 <Hand
                   color="var(--lavender-ink)"
                   size={14}
                   style={{ display: 'block', marginTop: 10 }}
                 >
-                  clica num plantão sugerido pra editar ou remover · num dia livre pra adicionar
+                  passa o mouse num dia pra ver as opções · click num plantão pra editar
                 </Hand>
 
                 <div
@@ -544,9 +583,141 @@ export function MontarEscala({
           onFechar={() => setHistoricoAberto(false)}
         />
       )}
+
+      {menuDia && (
+        <MenuDia
+          iso={menuDia.iso}
+          anchor={menuDia.anchor}
+          jaTemBloqueio={blocos.some(
+            (b) => b.tipo === 'bloqueio' && b.data === menuDia.iso,
+          )}
+          plantoesNoDia={blocosFinaisProposta.filter((p) => p.data === menuDia.iso).length}
+          onAdicionarPlantao={() => abrirEditorDoMenu(menuDia.iso)}
+          onBloquear={() => bloquearDia(menuDia.iso)}
+          onDesbloquear={() => desbloquearDia(menuDia.iso)}
+          onFechar={() => setMenuDia(null)}
+        />
+      )}
+
+      {flashMsg && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: 24,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: 'var(--ink)',
+            color: 'var(--bg)',
+            padding: '10px 18px',
+            borderRadius: 999,
+            font: '500 13px/1.4 var(--font-body)',
+            boxShadow: 'var(--shadow-lg)',
+            zIndex: 80,
+            animation: 'colo-fade-in 180ms ease',
+          }}
+        >
+          {flashMsg}
+        </div>
+      )}
     </>
   );
 }
+
+interface MenuDiaProps {
+  iso: string;
+  anchor: { x: number; y: number };
+  jaTemBloqueio: boolean;
+  plantoesNoDia: number;
+  onAdicionarPlantao: () => void;
+  onBloquear: () => void;
+  onDesbloquear: () => void;
+  onFechar: () => void;
+}
+
+function MenuDia({
+  iso,
+  anchor,
+  jaTemBloqueio,
+  plantoesNoDia,
+  onAdicionarPlantao,
+  onBloquear,
+  onDesbloquear,
+  onFechar,
+}: MenuDiaProps) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onFechar();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onFechar]);
+
+  // Posiciona pra não sair da viewport
+  const w = 220;
+  const h = 140;
+  const x = Math.min(anchor.x + 6, window.innerWidth - w - 12);
+  const y = Math.min(anchor.y + 6, window.innerHeight - h - 12);
+
+  const labelAdicionar =
+    plantoesNoDia > 0 ? 'adicionar outro plantão' : 'adicionar plantão à proposta';
+
+  return (
+    <div
+      onClick={onFechar}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 75,
+        background: 'transparent',
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          position: 'fixed',
+          top: y,
+          left: x,
+          width: w,
+          background: 'var(--bg)',
+          border: '1px solid var(--lavender-ink)',
+          borderRadius: 12,
+          padding: '8px',
+          boxShadow: 'var(--shadow-lg)',
+          animation: 'colo-drawer-down 180ms ease',
+        }}
+      >
+        <div style={{ padding: '4px 8px 6px', borderBottom: '1px dashed var(--line-2)', marginBottom: 4 }}>
+          <Eyebrow color="var(--lavender-ink)">{fmtDate(iso)}</Eyebrow>
+        </div>
+        <button type="button" onClick={onAdicionarPlantao} style={menuItemStyle}>
+          {labelAdicionar}
+        </button>
+        {jaTemBloqueio ? (
+          <button type="button" onClick={onDesbloquear} style={menuItemStyle}>
+            desbloquear este dia
+          </button>
+        ) : (
+          <button type="button" onClick={onBloquear} style={menuItemStyle}>
+            bloquear este dia
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const menuItemStyle: React.CSSProperties = {
+  display: 'block',
+  width: '100%',
+  textAlign: 'left',
+  font: '500 13px/1.3 var(--font-body)',
+  padding: '10px 12px',
+  borderRadius: 8,
+  border: 'none',
+  background: 'transparent',
+  color: 'var(--ink)',
+  cursor: 'pointer',
+};
 
 function HistoricoTrigger({
   quantidade,
@@ -939,9 +1110,6 @@ interface SetupCardProps {
   metaInput: string;
   onMetaInput: (v: string) => void;
   metaPreferencia: number;
-  bloqueios: BlocoBloqueio[];
-  onAdicionarBloco?: (b: Bloco) => void;
-  onRemoverBloco?: (id: number | string) => void;
   onGerar: () => void;
   podeGerar: boolean;
   jaTemResultado: boolean;
@@ -956,32 +1124,10 @@ function SetupCard({
   metaInput,
   onMetaInput,
   metaPreferencia,
-  bloqueios,
-  onAdicionarBloco,
-  onRemoverBloco,
   onGerar,
   podeGerar,
   jaTemResultado,
 }: SetupCardProps) {
-  const [bloqueioOpen, setBloqueioOpen] = useState(false);
-  const [bloqData, setBloqData] = useState(`${mesAlvo}-15`);
-  const [bloqMotivo, setBloqMotivo] = useState('');
-
-  function adicionarBloqueio() {
-    if (!onAdicionarBloco || !bloqData) return;
-    const novo: BlocoBloqueio = {
-      id: `bloq-${Date.now()}`,
-      tipo: 'bloqueio',
-      data: bloqData,
-      horaInicio: 0,
-      duracao: 24,
-      motivo: bloqMotivo || undefined,
-    };
-    onAdicionarBloco(novo);
-    setBloqMotivo('');
-    setBloqueioOpen(false);
-  }
-
   return (
     <Card titulo="setup do mês" eyebrow="defina antes de gerar">
       <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
@@ -1042,136 +1188,9 @@ function SetupCard({
           </div>
         </Field>
 
-        <Field label="bloqueios deste mês">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {bloqueios.length === 0 && !bloqueioOpen && (
-              <Mono style={{ color: 'var(--ink-3)' }}>nenhum bloqueio cadastrado</Mono>
-            )}
-            {bloqueios.map((b) => (
-              <div
-                key={b.id}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '8px 12px',
-                  background: 'var(--bg-alt)',
-                  borderRadius: 'var(--r-md)',
-                }}
-              >
-                <span style={{ font: '500 13px/1.3 var(--font-body)', color: 'var(--ink-2)' }}>
-                  {fmtDate(b.data)} {b.motivo ? `· ${b.motivo}` : ''}
-                </span>
-                {onRemoverBloco && (
-                  <button
-                    type="button"
-                    onClick={() => onRemoverBloco(b.id)}
-                    aria-label="remover"
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      cursor: 'pointer',
-                      color: 'var(--ink-3)',
-                      font: '500 18px/1 var(--font-body)',
-                    }}
-                  >
-                    ×
-                  </button>
-                )}
-              </div>
-            ))}
-
-            {bloqueioOpen ? (
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '160px 1fr auto auto',
-                  gap: 8,
-                  alignItems: 'center',
-                  marginTop: 4,
-                }}
-              >
-                <input
-                  type="date"
-                  value={bloqData}
-                  onChange={(e) => setBloqData(e.target.value)}
-                  style={{
-                    padding: '10px 12px',
-                    borderRadius: 'var(--r-md)',
-                    border: '1px solid var(--line)',
-                    background: 'var(--bg)',
-                    font: '500 13px/1.4 var(--font-body)',
-                    color: 'var(--ink)',
-                    outline: 'none',
-                  }}
-                />
-                <input
-                  type="text"
-                  value={bloqMotivo}
-                  onChange={(e) => setBloqMotivo(e.target.value)}
-                  placeholder="aniversário · viagem · descanso"
-                  style={{
-                    padding: '10px 12px',
-                    borderRadius: 'var(--r-md)',
-                    border: '1px solid var(--line)',
-                    background: 'var(--bg)',
-                    font: '500 13px/1.4 var(--font-body)',
-                    color: 'var(--ink)',
-                    outline: 'none',
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={adicionarBloqueio}
-                  style={{
-                    font: '600 12px/1 var(--font-body)',
-                    padding: '10px 14px',
-                    borderRadius: 999,
-                    border: 'none',
-                    background: 'var(--sage-ink)',
-                    color: 'var(--bg)',
-                    cursor: 'pointer',
-                  }}
-                >
-                  salvar
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setBloqueioOpen(false)}
-                  style={{
-                    font: '600 12px/1 var(--font-body)',
-                    padding: '10px 14px',
-                    borderRadius: 999,
-                    border: '1px solid var(--line)',
-                    background: 'transparent',
-                    color: 'var(--ink-3)',
-                    cursor: 'pointer',
-                  }}
-                >
-                  cancelar
-                </button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setBloqueioOpen(true)}
-                style={{
-                  alignSelf: 'flex-start',
-                  font: '600 12px/1 var(--font-body)',
-                  padding: '8px 14px',
-                  borderRadius: 999,
-                  border: '1px dashed var(--line-2)',
-                  background: 'transparent',
-                  color: 'var(--ink-2)',
-                  cursor: 'pointer',
-                  marginTop: 4,
-                }}
-              >
-                + adicionar bloqueio
-              </button>
-            )}
-          </div>
-        </Field>
+        <Hand color="var(--ink-3)" size={13} style={{ display: 'block' }}>
+          bloqueios você cria depois, clicando direto no dia da prévia
+        </Hand>
 
         <button
           type="button"
@@ -1411,7 +1430,6 @@ interface SetupChipProps {
   mesAlvo: string;
   hospitaisIncluidos: Set<string>;
   metaInput: string;
-  bloqueios: BlocoBloqueio[];
   onEditar: () => void;
 }
 
@@ -1422,15 +1440,12 @@ function fmtMesAlvo(iso: string): string {
   return `${meses[mes - 1]} ${ano}`;
 }
 
-function SetupChip({ mesAlvo, hospitaisIncluidos, metaInput, bloqueios, onEditar }: SetupChipProps) {
+function SetupChip({ mesAlvo, hospitaisIncluidos, metaInput, onEditar }: SetupChipProps) {
   const meta = Number(metaInput.replace(/\D/g, '')) || 0;
   const partes = [
     fmtMesAlvo(mesAlvo),
     `${hospitaisIncluidos.size} ${hospitaisIncluidos.size === 1 ? 'hospital' : 'hospitais'}`,
     `meta R$ ${meta.toLocaleString('pt-BR')}`,
-    bloqueios.length > 0
-      ? `${bloqueios.length} ${bloqueios.length === 1 ? 'bloqueio' : 'bloqueios'}`
-      : 'sem bloqueios',
   ];
   return (
     <div
