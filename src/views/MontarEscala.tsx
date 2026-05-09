@@ -946,11 +946,6 @@ function PlantaoLinha({
           }}
         >
           {h?.nome ?? plantao.hospitalId}
-          {plantao.setor ? (
-            <span style={{ color: 'var(--ink-3)', fontWeight: 400, fontSize: 13 }}>
-              {' '}· {plantao.setor}
-            </span>
-          ) : null}
         </p>
       </div>
       <div style={{ display: 'flex', gap: 6 }}>
@@ -1796,10 +1791,7 @@ function EditorPlantaoProposta({
   const [data, setData] = useState(blocoExistente?.data ?? dataISO ?? '');
   const [horaInicio, setHoraInicio] = useState(blocoExistente?.horaInicio ?? 7);
   const [duracao, setDuracao] = useState(blocoExistente?.duracao ?? 12);
-  const [setor, setSetor] = useState(blocoExistente?.setor ?? '');
 
-  const hosp = hospitais[hospitalId];
-  const setores = hosp?.setores ?? [];
   const valido = hospitalId && duracao > 0 && data;
 
   function confirmar() {
@@ -1812,7 +1804,6 @@ function EditorPlantaoProposta({
       data,
       horaInicio,
       duracao,
-      setor: setor || setores[0] || '',
     };
     onConfirmar(novo);
   }
@@ -1924,20 +1915,6 @@ function EditorPlantaoProposta({
                 />
               </Field>
             </div>
-            <Field label="setor">
-              <input
-                value={setor}
-                onChange={(e) => setSetor(e.target.value)}
-                placeholder={setores[0] ?? 'enfermaria'}
-                list="setores-modal-prop"
-                style={inputStyle}
-              />
-              <datalist id="setores-modal-prop">
-                {setores.map((s) => (
-                  <option key={s} value={s} />
-                ))}
-              </datalist>
-            </Field>
             <Mono style={{ color: 'var(--ink-3)', display: 'block' }}>
               {data ? fmtDate(data) + ' · ' : ''}
               {fmtRange(horaInicio, duracao)} · {duracao}h

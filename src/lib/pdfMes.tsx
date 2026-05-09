@@ -510,17 +510,7 @@ function desenharLista(pdf: import('jspdf').jsPDF, args: ListaArgs) {
     pdf.setFontSize(9);
     pdf.setTextColor(...INK_2);
     pdf.text(`${fmtRangeFormal(p.horaInicio, p.duracao)}  (${p.duracao}h)`, x, cy);
-    cy += 10;
-
-    if (p.setor) {
-      pdf.setFont('Nunito', 'normal');
-      pdf.setFontSize(8);
-      pdf.setTextColor(...INK_3);
-      pdf.text(p.setor, x, cy);
-      cy += 13;
-    } else {
-      cy += 5;
-    }
+    cy += 13;
   }
 
   // Total

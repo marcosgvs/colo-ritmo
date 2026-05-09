@@ -35,10 +35,10 @@ const HOSP_HBDF: Hospital = {
   abrev: 'HBDF',
 };
 
-function plantao(id: string, hospId: string, data: string, ini: number, dur: number, setor = 'UTI Pediátrica'): BlocoPlantao {
+function plantao(id: string, hospId: string, data: string, ini: number, dur: number): BlocoPlantao {
   return {
     id, tipo: 'plantao', hospitalId: hospId, data,
-    horaInicio: ini, duracao: dur, setor,
+    horaInicio: ini, duracao: dur,
   };
 }
 
@@ -53,7 +53,7 @@ describe('montarMensagem', () => {
   test('mensagem usa Português padrão (capitalização e pontuação)', () => {
     const txt = montarMensagem({
       hospital: HOSP_HSL,
-      plantoes: [plantao('1', 'HSL', '2026-06-03', 7, 12, 'UTI Pediátrica')],
+      plantoes: [plantao('1', 'HSL', '2026-06-03', 7, 12)],
       mesISO: '2026-06',
       nomeMedico: 'Dra. Mariana',
       nomeChefe: 'Dr. Roberto',
@@ -63,7 +63,6 @@ describe('montarMensagem', () => {
     expect(txt).not.toContain('Dr(a). Dr.');
     expect(txt).toContain('Hospital Santa Lúcia');
     expect(txt).toContain('junho de 2026');
-    expect(txt).toContain('UTI Pediátrica');
     expect(txt).toContain('Atenciosamente');
     expect(txt).toContain('Dra. Mariana');
     // Nada minúsculo na saudação, nem nos cabeçalhos
@@ -139,25 +138,14 @@ describe('montarCSV', () => {
   test('inclui BOM UTF-8 + cabeçalho em Português padrão', () => {
     const csv = montarCSV({
       hospital: HOSP_HSL,
-      plantoes: [plantao('1', 'HSL', '2026-06-03', 7, 12, 'UTI')],
+      plantoes: [plantao('1', 'HSL', '2026-06-03', 7, 12)],
       mesISO: '2026-06',
       nomeMedico: 'Dra. M',
     });
     expect(csv.charCodeAt(0)).toBe(0xfeff);
     expect(csv).toContain('Data;Dia;Início;Fim;Duração');
-    expect(csv).toContain('UTI');
     expect(csv).toContain('Hospital Santa Lúcia');
     expect(csv).toContain('Quarta');
-  });
-
-  test('escapa setor com ponto-e-vírgula', () => {
-    const csv = montarCSV({
-      hospital: HOSP_HSL,
-      plantoes: [plantao('1', 'HSL', '2026-06-03', 7, 12, 'UTI; sala 2')],
-      mesISO: '2026-06',
-      nomeMedico: 'Dra. M',
-    });
-    expect(csv).toContain('"UTI; sala 2"');
   });
 });
 

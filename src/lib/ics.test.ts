@@ -98,7 +98,7 @@ DTSTART:20260504T070000
 DTEND:20260504T190000
 END:VEVENT`;
     const evt = parsearICS(ics)[0]!;
-    const b = eventoParaBloco(evt, { id: 1, hospitalId: 'HBDF', setor: 'UTI Pediátrica' });
+    const b = eventoParaBloco(evt, { id: 1, hospitalId: 'HBDF' });
     expect(b).toEqual({
       id: 1,
       tipo: 'plantao',
@@ -106,7 +106,6 @@ END:VEVENT`;
       data: '2026-05-04',
       horaInicio: 7,
       duracao: 12,
-      setor: 'UTI Pediátrica',
     });
   });
 
@@ -146,13 +145,12 @@ describe('gerarICS', () => {
         data: '2026-05-04',
         horaInicio: 7,
         duracao: 12,
-        setor: 'UTI Pediátrica',
       },
     ];
     const ics = gerarICS(blocos, HOSPITAIS, { nome: 'Mariana' });
     expect(ics).toContain('BEGIN:VCALENDAR');
     expect(ics).toContain('END:VCALENDAR');
-    expect(ics).toContain('SUMMARY:HBDF · UTI Pediátrica');
+    expect(ics).toContain('SUMMARY:HBDF');
     expect(ics).toContain('DTSTART:20260504T070000');
     expect(ics).toContain('DTEND:20260504T190000');
     expect(ics).toContain('UID:colo-ritmo-1@hbdf.colopediatria');
@@ -184,13 +182,12 @@ describe('gerarICS', () => {
         data: '2026-05-04',
         horaInicio: 7,
         duracao: 12,
-        setor: 'UTI',
       },
     ];
     const ics = gerarICS(blocos, HOSPITAIS, { nome: 'Mariana' });
     const eventos = parsearICS(ics);
     expect(eventos).toHaveLength(1);
-    const re = eventoParaBloco(eventos[0]!, { id: 1, hospitalId: 'HBDF', setor: 'UTI' });
+    const re = eventoParaBloco(eventos[0]!, { id: 1, hospitalId: 'HBDF' });
     expect(re).toEqual(blocos[0]);
   });
 

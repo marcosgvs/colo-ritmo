@@ -97,7 +97,7 @@ function escapeICS(s: string): string {
  */
 export function eventoParaBloco(
   evt: VEvent,
-  opts: { id: number | string; hospitalId: string; setor?: string },
+  opts: { id: number | string; hospitalId: string },
 ): BlocoPlantao | null {
   if (!evt.dtStart || !evt.dtEnd) return null;
   const ini = parseICSDate(evt.dtStart);
@@ -116,7 +116,6 @@ export function eventoParaBloco(
     data: ini.iso,
     horaInicio,
     duracao,
-    setor: opts.setor ?? evt.location ?? evt.summary ?? '',
   };
 }
 
@@ -167,7 +166,7 @@ function vevent(b: BlocoPlantao, hosp: Hospital): string[] {
   const inicio = formatICSStamp(b.data, b.horaInicio);
   const fimDate = somaHoras(b.data, b.horaInicio, b.duracao);
   const fim = formatICSStamp(fimDate.data, fimDate.hora);
-  const summary = `${hosp.abrev} · ${b.setor}`;
+  const summary = hosp.abrev;
   const description = `${fmtRange(b.horaInicio, b.duracao)} · ${b.duracao}h · ${hosp.nome}`;
   return [
     'BEGIN:VEVENT',

@@ -141,7 +141,6 @@ function receitaJanela(
     data: '2000-01-01',
     horaInicio: noturno ? 19 : 7,
     duracao: 12,
-    setor: '',
   };
   return calcRemuneracaoBloco(fake, hosp).liquido;
 }
@@ -264,7 +263,6 @@ export function sugerirPlantoes(opts: SugerirOpts): SugestaoSolver {
       data: cursor,
       horaInicio,
       duracao,
-      setor: hosp.setores[0] ?? '',
     };
 
     // Conflito CFM (sobreposição / sem descanso < 11h) · sempre rejeita

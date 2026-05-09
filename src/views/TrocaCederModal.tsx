@@ -63,9 +63,8 @@ export function TrocaCederModal({
       data: recebidoData,
       horaInicio: recebidoHora,
       duracao: recebidoDur,
-      setor: hospitais[recebidoHospital]?.setores[0] ?? '',
     };
-  }, [modo, recebidoData, recebidoHospital, recebidoHora, recebidoDur, hospitais, bloco.id]);
+  }, [modo, recebidoData, recebidoHospital, recebidoHora, recebidoDur, bloco.id]);
 
   const blocosSemOriginal = useMemo(
     () => outrosPlantoes.filter((b) => b.id !== bloco.id),

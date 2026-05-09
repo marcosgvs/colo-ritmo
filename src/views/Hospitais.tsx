@@ -143,7 +143,6 @@ function HospitalForm({ inicial, coresUsadas, onSalvar, onCancelar, onRemover }:
       tipo: 'publico',
       valorPlantao: 1800,
       adicionalNoite: 200,
-      setores: [],
       regras: {
         maxPorSemana: 2,
         minFimDeSemana: 0,

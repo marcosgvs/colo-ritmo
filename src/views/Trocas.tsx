@@ -110,7 +110,7 @@ export function Trocas({ blocos, hospitais: _h, onCriarPedido }: TrocasProps) {
                   >
                     <div style={{ flex: 1 }}>
                       <Eyebrow color={`var(--${hosp.cor}-ink)`}>
-                        {hosp.abrev} · {p.setor}
+                        {hosp.abrev}
                       </Eyebrow>
                       <p
                         style={{
@@ -330,7 +330,7 @@ function Resumo({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <Linha rotulo="plantão">
-        {hosp?.abrev} · {escolhido.setor} · {fmtDate(escolhido.data)} ·{' '}
+        {hosp?.abrev} · {fmtDate(escolhido.data)} ·{' '}
         {fmtRange(escolhido.horaInicio, escolhido.duracao)}
       </Linha>
       <Linha rotulo="motivo">{motivo}</Linha>

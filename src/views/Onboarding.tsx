@@ -38,7 +38,6 @@ export function Onboarding({ onConcluir, onPular }: OnboardingProps) {
               tipo: 'publico',
               valorPlantao,
               adicionalNoite: 200,
-              setores: [],
               regras: {
                 maxPorSemana: 2,
                 minFimDeSemana: 0,

@@ -85,10 +85,10 @@ export function montarMensagem(opts: DadosExportacao): string {
   const { hospital, mesISO, nomeMedico, nomeChefe } = opts;
   const plantoes = ordenar(opts.plantoes);
   const saudacao = nomeChefe ? `Olá, ${formatarTratamento(nomeChefe)}!` : 'Olá!';
-  const linhas = plantoes.map((p) => {
-    const setor = p.setor ? ` — ${p.setor}` : '';
-    return `• ${fmtDataExtenso(p.data)}, das ${fmtRangeFormal(p.horaInicio, p.duracao)} (${p.duracao}h)${setor}`;
-  });
+  const linhas = plantoes.map(
+    (p) =>
+      `• ${fmtDataExtenso(p.data)}, das ${fmtRangeFormal(p.horaInicio, p.duracao)} (${p.duracao}h)`,
+  );
 
   const corpo = plantoes.length === 0
     ? 'Esse mês não tenho plantões a propor neste hospital.'
@@ -111,7 +111,7 @@ ${nomeMedico}`;
 export function montarCSV(opts: DadosExportacao): string {
   const plantoes = ordenar(opts.plantoes);
   const linhas: string[] = [
-    'Data;Dia;Início;Fim;Duração (h);Setor;Hospital',
+    'Data;Dia;Início;Fim;Duração (h);Hospital',
   ];
   for (const p of plantoes) {
     const dow = capitalizar(DOWS_LONG[diaSemanaBR(p.data)] ?? '');
@@ -122,7 +122,6 @@ export function montarCSV(opts: DadosExportacao): string {
       fmtHora(p.horaInicio),
       fmtHora(fim),
       String(p.duracao),
-      escapeCSV(p.setor),
       escapeCSV(opts.hospital.nome),
     ].join(';'));
   }
@@ -265,7 +264,6 @@ export async function gerarPDF(opts: DadosExportacao): Promise<Blob> {
     doc.text('DIA', margem + 80, y);
     doc.text('HORÁRIO', margem + 160, y);
     doc.text('DURAÇÃO', margem + 250, y);
-    doc.text('SETOR', margem + 320, y);
     y += 6;
     doc.setDrawColor(...INK_3);
     doc.setLineWidth(0.3);
@@ -281,7 +279,6 @@ export async function gerarPDF(opts: DadosExportacao): Promise<Blob> {
       doc.text(dow, margem + 80, y);
       doc.text(fmtRangeFormal(p.horaInicio, p.duracao), margem + 160, y);
       doc.text(`${p.duracao}h`, margem + 250, y);
-      doc.text(p.setor || '—', margem + 320, y);
       y += 16;
       if (y > doc.internal.pageSize.getHeight() - 100) {
         doc.addPage();

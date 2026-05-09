@@ -90,7 +90,6 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, icsToken, nomeUser 
         const b = eventoParaBloco(evt, {
           id: `ics-${Date.now()}-${i}`,
           hospitalId,
-          setor: evt.summary?.split('·').pop()?.trim() ?? '',
         });
         if (b) blocos.push(b);
         else avisos.push(`evento sem início/fim · pulei (${evt.summary ?? evt.uid})`);

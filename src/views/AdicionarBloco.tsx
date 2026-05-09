@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { Bloco, BlocoPlantao, HospitaisMap } from '@/types';
 import type { AddTipo } from '@/components/shell';
 import { Eyebrow, Hand, Mono, Pill } from '@/components/atoms';
@@ -96,9 +96,6 @@ export function AdicionarBloco({
   const [hospitalId, setHospitalId] = useState(
     blocoExistente?.tipo === 'plantao' ? blocoExistente.hospitalId : hospitaisLista[0]?.id ?? '',
   );
-  const [setor, setSetor] = useState(
-    blocoExistente?.tipo === 'plantao' ? blocoExistente.setor : '',
-  );
   const [titulo, setTitulo] = useState(
     blocoExistente?.tipo === 'estudo' ||
       blocoExistente?.tipo === 'pessoal' ||
@@ -113,25 +110,10 @@ export function AdicionarBloco({
     blocoExistente?.tipo === 'consulta' ? blocoExistente.local ?? '' : '',
   );
 
-  // Atalho · setor segue o primeiro do hospital escolhido se ainda vazio
-  useEffect(() => {
-    if (tipo !== 'plantao') return;
-    const hosp = hospitais[hospitalId];
-    if (hosp && !setor && hosp.setores[0]) setSetor(hosp.setores[0]);
-  }, [hospitalId, tipo, hospitais, setor]);
-
   const novoBloco: Bloco = useMemo(() => {
     const id = blocoExistente?.id ?? `manual-${Date.now()}`;
     if (tipo === 'plantao') {
-      return {
-        id,
-        tipo: 'plantao',
-        hospitalId,
-        data,
-        horaInicio,
-        duracao,
-        setor: setor || hospitais[hospitalId]?.setores[0] || '',
-      };
+      return { id, tipo: 'plantao', hospitalId, data, horaInicio, duracao };
     }
     if (tipo === 'sono') return { id, tipo: 'sono', data, horaInicio, duracao };
     if (tipo === 'bloqueio') return { id, tipo: 'bloqueio', data, horaInicio, duracao, motivo };
@@ -139,7 +121,7 @@ export function AdicionarBloco({
     if (tipo === 'estudo') return { id, tipo: 'estudo', data, horaInicio, duracao, titulo };
     if (tipo === 'pessoal') return { id, tipo: 'pessoal', data, horaInicio, duracao, titulo };
     return { id, tipo: 'outros', data, horaInicio, duracao, titulo };
-  }, [tipo, hospitalId, data, horaInicio, duracao, setor, motivo, local, titulo, hospitais, blocoExistente]);
+  }, [tipo, hospitalId, data, horaInicio, duracao, motivo, local, titulo, blocoExistente]);
 
   const conflitos = useMemo(() => {
     if (tipo !== 'plantao') return [];
@@ -148,8 +130,7 @@ export function AdicionarBloco({
     );
   }, [tipo, novoBloco, blocosAtuais, hospitais]);
 
-  const podeSalvar =
-    (tipo !== 'plantao' || (hospitalId && setor.length > 0)) && duracao > 0;
+  const podeSalvar = (tipo !== 'plantao' || hospitalId) && duracao > 0;
 
   return (
     <div
@@ -250,36 +231,20 @@ export function AdicionarBloco({
         </div>
 
         {tipo === 'plantao' && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 12 }}>
-            <Field label="hospital">
-              <select
-                value={hospitalId}
-                onChange={(e) => setHospitalId(e.target.value)}
-                style={input}
-              >
-                {hospitaisLista.length === 0 && <option value="">cadastra um hospital antes</option>}
-                {hospitaisLista.map((h) => (
-                  <option key={h.id} value={h.id}>
-                    {h.abrev} · {h.nome}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="setor">
-              <input
-                value={setor}
-                onChange={(e) => setSetor(e.target.value)}
-                placeholder="UTI Pediátrica"
-                style={input}
-                list="setores-sugeridos"
-              />
-              <datalist id="setores-sugeridos">
-                {(hospitais[hospitalId]?.setores ?? []).map((s) => (
-                  <option key={s} value={s} />
-                ))}
-              </datalist>
-            </Field>
-          </div>
+          <Field label="hospital">
+            <select
+              value={hospitalId}
+              onChange={(e) => setHospitalId(e.target.value)}
+              style={input}
+            >
+              {hospitaisLista.length === 0 && <option value="">cadastra um hospital antes</option>}
+              {hospitaisLista.map((h) => (
+                <option key={h.id} value={h.id}>
+                  {h.abrev} · {h.nome}
+                </option>
+              ))}
+            </select>
+          </Field>
         )}
 
         {tipo === 'bloqueio' && (

@@ -103,7 +103,6 @@ export const HOSPITAIS: HospitaisMap = {
     valorPlantao: 1800,
     valorHora: 150,
     adicionalNoite: 200,
-    setores: ['enfermaria', 'pronto-atendimento', 'noite'],
     regras: {
       maxPorSemana: 2,
       minFimDeSemana: 1,
@@ -122,7 +121,6 @@ export const HOSPITAIS: HospitaisMap = {
     valorPlantao: 1800,
     valorFixo: 1800,
     adicionalNoite: 250,
-    setores: ['UTI Pediátrica', 'enfermaria', 'PS'],
     regras: {
       maxPorSemana: 2,
       minFimDeSemana: 2,
@@ -141,7 +139,6 @@ export const HOSPITAIS: HospitaisMap = {
     valorPlantao: 2400,
     valorHora: 200,
     adicionalNoite: 250,
-    setores: ['PS pediátrico', 'enfermaria'],
     regras: {
       maxPorSemana: 1,
       minFimDeSemana: 0,
@@ -160,7 +157,6 @@ export const HOSPITAIS: HospitaisMap = {
     valorPlantao: 1600,
     valorFixo: 1600,
     adicionalNoite: 200,
-    setores: ['pronto-atendimento', 'enfermaria', 'UTI'],
     regras: {
       maxPorSemana: 2,
       minFimDeSemana: 1,
@@ -212,15 +208,15 @@ export function nivelCarga(h: number): Nivel {
  * Usado como fallback até o user_state real carregar do Supabase.
  */
 export const BLOCOS_SEMANA: Bloco[] = [
-  { id: 1, tipo: 'plantao', hospitalId: 'HSL',  data: '2026-05-04', horaInicio: 7,  duracao: 6,  setor: 'enfermaria' },
+  { id: 1, tipo: 'plantao', hospitalId: 'HSL',  data: '2026-05-04', horaInicio: 7,  duracao: 6 },
   { id: 2, tipo: 'deslocamento', data: '2026-05-04', horaInicio: 13, duracao: 0.5, de: 'HSL', para: 'HCB', auto: true },
-  { id: 3, tipo: 'plantao', hospitalId: 'HCB',  data: '2026-05-04', horaInicio: 19, duracao: 12, setor: 'pronto-atendimento' },
+  { id: 3, tipo: 'plantao', hospitalId: 'HCB',  data: '2026-05-04', horaInicio: 19, duracao: 12 },
   { id: 4, tipo: 'sono',                          data: '2026-05-05', horaInicio: 8,  duracao: 8 },
-  { id: 5, tipo: 'plantao', hospitalId: 'HBDF', data: '2026-05-06', horaInicio: 13, duracao: 6,  setor: 'UTI Pediátrica' },
+  { id: 5, tipo: 'plantao', hospitalId: 'HBDF', data: '2026-05-06', horaInicio: 13, duracao: 6 },
   { id: 6, tipo: 'cedido',  hospitalId: 'HSL',  data: '2026-05-07', horaInicio: 7,  duracao: 6,  cedidoPara: 'Dra. Ana', motivo: 'aniversário do filho' },
-  { id: 7, tipo: 'plantao', hospitalId: 'HSL',  data: '2026-05-08', horaInicio: 19, duracao: 12, setor: 'noite', viaTroca: true, trocaInfo: 'Dr. João · HBDF sex' },
+  { id: 7, tipo: 'plantao', hospitalId: 'HSL',  data: '2026-05-08', horaInicio: 19, duracao: 12, viaTroca: true, trocaInfo: 'Dr. João · HBDF sex' },
   { id: 8, tipo: 'bloqueio',                       data: '2026-05-09', horaInicio: 0,  duracao: 24, motivo: 'aniversário Mariana' },
-  { id: 9, tipo: 'plantao', hospitalId: 'HCB',  data: '2026-05-10', horaInicio: 7,  duracao: 12, setor: 'pronto-atendimento' },
+  { id: 9, tipo: 'plantao', hospitalId: 'HCB',  data: '2026-05-10', horaInicio: 7,  duracao: 12 },
 ];
 
 /** Carga das 4 semanas do mês — usado no Rail (ritmo do mês). */

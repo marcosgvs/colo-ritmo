@@ -141,7 +141,6 @@ export function App() {
         data: reg.recebidoEmISO ?? '',
         horaInicio: reg.recebidoHora ?? 0,
         duracao: reg.recebidoDuracao ?? 0,
-        setor: '',
         viaTroca: true,
         trocaInfo: `${reg.quem} · ${reg.recebidoEmISO ?? ''}`,
       };

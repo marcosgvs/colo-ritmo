@@ -53,7 +53,8 @@ export interface Hospital {
   valorHora?: number;
   valorFixo?: number;
   adicionalNoite: number;
-  setores: string[];
+  /** @deprecated não usado mais na UI · mantido opcional pra dados antigos */
+  setores?: string[];
   regras: RegrasHospital;
   endereco?: EnderecoHospital;
 }
@@ -74,7 +75,8 @@ export interface BlocoBase {
 export interface BlocoPlantao extends BlocoBase {
   tipo: 'plantao';
   hospitalId: string;
-  setor: string;
+  /** @deprecated não usado mais na UI · mantido opcional pra dados antigos */
+  setor?: string;
   viaTroca?: boolean;
   trocaInfo?: string;
   conflito?: boolean;
