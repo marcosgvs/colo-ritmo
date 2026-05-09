@@ -95,11 +95,8 @@ export function MontarEscala({
   >(null);
   const [previewAberto, setPreviewAberto] = useState(false);
 
-  // Menu de dia (popover ancorado quando clica numa célula da prévia)
-  const [menuDia, setMenuDia] = useState<
-    | { iso: string; anchor: { x: number; y: number } }
-    | null
-  >(null);
+  // Detalhe do dia (modal expandido quando clica numa célula da prévia)
+  const [diaAtivo, setDiaAtivo] = useState<string | null>(null);
   const [flashMsg, setFlashMsg] = useState<string | null>(null);
 
   // Id da proposta ativa · setado quando reabre do drawer ou ao primeiro export
@@ -201,8 +198,8 @@ export function MontarEscala({
     setEditorPlantao({ modo: 'editar', bloco: b });
   }
 
-  function abrirMenuDia(iso: string, anchor: { x: number; y: number }) {
-    setMenuDia({ iso, anchor });
+  function abrirDiaAtivo(iso: string) {
+    setDiaAtivo(iso);
   }
 
   function flash(msg: string) {
@@ -221,7 +218,7 @@ export function MontarEscala({
     };
     onAdicionarBloco(novo);
     flash(`${fmtDate(iso)} bloqueado · vai pra agenda`);
-    setMenuDia(null);
+    setDiaAtivo(null);
   }
 
   function desbloquearDia(iso: string) {
@@ -232,12 +229,23 @@ export function MontarEscala({
     if (!bloq) return;
     onRemoverBloco(bloq.id);
     flash(`${fmtDate(iso)} desbloqueado`);
-    setMenuDia(null);
+    setDiaAtivo(null);
   }
 
-  function abrirEditorDoMenu(iso: string) {
+  function adicionarPlantaoNoDia(iso: string) {
     setEditorPlantao({ modo: 'adicionar', dataISO: iso });
-    setMenuDia(null);
+    setDiaAtivo(null);
+  }
+
+  function editarPlantaoDoDia(b: BlocoPlantao) {
+    setEditorPlantao({ modo: 'editar', bloco: b });
+    setDiaAtivo(null);
+  }
+
+  function removerPlantaoDoDia(id: string | number) {
+    if (!sugestaoEditavel) return;
+    setSugestaoEditavel(sugestaoEditavel.filter((p) => p.id !== id));
+    flash('plantão removido da proposta');
   }
 
   function salvarPlantaoEditor(novo: BlocoPlantao) {
@@ -410,14 +418,14 @@ export function MontarEscala({
                   marcadores={blocosFinaisProposta}
                   onSelectMarcador={abrirEditorMarcador}
                   cellHotspot
-                  onSelectDiaComAnchor={abrirMenuDia}
+                  onSelectDia={abrirDiaAtivo}
                 />
                 <Hand
                   color="var(--lavender-ink)"
                   size={14}
                   style={{ display: 'block', marginTop: 10 }}
                 >
-                  passa o mouse num dia pra ver as opções · click num plantão pra editar
+                  click num dia pra ver e ajustar tudo que tem nele
                 </Hand>
 
                 <div
@@ -584,18 +592,22 @@ export function MontarEscala({
         />
       )}
 
-      {menuDia && (
-        <MenuDia
-          iso={menuDia.iso}
-          anchor={menuDia.anchor}
-          jaTemBloqueio={blocos.some(
-            (b) => b.tipo === 'bloqueio' && b.data === menuDia.iso,
-          )}
-          plantoesNoDia={blocosFinaisProposta.filter((p) => p.data === menuDia.iso).length}
-          onAdicionarPlantao={() => abrirEditorDoMenu(menuDia.iso)}
-          onBloquear={() => bloquearDia(menuDia.iso)}
-          onDesbloquear={() => desbloquearDia(menuDia.iso)}
-          onFechar={() => setMenuDia(null)}
+      {diaAtivo && (
+        <DiaProposta
+          iso={diaAtivo}
+          plantoesNoDia={blocosFinaisProposta.filter((p) => p.data === diaAtivo)}
+          bloqueio={
+            blocos.find(
+              (b): b is BlocoBloqueio => b.tipo === 'bloqueio' && b.data === diaAtivo,
+            ) ?? null
+          }
+          hospitais={hospitaisAtivos}
+          onAdicionar={() => adicionarPlantaoNoDia(diaAtivo)}
+          onEditar={editarPlantaoDoDia}
+          onRemover={removerPlantaoDoDia}
+          onBloquear={() => bloquearDia(diaAtivo)}
+          onDesbloquear={() => desbloquearDia(diaAtivo)}
+          onFechar={() => setDiaAtivo(null)}
         />
       )}
 
@@ -623,27 +635,37 @@ export function MontarEscala({
   );
 }
 
-interface MenuDiaProps {
+interface DiaPropostaProps {
   iso: string;
-  anchor: { x: number; y: number };
-  jaTemBloqueio: boolean;
-  plantoesNoDia: number;
-  onAdicionarPlantao: () => void;
+  plantoesNoDia: BlocoPlantao[];
+  bloqueio: BlocoBloqueio | null;
+  hospitais: HospitaisMap;
+  onAdicionar: () => void;
+  onEditar: (b: BlocoPlantao) => void;
+  onRemover: (id: string | number) => void;
   onBloquear: () => void;
   onDesbloquear: () => void;
   onFechar: () => void;
 }
 
-function MenuDia({
+/**
+ * Modal "detalhe do dia" no builder de proposta. Expande o conteúdo do dia:
+ * cards individuais por plantão (cor do hospital · ações editar/remover),
+ * empty state se vazio, ação primária pra adicionar, e bloquear/desbloquear
+ * no rodapé separado por divisória.
+ */
+function DiaProposta({
   iso,
-  anchor,
-  jaTemBloqueio,
   plantoesNoDia,
-  onAdicionarPlantao,
+  bloqueio,
+  hospitais,
+  onAdicionar,
+  onEditar,
+  onRemover,
   onBloquear,
   onDesbloquear,
   onFechar,
-}: MenuDiaProps) {
+}: DiaPropostaProps) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onFechar();
@@ -652,14 +674,15 @@ function MenuDia({
     return () => window.removeEventListener('keydown', onKey);
   }, [onFechar]);
 
-  // Posiciona pra não sair da viewport
-  const w = 220;
-  const h = 140;
-  const x = Math.min(anchor.x + 6, window.innerWidth - w - 12);
-  const y = Math.min(anchor.y + 6, window.innerHeight - h - 12);
-
-  const labelAdicionar =
-    plantoesNoDia > 0 ? 'adicionar outro plantão' : 'adicionar plantão à proposta';
+  const ordenados = [...plantoesNoDia].sort((a, b) => a.horaInicio - b.horaInicio);
+  const [ano, mes, dia] = iso.split('-').map(Number);
+  const dt = new Date(ano!, mes! - 1, dia!);
+  const diaSemana = dt.toLocaleDateString('pt-BR', { weekday: 'long' });
+  const dataLonga = dt.toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+  });
 
   return (
     <div
@@ -667,56 +690,309 @@ function MenuDia({
       style={{
         position: 'fixed',
         inset: 0,
-        zIndex: 75,
-        background: 'transparent',
+        background: 'rgba(58,46,42,0.28)',
+        zIndex: 70,
+        display: 'flex',
+        alignItems: 'flex-start',
+        justifyContent: 'center',
+        padding: '60px 20px',
+        animation: 'colo-fade-in 160ms ease',
+        overflow: 'auto',
       }}
     >
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          position: 'fixed',
-          top: y,
-          left: x,
-          width: w,
           background: 'var(--bg)',
-          border: '1px solid var(--lavender-ink)',
-          borderRadius: 12,
-          padding: '8px',
+          borderRadius: 'var(--r-xl)',
+          width: '100%',
+          maxWidth: 560,
           boxShadow: 'var(--shadow-lg)',
-          animation: 'colo-drawer-down 180ms ease',
+          animation: 'colo-day-expand 220ms cubic-bezier(.2,.7,.2,1)',
+          overflow: 'hidden',
+          border: '1px solid var(--lavender-ink)',
         }}
       >
-        <div style={{ padding: '4px 8px 6px', borderBottom: '1px dashed var(--line-2)', marginBottom: 4 }}>
-          <Eyebrow color="var(--lavender-ink)">{fmtDate(iso)}</Eyebrow>
+        <div
+          style={{
+            background: 'var(--lavender-surface)',
+            padding: '16px 24px 14px',
+            borderBottom: '1px dashed var(--lavender-ink)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            gap: 12,
+          }}
+        >
+          <div>
+            <Eyebrow color="var(--lavender-ink)">{diaSemana}</Eyebrow>
+            <h2
+              style={{
+                fontFamily: 'var(--font-display)',
+                fontWeight: 500,
+                fontSize: 26,
+                letterSpacing: '-0.015em',
+                margin: '4px 0 2px',
+                color: 'var(--ink)',
+              }}
+            >
+              {dataLonga}
+            </h2>
+            <Mono style={{ color: 'var(--lavender-ink)', display: 'block', fontSize: 11 }}>
+              {bloqueio
+                ? 'dia bloqueado · não vai pro chefe'
+                : ordenados.length === 0
+                ? 'nenhum plantão proposto'
+                : `${ordenados.length} ${ordenados.length === 1 ? 'plantão proposto' : 'plantões propostos'}`}
+            </Mono>
+          </div>
+          <button
+            type="button"
+            onClick={onFechar}
+            aria-label="fechar"
+            style={{
+              background: 'var(--bg)',
+              border: '1px solid var(--lavender-ink)',
+              borderRadius: 999,
+              padding: 6,
+              cursor: 'pointer',
+              color: 'var(--lavender-ink)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
         </div>
-        <button type="button" onClick={onAdicionarPlantao} style={menuItemStyle}>
-          {labelAdicionar}
-        </button>
-        {jaTemBloqueio ? (
-          <button type="button" onClick={onDesbloquear} style={menuItemStyle}>
-            desbloquear este dia
-          </button>
-        ) : (
-          <button type="button" onClick={onBloquear} style={menuItemStyle}>
-            bloquear este dia
-          </button>
-        )}
+
+        <div style={{ padding: '20px 24px 4px' }}>
+          {bloqueio ? (
+            <div
+              style={{
+                background: 'var(--bg-alt)',
+                border: '1px dashed var(--line-2)',
+                borderRadius: 14,
+                padding: '20px 20px',
+                textAlign: 'center',
+                marginBottom: 16,
+              }}
+            >
+              <Hand color="var(--ink-3)" size={16} style={{ display: 'block' }}>
+                este dia tá bloqueado
+              </Hand>
+              <Mono style={{ color: 'var(--ink-3)', display: 'block', marginTop: 6, fontSize: 11 }}>
+                bloqueios não viram sugestão pro chefe
+              </Mono>
+            </div>
+          ) : ordenados.length === 0 ? (
+            <div
+              style={{
+                background: 'var(--bg-alt)',
+                border: '1px dashed var(--line-2)',
+                borderRadius: 14,
+                padding: '24px 20px',
+                textAlign: 'center',
+                marginBottom: 16,
+              }}
+            >
+              <Hand color="var(--ink-3)" size={16} style={{ display: 'block' }}>
+                nada proposto pra este dia ainda
+              </Hand>
+            </div>
+          ) : (
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 10,
+                marginBottom: 16,
+              }}
+            >
+              {ordenados.map((p) => (
+                <PlantaoLinha
+                  key={String(p.id)}
+                  plantao={p}
+                  hospitais={hospitais}
+                  onEditar={() => onEditar(p)}
+                  onRemover={() => onRemover(p.id)}
+                />
+              ))}
+            </div>
+          )}
+
+          {!bloqueio && (
+            <button
+              type="button"
+              onClick={onAdicionar}
+              style={{
+                width: '100%',
+                font: '600 13px/1 var(--font-body)',
+                padding: '14px 18px',
+                borderRadius: 12,
+                border: '1px dashed var(--lavender-ink)',
+                background: 'transparent',
+                color: 'var(--lavender-ink)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+              {ordenados.length > 0 ? 'adicionar outro plantão' : 'adicionar plantão à proposta'}
+            </button>
+          )}
+        </div>
+
+        <div
+          style={{
+            borderTop: '1px solid var(--line)',
+            padding: '14px 24px 18px',
+            background: 'var(--bg-alt)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: 10,
+            flexWrap: 'wrap',
+          }}
+        >
+          <Mono style={{ color: 'var(--ink-3)', fontSize: 11 }}>
+            {bloqueio ? 'desbloquear devolve à agenda livre' : 'bloquear vai pra sua agenda real'}
+          </Mono>
+          {bloqueio ? (
+            <button
+              type="button"
+              onClick={onDesbloquear}
+              style={{
+                font: '600 12px/1 var(--font-body)',
+                padding: '10px 18px',
+                borderRadius: 999,
+                border: '1px solid var(--ink-2)',
+                background: 'transparent',
+                color: 'var(--ink-2)',
+                cursor: 'pointer',
+              }}
+            >
+              desbloquear o dia
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={onBloquear}
+              style={{
+                font: '600 12px/1 var(--font-body)',
+                padding: '10px 18px',
+                borderRadius: 999,
+                border: '1px solid var(--coral-ink)',
+                background: 'transparent',
+                color: 'var(--coral-ink)',
+                cursor: 'pointer',
+              }}
+            >
+              bloquear o dia
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
-const menuItemStyle: React.CSSProperties = {
-  display: 'block',
-  width: '100%',
-  textAlign: 'left',
-  font: '500 13px/1.3 var(--font-body)',
-  padding: '10px 12px',
-  borderRadius: 8,
-  border: 'none',
-  background: 'transparent',
-  color: 'var(--ink)',
+function PlantaoLinha({
+  plantao,
+  hospitais,
+  onEditar,
+  onRemover,
+}: {
+  plantao: BlocoPlantao;
+  hospitais: HospitaisMap;
+  onEditar: () => void;
+  onRemover: () => void;
+}) {
+  const h = hospitais[plantao.hospitalId];
+  const cor = h?.cor ?? 'sand';
+  return (
+    <div
+      style={{
+        background: `var(--${cor}-surface)`,
+        borderLeft: `4px solid var(--${cor})`,
+        borderRadius: 12,
+        padding: '14px 16px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+      }}
+    >
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+          <Eyebrow color={`var(--${cor}-ink)`}>{h?.abrev ?? plantao.hospitalId}</Eyebrow>
+          <Mono style={{ color: 'var(--ink-3)', fontSize: 11 }}>
+            {fmtRange(plantao.horaInicio, plantao.duracao)} · {plantao.duracao}h
+          </Mono>
+        </div>
+        <p
+          style={{
+            fontFamily: 'var(--font-display)',
+            fontWeight: 500,
+            fontSize: 16,
+            margin: '4px 0 0',
+            color: 'var(--ink)',
+          }}
+        >
+          {h?.nome ?? plantao.hospitalId}
+          {plantao.setor ? (
+            <span style={{ color: 'var(--ink-3)', fontWeight: 400, fontSize: 13 }}>
+              {' '}· {plantao.setor}
+            </span>
+          ) : null}
+        </p>
+      </div>
+      <div style={{ display: 'flex', gap: 6 }}>
+        <button
+          type="button"
+          onClick={onEditar}
+          aria-label="editar"
+          title="editar"
+          style={iconBtnStyle}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 20h9" />
+            <path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          onClick={onRemover}
+          aria-label="remover"
+          title="remover"
+          style={{ ...iconBtnStyle, color: 'var(--coral-ink)', borderColor: 'var(--coral-ink)' }}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+            <path d="M6 6l12 12M18 6L6 18" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+const iconBtnStyle: React.CSSProperties = {
+  width: 32,
+  height: 32,
+  borderRadius: 999,
+  border: '1px solid var(--line)',
+  background: 'var(--bg)',
+  color: 'var(--ink-2)',
   cursor: 'pointer',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
 };
 
 function HistoricoTrigger({

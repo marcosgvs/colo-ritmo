@@ -68,6 +68,11 @@ a:focus-visible,
   to   { opacity: 1; transform: translateX(0); }
 }
 
+@keyframes colo-day-expand {
+  from { opacity: 0; transform: scale(0.94); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
 /* Hotspot da célula do calendário no Montar · hover revela o lápis. */
 .colo-cal-cell-hot {
   transition: background 140ms ease;
