@@ -1,5 +1,12 @@
 import { useMemo, useRef, useState } from 'react';
-import type { CorFamilia, EnderecoHospital, Hospital, HospitaisMap, TipoHospital } from '@/types';
+import type {
+  CorFamilia,
+  EnderecoHospital,
+  Hospital,
+  HospitaisMap,
+  Janela,
+  TipoHospital,
+} from '@/types';
 import { buscarCep, geocodificar } from '@/lib/geo';
 import {
   buscarSugestoesHospitais,
@@ -8,6 +15,13 @@ import {
 import { Eyebrow, Mono, Pill } from '@/components/atoms';
 import { EmptyState } from '@/components/empty';
 import { PageHead } from './_PageHead';
+
+const JANELAS_DEFAULT: Janela[] = [
+  { rotulo: 'manhã', inicio: 7, duracao: 6 },
+  { rotulo: 'tarde', inicio: 13, duracao: 6 },
+  { rotulo: 'noitinha', inicio: 19, duracao: 5 },
+  { rotulo: 'noite', inicio: 19, duracao: 12 },
+];
 
 interface HospitaisProps {
   hospitais: HospitaisMap;
@@ -145,18 +159,28 @@ function HospitalForm({ inicial, coresUsadas, onSalvar, onCancelar, onRemover }:
       abrev: '',
       cor: CORES.find((c) => !coresUsadas.includes(c)) ?? 'lavender',
       tipo: 'publico',
-      valorPlantao: 1800,
+      valorPlantao: 0,
+      valorFixo: 0,
       adicionalNoite: 200,
       regras: {
         maxPorSemana: 2,
         minFimDeSemana: 0,
         intervaloMinHoras: 11,
         duracaoPlantao: 12,
-        janelas: ['07:00–19:00', '19:00–07:00'],
+        janelas: [],
         maxPorMes: 8,
       },
+      janelas: JANELAS_DEFAULT,
+      observacoes: '',
     },
   );
+
+  const [enderecoAberto, setEnderecoAberto] = useState(false);
+  const ehPublico = draft.tipo === 'publico';
+
+  function setJanelas(novas: Janela[]) {
+    setDraft((d) => ({ ...d, janelas: novas }));
+  }
 
   // Autocomplete por nome contra a lista curada de Brasília + entorno
   const [sugestoesAbertas, setSugestoesAbertas] = useState(false);
@@ -364,14 +388,27 @@ function HospitalForm({ inicial, coresUsadas, onSalvar, onCancelar, onRemover }:
             })}
           </div>
         </Field>
-        <Field label="valor / plantão (R$)">
-          <input
-            type="number"
-            value={draft.valorPlantao}
-            onChange={(e) => setCampo('valorPlantao', Number(e.target.value))}
-            style={input}
-          />
-        </Field>
+        {ehPublico ? (
+          <Field label="valor fixo mensal (R$)">
+            <input
+              type="number"
+              value={draft.valorFixo ?? 0}
+              onChange={(e) => setCampo('valorFixo', Number(e.target.value))}
+              placeholder="contrato CLT · independente das horas"
+              style={input}
+            />
+          </Field>
+        ) : (
+          <Field label="valor por hora (R$)">
+            <input
+              type="number"
+              value={draft.valorHora ?? 0}
+              onChange={(e) => setCampo('valorHora', Number(e.target.value))}
+              placeholder="ex: 150"
+              style={input}
+            />
+          </Field>
+        )}
         <Field label="adicional noturno (R$)">
           <input
             type="number"
@@ -380,7 +417,7 @@ function HospitalForm({ inicial, coresUsadas, onSalvar, onCancelar, onRemover }:
             style={input}
           />
         </Field>
-        <Field label="máx por semana">
+        <Field label={ehPublico ? 'máx plantões por semana' : 'máx por semana'}>
           <input
             type="number"
             value={draft.regras.maxPorSemana}
@@ -404,7 +441,7 @@ function HospitalForm({ inicial, coresUsadas, onSalvar, onCancelar, onRemover }:
             style={input}
           />
         </Field>
-        <Field label="finais de semana mínimos">
+        <Field label={ehPublico ? 'fins-de-semana obrigatórios / mês' : 'finais de semana mínimos'}>
           <input
             type="number"
             value={draft.regras.minFimDeSemana}
@@ -414,11 +451,57 @@ function HospitalForm({ inicial, coresUsadas, onSalvar, onCancelar, onRemover }:
         </Field>
 
         <div style={{ gridColumn: '1 / -1' }}>
-          <BlocoEndereco
-            endereco={draft.endereco}
-            onChange={(end) => setDraft((d) => ({ ...d, endereco: end }))}
-            nomeHospital={draft.nome}
+          <BlocoJanelas
+            janelas={draft.janelas ?? JANELAS_DEFAULT}
+            onChange={setJanelas}
           />
+        </div>
+
+        <div style={{ gridColumn: '1 / -1' }}>
+          <Field label="observações (opcional)">
+            <textarea
+              value={draft.observacoes ?? ''}
+              onChange={(e) => setCampo('observacoes', e.target.value)}
+              placeholder="ex: feriado conta dobrado · mês de jul tem semana de férias · plantão de sábado paga +30%"
+              rows={3}
+              style={{
+                ...input,
+                width: '100%',
+                resize: 'vertical',
+                fontFamily: 'var(--font-body)',
+              }}
+            />
+          </Field>
+        </div>
+
+        <div style={{ gridColumn: '1 / -1' }}>
+          {enderecoAberto ? (
+            <BlocoEndereco
+              endereco={draft.endereco}
+              onChange={(end) => setDraft((d) => ({ ...d, endereco: end }))}
+              nomeHospital={draft.nome}
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setEnderecoAberto(true)}
+              style={{
+                font: '500 13px/1 var(--font-body)',
+                padding: '10px 14px',
+                borderRadius: 'var(--r-md)',
+                border: '1px dashed var(--line-2)',
+                background: 'transparent',
+                color: 'var(--ink-2)',
+                cursor: 'pointer',
+                width: '100%',
+                textAlign: 'left',
+              }}
+            >
+              {draft.endereco?.logradouro
+                ? `endereço · ${draft.endereco.bairro || draft.endereco.cidade || 'preenchido'} (clica pra editar)`
+                : '+ adicionar endereço (opcional · ajuda no cálculo de deslocamento)'}
+            </button>
+          )}
         </div>
 
         <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 10, marginTop: 14 }}>
@@ -497,6 +580,118 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       <Eyebrow>{label}</Eyebrow>
       {children}
     </label>
+  );
+}
+
+function BlocoJanelas({
+  janelas,
+  onChange,
+}: {
+  janelas: Janela[];
+  onChange: (j: Janela[]) => void;
+}) {
+  function setItem(i: number, patch: Partial<Janela>) {
+    onChange(janelas.map((j, idx) => (idx === i ? { ...j, ...patch } : j)));
+  }
+  function remover(i: number) {
+    onChange(janelas.filter((_, idx) => idx !== i));
+  }
+  function adicionar() {
+    onChange([...janelas, { rotulo: 'novo', inicio: 7, duracao: 6 }]);
+  }
+  return (
+    <div
+      style={{
+        background: 'var(--bg-alt)',
+        borderRadius: 'var(--r-md)',
+        padding: '14px 16px',
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
+        <Eyebrow>turnos</Eyebrow>
+        <Mono style={{ color: 'var(--ink-3)', fontSize: 11 }}>
+          edite ou adicione conforme a escala do hospital
+        </Mono>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {janelas.map((j, i) => (
+          <div
+            key={i}
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 90px 90px 36px',
+              gap: 8,
+              alignItems: 'center',
+            }}
+          >
+            <input
+              value={j.rotulo}
+              onChange={(e) => setItem(i, { rotulo: e.target.value })}
+              placeholder="rótulo"
+              style={input}
+            />
+            <input
+              type="number"
+              step="0.5"
+              min={0}
+              max={23.5}
+              value={j.inicio}
+              onChange={(e) => setItem(i, { inicio: Number(e.target.value) })}
+              placeholder="início"
+              style={input}
+            />
+            <input
+              type="number"
+              step="0.5"
+              min={0.5}
+              max={24}
+              value={j.duracao}
+              onChange={(e) => setItem(i, { duracao: Number(e.target.value) })}
+              placeholder="duração (h)"
+              style={input}
+            />
+            <button
+              type="button"
+              onClick={() => remover(i)}
+              aria-label="remover turno"
+              title="remover turno"
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: 999,
+                border: '1px solid var(--line)',
+                background: 'transparent',
+                color: 'var(--coral-ink)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+                <path d="M6 6l12 12M18 6L6 18" />
+              </svg>
+            </button>
+          </div>
+        ))}
+      </div>
+      <button
+        type="button"
+        onClick={adicionar}
+        style={{
+          marginTop: 10,
+          font: '600 12px/1 var(--font-body)',
+          padding: '8px 14px',
+          borderRadius: 999,
+          border: '1px dashed var(--line-2)',
+          background: 'transparent',
+          color: 'var(--ink-2)',
+          cursor: 'pointer',
+        }}
+      >
+        + adicionar turno
+      </button>
+    </div>
   );
 }
 

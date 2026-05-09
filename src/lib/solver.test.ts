@@ -10,7 +10,6 @@ const HOSPITAIS: HospitaisMap = {
     cor: 'blue',
     tipo: 'publico',
     valorPlantao: 1800,
-    valorFixo: 1800,
     adicionalNoite: 250,
     setores: ['UTI'],
     regras: {

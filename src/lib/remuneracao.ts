@@ -36,14 +36,17 @@ export function ehNoturno(b: BlocoPlantao): boolean {
 export function calcRemuneracaoBloco(b: BlocoPlantao, hosp: Hospital): ResumoBloco {
   const noturno = ehNoturno(b);
   let bruto: number;
-  if (typeof hosp.valorFixo === 'number') {
-    bruto = hosp.valorFixo;
-  } else if (typeof hosp.valorHora === 'number') {
+  if (typeof hosp.valorFixo === 'number' && hosp.valorFixo > 0) {
+    // Público CLT · valorFixo é mensal · por plantão só adicional noturno
+    // (o fixo entra UMA vez no mês via calcRemuneracaoMes)
+    bruto = noturno ? hosp.adicionalNoite : 0;
+  } else if (typeof hosp.valorHora === 'number' && hosp.valorHora > 0) {
     bruto = hosp.valorHora * b.duracao;
+    if (noturno) bruto += hosp.adicionalNoite;
   } else {
-    bruto = hosp.valorPlantao;
+    bruto = hosp.valorPlantao || 0;
+    if (noturno) bruto += hosp.adicionalNoite;
   }
-  if (noturno) bruto += hosp.adicionalNoite;
   const factor = hosp.tipo === 'privado' ? 0.94 : 0.725;
   const liquido = Math.round(bruto * factor);
   return { hospitalId: hosp.id, bruto, liquido, noturno };
@@ -80,6 +83,19 @@ export function calcRemuneracaoMes(
     sub.bruto += res.bruto;
     sub.liquido += res.liquido;
     sub.plantoes += 1;
+  }
+
+  // Adiciona valorFixo (CLT mensal) UMA vez por hospital com >=1 plantão no mês.
+  for (const [hospId, sub] of Object.entries(out.porHospital)) {
+    const hosp = hospitais[hospId];
+    if (!hosp) continue;
+    if (typeof hosp.valorFixo === 'number' && hosp.valorFixo > 0) {
+      const liquidoFixo = Math.round(hosp.valorFixo * 0.725);
+      sub.bruto += hosp.valorFixo;
+      sub.liquido += liquidoFixo;
+      out.total.bruto += hosp.valorFixo;
+      out.total.liquido += liquidoFixo;
+    }
   }
   return out;
 }

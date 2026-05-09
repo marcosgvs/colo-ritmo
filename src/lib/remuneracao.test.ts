@@ -65,18 +65,17 @@ describe('ehNoturno', () => {
 });
 
 describe('calcRemuneracaoBloco', () => {
-  test('público diurno usa valorFixo', () => {
+  test('público CLT diurno · plantão não soma valor (fixo entra uma vez no mês)', () => {
     const b: Bloco = { id: 1, tipo: 'plantao', hospitalId: 'HBDF', data: '2026-05-04', horaInicio: 7, duracao: 12, setor: '' };
     const r = calcRemuneracaoBloco(b, HBDF);
-    expect(r.bruto).toBe(1800);
+    expect(r.bruto).toBe(0);
     expect(r.noturno).toBe(false);
-    expect(r.liquido).toBe(Math.round(1800 * 0.725));
   });
 
-  test('público noturno soma adicional', () => {
+  test('público CLT noturno · plantão soma só o adicional noturno', () => {
     const b: Bloco = { id: 1, tipo: 'plantao', hospitalId: 'HBDF', data: '2026-05-04', horaInicio: 19, duracao: 12, setor: '' };
     const r = calcRemuneracaoBloco(b, HBDF);
-    expect(r.bruto).toBe(1800 + 250);
+    expect(r.bruto).toBe(250);
     expect(r.noturno).toBe(true);
   });
 
@@ -100,8 +99,10 @@ describe('calcRemuneracaoMes', () => {
     const r = calcRemuneracaoMes(blocos, HOSPITAIS, '2026-05');
     expect(r.porHospital['HBDF']?.plantoes).toBe(2);
     expect(r.porHospital['HSL']?.plantoes).toBe(1);
-    // total bruto: 1800 + (1800+250) + 150*6 = 4750
-    expect(r.total.bruto).toBe(4750);
+    // HBDF público CLT: valorFixo 1800 (uma vez) + 1 noturno = 1800 + 250 = 2050
+    // HSL privado: valorHora 150 * 6 = 900
+    // total bruto: 2050 + 900 = 2950
+    expect(r.total.bruto).toBe(2950);
   });
 
   test('mês vazio retorna zero', () => {
