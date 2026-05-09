@@ -305,35 +305,82 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
                 />
               ) : (
                 <>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
-                    {resultado.blocos.slice(0, 8).map((b) => (
-                      <div
-                        key={String(b.id)}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 12,
-                          padding: '10px 12px',
-                          background: 'var(--bg-alt)',
-                          borderRadius: 'var(--r-sm)',
-                        }}
-                      >
-                        <Mono style={{ width: 110 }}>{fmtDate(b.data)}</Mono>
-                        <Mono>{fmtRange(b.horaInicio, b.duracao)}</Mono>
-                        <span style={{ flex: 1 }} />
-                        <Pill kind="info">{b.duracao}h</Pill>
-                      </div>
-                    ))}
-                    {resultado.blocos.length > 8 && (
-                      <Mono style={{ color: 'var(--ink-3)' }}>
-                        + {resultado.blocos.length - 8} blocos
-                      </Mono>
-                    )}
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 6,
+                      marginBottom: 14,
+                      maxHeight: 380,
+                      overflowY: 'auto',
+                    }}
+                  >
+                    {resultado.blocos
+                      .slice()
+                      .sort(
+                        (a, b) =>
+                          a.data.localeCompare(b.data) || a.horaInicio - b.horaInicio,
+                      )
+                      .map((b) => (
+                        <div
+                          key={String(b.id)}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 12,
+                            padding: '10px 12px',
+                            background: 'var(--bg-alt)',
+                            borderRadius: 'var(--r-sm)',
+                          }}
+                        >
+                          <Mono style={{ width: 130 }}>{fmtDate(b.data)}</Mono>
+                          <Mono>{fmtRange(b.horaInicio, b.duracao)}</Mono>
+                          <span style={{ flex: 1 }} />
+                          <Pill kind="info">{b.duracao}h</Pill>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setResultado((r) =>
+                                r
+                                  ? { ...r, blocos: r.blocos.filter((x) => x.id !== b.id) }
+                                  : r,
+                              )
+                            }
+                            aria-label="remover deste import"
+                            title="remover deste import"
+                            style={{
+                              width: 28,
+                              height: 28,
+                              borderRadius: 999,
+                              border: '1px solid var(--coral-ink)',
+                              background: 'transparent',
+                              color: 'var(--coral-ink)',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                          >
+                            <svg
+                              width="11"
+                              height="11"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2.4"
+                              strokeLinecap="round"
+                            >
+                              <path d="M6 6l12 12M18 6L6 18" />
+                            </svg>
+                          </button>
+                        </div>
+                      ))}
                   </div>
                   <div style={{ display: 'flex', gap: 10 }}>
                     <button
                       type="button"
                       onClick={confirmarImport}
+                      disabled={resultado.blocos.length === 0}
                       style={{
                         font: '600 13px/1 var(--font-body)',
                         padding: '12px 20px',
@@ -341,10 +388,12 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
                         border: 'none',
                         background: 'var(--sage-ink)',
                         color: 'var(--bg)',
-                        cursor: 'pointer',
+                        cursor: resultado.blocos.length === 0 ? 'not-allowed' : 'pointer',
+                        opacity: resultado.blocos.length === 0 ? 0.5 : 1,
                       }}
                     >
-                      adicionar {resultado.blocos.length} plantões
+                      adicionar {resultado.blocos.length}{' '}
+                      {resultado.blocos.length === 1 ? 'plantão' : 'plantões'}
                     </button>
                     <button
                       type="button"

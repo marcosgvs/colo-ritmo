@@ -206,8 +206,20 @@ export const SEMANA: readonly string[] = [
  */
 export const HOJE: string = new Date().toISOString().slice(0, 10);
 
+/**
+ * Map de hospitais do usuário em runtime · setado pelo App.tsx quando o
+ * user_state carrega. `getHospital` consulta primeiro esse map (cobre
+ * hospitais customizados com id "H-...") e cai pra constante default.
+ */
+let hospitaisRuntime: Record<string, Hospital> | null = null;
+
+export function setHospitaisRuntime(map: Record<string, Hospital> | null): void {
+  hospitaisRuntime = map;
+}
+
 export function getHospital(id: string | undefined): Hospital | undefined {
-  return id ? HOSPITAIS[id] : undefined;
+  if (!id) return undefined;
+  return hospitaisRuntime?.[id] ?? HOSPITAIS[id];
 }
 
 export function nivelCarga(h: number): Nivel {

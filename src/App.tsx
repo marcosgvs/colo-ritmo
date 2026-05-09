@@ -8,7 +8,7 @@ import type {
   Preferencias,
   PropostaSalva,
 } from '@/types';
-import { cargaSemanal } from '@/lib/data';
+import { cargaSemanal, setHospitaisRuntime } from '@/lib/data';
 import { calcularPadroes } from '@/lib/padroes';
 import { HandVariantContext } from '@/components/atoms';
 import { useAuth } from '@/hooks/useAuth';
@@ -84,6 +84,12 @@ export function App() {
   useEffect(() => {
     void registrarServiceWorker();
   }, []);
+
+  // Atualiza o map runtime de hospitais · permite que getHospital() resolva
+  // hospitais customizados (id "H-...") em qualquer view.
+  useEffect(() => {
+    setHospitaisRuntime(userState.state.hospitais);
+  }, [userState.state.hospitais]);
 
   const carga = useMemo(() => cargaSemanal(userState.state.blocos), [userState.state.blocos]);
 
