@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RealtimeChannel } from '@supabase/supabase-js';
-import type { Bloco, Hospital, Preferencias, PropostaSalva } from '@/types';
+import type { Bloco, Hospital, PadraoMedica, Preferencias, PropostaSalva } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { BLOCOS_SEMANA, HOSPITAIS, PREFERENCIAS_ME } from '@/lib/data';
 
@@ -15,6 +15,7 @@ export interface UserStateBlob {
   hospitais?: Record<string, Hospital>;
   preferencias?: Preferencias;
   propostas?: PropostaSalva[];
+  padroes?: PadraoMedica[];
   updatedAt?: string;
 }
 
@@ -25,6 +26,7 @@ export interface UserStateValor {
   hospitais: Record<string, Hospital>;
   preferencias: Preferencias;
   propostas: PropostaSalva[];
+  padroes: PadraoMedica[];
 }
 
 export interface UserStateAPI {
@@ -44,6 +46,7 @@ const FALLBACK: UserStateValor = {
   hospitais: HOSPITAIS,
   preferencias: PREFERENCIAS_ME,
   propostas: [],
+  padroes: [],
 };
 
 /**
@@ -70,6 +73,7 @@ export function useUserState(userId: string | null): UserStateAPI {
         hospitais: valor.hospitais,
         preferencias: valor.preferencias,
         propostas: valor.propostas,
+        padroes: valor.padroes,
         updatedAt: new Date().toISOString(),
       };
       const { error } = await supabase()
@@ -100,6 +104,7 @@ export function useUserState(userId: string | null): UserStateAPI {
           hospitais: next.hospitais ?? prev.hospitais,
           preferencias: next.preferencias ?? prev.preferencias,
           propostas: next.propostas ?? prev.propostas,
+          padroes: next.padroes ?? prev.padroes,
         };
         pendingRef.current = merged;
         if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -144,6 +149,7 @@ export function useUserState(userId: string | null): UserStateAPI {
             hospitais: blob.hospitais ?? FALLBACK.hospitais,
             preferencias: blob.preferencias ?? FALLBACK.preferencias,
             propostas: blob.propostas ?? [],
+            padroes: blob.padroes ?? [],
           });
         } else {
           // Primeiro acesso · semeia com defaults pra Mariana ver agenda.
@@ -172,6 +178,7 @@ export function useUserState(userId: string | null): UserStateAPI {
             hospitais: novoState.hospitais ?? prev.hospitais,
             preferencias: novoState.preferencias ?? prev.preferencias,
             propostas: novoState.propostas ?? prev.propostas,
+            padroes: novoState.padroes ?? prev.padroes,
           }));
         },
       )

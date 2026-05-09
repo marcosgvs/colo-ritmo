@@ -1,5 +1,5 @@
 import { useState, type ChangeEvent } from 'react';
-import type { Bloco, BlocoPlantao, HospitaisMap } from '@/types';
+import type { Bloco, BlocoPlantao, HospitaisMap, Janela } from '@/types';
 import {
   eventoParaBloco,
   fmtDate,
@@ -15,6 +15,13 @@ interface SyncProps {
   blocos: Bloco[];
   hospitais: HospitaisMap;
   onAdicionarBlocos: (b: BlocoPlantao[]) => void;
+  /** Aplicar uma escala importada de PDF · substitui mês×hospital + atualiza janelas. */
+  onAplicarEscala?: (data: {
+    hospitalId: string;
+    mesISO: string;
+    blocos: BlocoPlantao[];
+    janelas: Janela[];
+  }) => void;
   /** ICS token público do user · gerado server-side. */
   icsToken?: string | null;
   nomeUser?: string;
@@ -24,10 +31,13 @@ type Estado = 'parado' | 'lendo' | 'enviando' | 'pronto' | 'erro';
 
 interface Resultado {
   blocos: BlocoPlantao[];
+  janelas: Janela[];
   avisos: string[];
+  /** Diferenciamos: ICS = só blocos, PDF = blocos + janelas */
+  origem: 'ics' | 'pdf';
 }
 
-export function Sync({ blocos, hospitais, onAdicionarBlocos, icsToken, nomeUser }: SyncProps) {
+export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, icsToken, nomeUser }: SyncProps) {
   const [hospitalId, setHospitalId] = useState<string>(() => Object.keys(hospitais)[0] ?? '');
   const [mes, setMes] = useState<string>(() => new Date().toISOString().slice(0, 7));
   const [estado, setEstado] = useState<Estado>('parado');
@@ -45,18 +55,25 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, icsToken, nomeUser 
       setEstado('erro');
       return;
     }
+    if (!nomeUser) {
+      setErro('cadastre seu nome em "usuário" antes · preciso pra achar você na escala');
+      setEstado('erro');
+      return;
+    }
     setEstado('lendo');
     setErro(null);
     try {
       const base64 = await fileToBase64(file);
       setEstado('enviando');
       const [ano, mesNum] = mes.split('-').map((v) => parseInt(v, 10));
+      const hospital = hospitais[hospitalId];
       const resp = await fetch('/api/extrair-escala', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           pdfBase64: base64,
           hospitalId,
+          hospitalAbrev: hospital?.abrev ?? hospitalId,
           ano,
           mes: mesNum,
           nome: nomeUser,
@@ -69,8 +86,17 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, icsToken, nomeUser 
         console.error('extrair-escala:', txt);
         return;
       }
-      const json = (await resp.json()) as Resultado;
-      setResultado(json);
+      const json = (await resp.json()) as {
+        blocos: BlocoPlantao[];
+        janelas?: Janela[];
+        avisos?: string[];
+      };
+      setResultado({
+        blocos: json.blocos,
+        janelas: json.janelas ?? [],
+        avisos: json.avisos ?? [],
+        origem: 'pdf',
+      });
       setEstado('pronto');
     } catch (err) {
       setErro((err as Error).message);
@@ -94,7 +120,7 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, icsToken, nomeUser 
         if (b) blocos.push(b);
         else avisos.push(`evento sem início/fim · pulei (${evt.summary ?? evt.uid})`);
       });
-      setResultado({ blocos, avisos });
+      setResultado({ blocos, janelas: [], avisos, origem: 'ics' });
       setEstado('pronto');
     } catch (err) {
       setErro((err as Error).message);
@@ -104,7 +130,18 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, icsToken, nomeUser 
 
   function confirmarImport() {
     if (!resultado) return;
-    onAdicionarBlocos(resultado.blocos);
+    if (resultado.origem === 'pdf' && onAplicarEscala) {
+      // PDF · substitui mês×hospital + atualiza janelas + recalcula padrões
+      onAplicarEscala({
+        hospitalId,
+        mesISO: mes,
+        blocos: resultado.blocos,
+        janelas: resultado.janelas,
+      });
+    } else {
+      // ICS · só adiciona blocos
+      onAdicionarBlocos(resultado.blocos);
+    }
     setResultado(null);
     setIcsTexto('');
     setEstado('parado');

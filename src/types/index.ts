@@ -24,11 +24,21 @@ export type CorFamilia =
 
 export type TipoHospital = 'publico' | 'privado';
 
+export interface Janela {
+  /** Rótulo curto pra UI ("manhã", "tarde 1", "noitinha", "noite"). */
+  rotulo: string;
+  /** Hora decimal de início (7 = 07:00, 19.5 = 19:30). */
+  inicio: number;
+  /** Duração em horas. */
+  duracao: number;
+}
+
 export interface RegrasHospital {
   maxPorSemana: number;
   minFimDeSemana: number;
   intervaloMinHoras: number;
   duracaoPlantao: number;
+  /** @deprecated mantido pra retrocompat — janelas agora ficam em Hospital.janelas. */
   janelas: string[];
   maxPorMes: number;
 }
@@ -56,6 +66,8 @@ export interface Hospital {
   /** @deprecated não usado mais na UI · mantido opcional pra dados antigos */
   setores?: string[];
   regras: RegrasHospital;
+  /** Janelas reais detectadas/cadastradas (ex: HSLz tem 5: manhã, tarde 1+2, noitinha, noite). */
+  janelas?: Janela[];
   endereco?: EnderecoHospital;
 }
 
@@ -164,6 +176,27 @@ export interface CargaSemana {
 }
 
 export type LenteProposta = 'descansar' | 'equilibrar' | 'ganhar';
+
+/**
+ * Padrão observado da médica em um hospital específico — derivado dos
+ * plantões importados (escala oficial + ajustes manuais). Usado pelo
+ * solver pra dar bônus a candidatos que batem com a rotina natural dela.
+ *
+ * Ex: "Mariana faz noitinha em 80% das segundas no HSLz"
+ */
+export interface PadraoMedica {
+  hospitalId: string;
+  /** 0=domingo, 1=segunda, ..., 6=sábado (segue Date.getDay). */
+  diaDeSemana: 0 | 1 | 2 | 3 | 4 | 5 | 6;
+  /** Hora decimal de início típica (matcha com Janela.inicio). */
+  inicio: number;
+  /** Duração típica desse turno. */
+  duracao: number;
+  /** Quantidade de meses observados em que esse padrão apareceu. */
+  observadoEm: number;
+  /** Total de meses observados naquele hospital (denominador). */
+  totalMeses: number;
+}
 
 /**
  * Proposta salva no histórico do Montar.

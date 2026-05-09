@@ -1,8 +1,15 @@
-import type { Bloco, BlocoPlantao, HospitaisMap, Preferencias } from '@/types';
+import type {
+  Bloco,
+  BlocoPlantao,
+  HospitaisMap,
+  PadraoMedica,
+  Preferencias,
+} from '@/types';
 import { adicionaDia, diaSemanaBR, fimDoMes, fromISO, inicioDoMes, semanaDe } from './dates.js';
 import { detectarConflitos } from './conflitos.js';
 import { calcRemuneracaoBloco } from './remuneracao.js';
 import { analisarDescanso } from './descanso.js';
+import { bonusPadrao } from './padroes.js';
 
 /**
  * Solver heurístico greedy · sugere plantões pro mês respeitando
@@ -68,6 +75,8 @@ export interface SugerirOpts {
   mes: string;
   /** Default `equilibrar`. */
   lente?: Lente;
+  /** Padrões observados · usados como bônus no scoring de hospital/janela. */
+  padroes?: PadraoMedica[];
 }
 
 export interface SugestaoSolver {
@@ -151,23 +160,30 @@ function escolherHospital(
   prefs: Preferencias,
   limites: Limites,
   cfg: LenteCfg,
+  padroes: PadraoMedica[],
 ): string | null {
-  const ordem = [
+  const ordemBase = [
     ...prefs.hospitaisPreferidos.filter((id) => hospitais[id]),
     ...Object.keys(hospitais).filter((id) => !prefs.hospitaisPreferidos.includes(id)),
   ];
 
-  // Lente "ganhar" reordena por receita potencial · ainda dá leve preferência aos preferidos
-  const ranqueado = cfg.preferirNoturno
-    ? [...ordem].sort((a, b) => {
-        const pa = prefs.hospitaisPreferidos.includes(a) ? 0 : 1;
-        const pb = prefs.hospitaisPreferidos.includes(b) ? 0 : 1;
-        if (pa !== pb) return pa - pb;
-        return receitaJanela(b, hospitais, true) - receitaJanela(a, hospitais, true);
-      })
-    : ordem;
+  // Score por hospital: combina preferência + padrão observado pra esse DOW + (lente ganhar) receita
+  const scored = ordemBase.map((id) => {
+    let score = prefs.hospitaisPreferidos.includes(id) ? 1 : 0;
+    // Padrão pesa MUITO · médica fazendo o que costuma fazer >> heurística genérica
+    const bonus = bonusPadrao(
+      { hospitalId: id, data: diaISO, horaInicio: 0, duracao: 0 },
+      padroes,
+    );
+    score += bonus * 3;
+    if (cfg.preferirNoturno) {
+      score += receitaJanela(id, hospitais, true) / 10000;
+    }
+    return { id, score };
+  });
+  scored.sort((a, b) => b.score - a.score);
 
-  for (const id of ranqueado) {
+  for (const { id } of scored) {
     const hosp = hospitais[id];
     if (!hosp || !hosp.regras) continue;
     const usadoMes = limites.porHospitalMes.get(id) ?? 0;
@@ -186,7 +202,17 @@ function janelaParaPlantao(
   hospitalId: string,
   hospitais: HospitaisMap,
   cfg: LenteCfg,
+  diaISO: string,
+  padroes: PadraoMedica[],
 ): { horaInicio: number; duracao: number } {
+  // Padrão observado pro mesmo DOW × hospital tem prioridade (mantém rotina natural)
+  const dow = fromISO(diaISO).getDay();
+  const padraoMatch = padroes
+    .filter((p) => p.hospitalId === hospitalId && p.diaDeSemana === dow)
+    .sort((a, b) => b.observadoEm / b.totalMeses - a.observadoEm / a.totalMeses)[0];
+  if (padraoMatch) {
+    return { horaInicio: padraoMatch.inicio, duracao: padraoMatch.duracao };
+  }
   if (cfg.preferirNoturno) {
     const dia = receitaJanela(hospitalId, hospitais, false);
     const noite = receitaJanela(hospitalId, hospitais, true);
@@ -200,6 +226,7 @@ export function sugerirPlantoes(opts: SugerirOpts): SugestaoSolver {
   const { blocos, hospitais, preferencias, mes } = opts;
   const lente: Lente = opts.lente ?? 'equilibrar';
   const cfg = LENTES[lente];
+  const padroes = opts.padroes ?? [];
 
   const ini = inicioDoMes(`${mes}-01`);
   const fim = fimDoMes(`${mes}-01`);
@@ -247,14 +274,14 @@ export function sugerirPlantoes(opts: SugerirOpts): SugestaoSolver {
       continue;
     }
 
-    const hospitalId = escolherHospital(cursor, hospitais, preferencias, limites, cfg);
+    const hospitalId = escolherHospital(cursor, hospitais, preferencias, limites, cfg, padroes);
     if (!hospitalId) {
       motivos.push(`${cursor} pulado · hospitais cheios`);
       cursor = adicionaDia(cursor, 1);
       continue;
     }
     const hosp = hospitais[hospitalId]!;
-    const { horaInicio, duracao } = janelaParaPlantao(preferencias, hospitalId, hospitais, cfg);
+    const { horaInicio, duracao } = janelaParaPlantao(preferencias, hospitalId, hospitais, cfg, cursor, padroes);
 
     const novo: BlocoPlantao = {
       id: `sug-${cursor}-${hospitalId}`,

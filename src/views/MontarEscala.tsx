@@ -4,6 +4,7 @@ import type {
   BlocoBloqueio,
   BlocoPlantao,
   HospitaisMap,
+  PadraoMedica,
   Preferencias,
   PropostaSalva,
 } from '@/types';
@@ -30,6 +31,7 @@ interface MontarEscalaProps {
   onRemoverBloco?: (id: number | string) => void;
   propostas: PropostaSalva[];
   onAtualizarPropostas: (lista: PropostaSalva[]) => void;
+  padroes?: PadraoMedica[];
 }
 
 const ROTULO_LENTE: Record<Lente, string> = {
@@ -65,6 +67,7 @@ export function MontarEscala({
   onRemoverBloco,
   propostas,
   onAtualizarPropostas,
+  padroes,
 }: MontarEscalaProps) {
   const semHospitais = Object.keys(hospitais).length === 0;
 
@@ -184,6 +187,7 @@ export function MontarEscala({
       hospitais: hospitaisAtivos,
       preferencias: preferenciasParaSolver,
       mes: mesAlvo,
+      padroes,
     });
     setComparativo(c);
     setLente(diagnostico.lenteSugerida);

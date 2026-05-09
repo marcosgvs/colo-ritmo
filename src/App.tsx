@@ -1,6 +1,15 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
-import type { Bloco, BlocoPlantao, Hospital, Mode, Preferencias, PropostaSalva } from '@/types';
+import type {
+  Bloco,
+  BlocoPlantao,
+  Hospital,
+  Janela,
+  Mode,
+  Preferencias,
+  PropostaSalva,
+} from '@/types';
 import { cargaSemanal } from '@/lib/data';
+import { calcularPadroes } from '@/lib/padroes';
 import { HandVariantContext } from '@/components/atoms';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserState } from '@/hooks/useUserState';
@@ -167,6 +176,54 @@ export function App() {
     userState.setState({ propostas });
   };
 
+  /**
+   * Aplica uma escala oficial importada de PDF · substitui plantões
+   * existentes do mês×hospital, preserva trocas/cedidos manuais, mescla
+   * janelas no hospital, e recalcula padrões observados.
+   */
+  const aplicarEscala = (data: {
+    hospitalId: string;
+    mesISO: string;
+    blocos: BlocoPlantao[];
+    janelas: Janela[];
+  }) => {
+    const { hospitalId, mesISO, blocos, janelas } = data;
+    // Remove plantões REGULARES existentes do mesmo mês×hospital (preserva cedidos/trocados/extras manuais)
+    const semOficiaisAntigos = userState.state.blocos.filter((b) => {
+      if (b.tipo !== 'plantao') return true; // sono, bloqueio, cedido, deslocamento, etc
+      if (b.hospitalId !== hospitalId) return true;
+      if (!b.data.startsWith(mesISO)) return true;
+      if (b.viaTroca) return true; // preserva troca manual
+      return false; // remove plantão regular antigo do mês×hospital
+    });
+    const novosBlocos = [...semOficiaisAntigos, ...blocos];
+
+    // Mescla janelas no hospital (rótulo único · novo sobrescreve antigo)
+    const hospital = userState.state.hospitais[hospitalId];
+    const hospitaisAtualizados = hospital
+      ? {
+          ...userState.state.hospitais,
+          [hospitalId]: { ...hospital, janelas: mesclarJanelas(hospital.janelas, janelas) },
+        }
+      : userState.state.hospitais;
+
+    // Recalcula padrões observados com a base de blocos atualizada
+    const padroes = calcularPadroes(novosBlocos);
+
+    userState.setState({
+      blocos: novosBlocos,
+      hospitais: hospitaisAtualizados,
+      padroes,
+    });
+  };
+
+  function mesclarJanelas(atuais: Janela[] | undefined, novas: Janela[]): Janela[] {
+    const map = new Map<string, Janela>();
+    for (const j of atuais ?? []) map.set(j.rotulo.toLowerCase(), j);
+    for (const j of novas) map.set(j.rotulo.toLowerCase(), j);
+    return [...map.values()];
+  }
+
   const concluirOnboarding = (dados: {
     hospitais: Hospital[];
     preferencias: Partial<Preferencias>;
@@ -275,6 +332,7 @@ export function App() {
                   removerHospital={removerHospital}
                   salvarPreferencias={salvarPreferencias}
                   atualizarPropostas={atualizarPropostas}
+                  aplicarEscala={aplicarEscala}
                 />
               </Suspense>
             </Shell>
@@ -332,6 +390,12 @@ interface ViewSwitchProps {
   removerHospital: (id: string) => void;
   salvarPreferencias: (p: Preferencias) => void;
   atualizarPropostas: (propostas: PropostaSalva[]) => void;
+  aplicarEscala: (data: {
+    hospitalId: string;
+    mesISO: string;
+    blocos: BlocoPlantao[];
+    janelas: Janela[];
+  }) => void;
 }
 
 function ViewSwitch({
@@ -348,6 +412,7 @@ function ViewSwitch({
   removerHospital,
   salvarPreferencias,
   atualizarPropostas,
+  aplicarEscala,
 }: ViewSwitchProps) {
   const { state, status, erro } = userState;
   const mesISO = new Date().toISOString().slice(0, 7);
@@ -401,6 +466,7 @@ function ViewSwitch({
           blocos={state.blocos}
           hospitais={state.hospitais}
           onAdicionarBlocos={adicionarBlocos}
+          onAplicarEscala={aplicarEscala}
           nomeUser={state.preferencias.nome}
         />
       );
@@ -436,6 +502,7 @@ function ViewSwitch({
           onRemoverBloco={removerBloco}
           propostas={state.propostas}
           onAtualizarPropostas={atualizarPropostas}
+          padroes={state.padroes}
         />
       );
 
