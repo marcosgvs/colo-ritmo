@@ -111,6 +111,37 @@ describe('detectarConflitos · sem_descanso', () => {
     const c = detectarConflitos(blocos, HOSPITAIS);
     expect(c.find((x) => x.tipo === 'sem_descanso')).toBeUndefined();
   });
+
+  test('jornada estendida no mesmo hospital · não é conflito (manhã + tarde)', () => {
+    const blocos = [
+      plantao(1, 'HBDF', '2026-05-04', 7, 6), // manhã 7→13
+      plantao(2, 'HBDF', '2026-05-04', 13, 6), // tarde 13→19 · gap 0
+    ];
+    const c = detectarConflitos(blocos, HOSPITAIS);
+    expect(c.find((x) => x.tipo === 'sem_descanso')).toBeUndefined();
+  });
+
+  test('jornada estendida com gap pequeno (< 30min) · não é conflito', () => {
+    const blocos = [
+      plantao(1, 'HBDF', '2026-05-04', 7, 6), // 7→13
+      plantao(2, 'HBDF', '2026-05-04', 13.25, 6), // 13:15→19:15 · gap 15min
+    ];
+    const c = detectarConflitos(blocos, HOSPITAIS);
+    expect(c.find((x) => x.tipo === 'sem_descanso')).toBeUndefined();
+  });
+
+  test('hospitais diferentes mesmo com gap zero · ainda é conflito (tem que se deslocar)', () => {
+    const blocos = [
+      plantao(1, 'HBDF', '2026-05-04', 7, 6), // 7→13
+      plantao(2, 'HSL', '2026-05-04', 13, 6), // 13→19 outro hospital
+    ];
+    const c = detectarConflitos(blocos, HOSPITAIS);
+    // O caso de gap=0 entre hospitais diferentes vira sobreposição (porque tempo de deslocamento)
+    // ou sem_descanso · qualquer dos dois é correto sinalizar.
+    expect(
+      c.find((x) => x.tipo === 'sobreposicao' || x.tipo === 'sem_descanso'),
+    ).toBeDefined();
+  });
 });
 
 describe('detectarConflitos · limite_cfm', () => {

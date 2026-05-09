@@ -207,7 +207,7 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
                   ))}
                 </select>
               </Field>
-              <Field label="como seu nome aparece na escala">
+              <Field label="seu nome na escala">
                 <input
                   type="text"
                   value={apelidoNaEscala}

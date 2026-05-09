@@ -72,6 +72,10 @@ export function detectarConflitos(
       const [primeiro, segundo] = ra.ini <= rb.ini ? [ra, rb] : [rb, ra];
       const gap = segundo.ini - primeiro.fim;
       if (gap < 0) continue;
+      // Jornada estendida no mesmo hospital (ex: manhã 7-13 + tarde 13-19) é
+      // uma única plantão "vendida" em duas células do PDF do chefe — não é
+      // falta de descanso. Tolera até 30min de gap (handover, pausa curta).
+      if (a.hospitalId === b.hospitalId && gap < 0.5) continue;
       const hospA = hospitais[a.hospitalId];
       const hospB = hospitais[b.hospitalId];
       const minDescanso = Math.min(
