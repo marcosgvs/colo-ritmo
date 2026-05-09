@@ -132,21 +132,31 @@ Pra cada janela, infira hora de início e duração em horas. Use convenções c
 - noite: 19-07 (12h)
 
 PARTE 2 — PLANTÕES DA MÉDICA
-Encontre TODOS os plantões em que aparece o nome "${opts.nome}" (procure variações: primeiro nome, "Dra. ${opts.nome}", abreviações).
+Encontre TODAS as células da tabela onde aparece o nome "${opts.nome}" (procure variações: primeiro nome, "Dra. ${opts.nome}", abreviações).
 
-REGRA SIMPLES: identificou o nome → plantão regular na agenda. PONTO.
-- Ignora completamente anotações tipo "*", "²", "(pg)", itálico, sigla de extra, etc.
-- Não interpreta nada · não tenta classificar como troca/extra/cedido · não gera avisos sobre isso.
-- Para cada nome encontrado, cria UM plantão regular com data, horaInicio e duracao.
+REGRA CRÍTICA · MÚLTIPLOS NOMES NA MESMA CÉLULA:
+Uma célula pode ter VÁRIOS médicos juntos com "+" ou ",". Exemplos REAIS:
+- "Bruna + Mariana" (manhã segunda 04) → Mariana TEM plantão nessa manhã
+- "Anna + Mariana" (manhã sábado 09) → Mariana TEM plantão nessa manhã
+- "Lucas, Carol" (manhã domingo 03) → ambos têm plantão
+
+Não pule a célula só porque ela tem outro nome junto. Se "${opts.nome}" aparece NA célula (mesmo que com outros), é um plantão dela.
+
+REGRA SIMPLES POR CÉLULA: identificou o nome → plantão regular na agenda. PONTO.
+- Mesmo que o nome esteja em itálico, com "*", "²", "(pg)" ou outra anotação, é plantão regular.
+- Não interpreta nada · não classifica como troca/extra/cedido · não gera avisos sobre isso.
+- Cada CÉLULA distinta da tabela onde o nome aparece = 1 plantão (mesmo dia pode ter 2+ plantões diferentes em colunas diferentes: manhã + noite, ou tarde 2 + noitinha, etc).
 
 Pra cada ocorrência:
 - "data" no formato YYYY-MM-${mesPad} (ano e mês fixos do contexto)
-- "horaInicio" decimal (7=07:00, 19.5=19:30) baseado na janela em que aparece
-- "duracao" em horas baseado na janela
+- "horaInicio" decimal (7=07:00, 19.5=19:30) baseado na coluna (janela) onde está
+- "duracao" em horas baseado na coluna
 
 Inclua no array "avisos" SOMENTE se a linha estiver ilegível ou ambígua quanto ao NOME ou HORÁRIO (não sobre extras/trocas).
 
 Não inclua plantões de OUTROS médicos.
+
+VARRA TODA A TABELA · cada coluna (manhã, tarde 1, tarde 2, noitinha, noite) e cada linha (cada dia do mês). Conte célula por célula. Em mês de 30 dias com 5 colunas = 150 células pra checar.
 
 FORMATO DE RESPOSTA (devolva SOMENTE este JSON, sem markdown, sem explicação):
 {

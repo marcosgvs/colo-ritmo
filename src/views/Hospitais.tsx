@@ -237,6 +237,28 @@ function HospitalForm({ inicial, coresUsadas, onSalvar, onCancelar, onRemover }:
 
   const valido = draft.nome.trim().length > 0 && draft.abrev.trim().length > 0;
 
+  async function salvar() {
+    if (!valido) return;
+    // Se ainda não tem geo, tenta auto-localizar pelo nome (melhor esforço)
+    const semGeo =
+      !draft.endereco || draft.endereco.lat === undefined || draft.endereco.lng === undefined;
+    if (semGeo && draft.nome.trim()) {
+      try {
+        const r = await geocodificar(draft.nome.trim());
+        if (r) {
+          const e2 = draft.endereco ?? {
+            cep: '', logradouro: '', bairro: '', cidade: '', uf: '',
+          };
+          onSalvar({ ...draft, endereco: { ...e2, lat: r.lat, lng: r.lng } });
+          return;
+        }
+      } catch {
+        /* segue sem geo */
+      }
+    }
+    onSalvar(draft);
+  }
+
   return (
     <>
       <button
@@ -285,23 +307,9 @@ function HospitalForm({ inicial, coresUsadas, onSalvar, onCancelar, onRemover }:
 
       {aba === 'dados' && (
       <form
-        onSubmit={async (e) => {
+        onSubmit={(e) => {
           e.preventDefault();
-          if (!valido) return;
-          // Tenta auto-localizar pelo nome se ainda sem coordenadas.
-          const semGeo =
-            !draft.endereco || draft.endereco.lat === undefined || draft.endereco.lng === undefined;
-          if (semGeo && draft.nome.trim()) {
-            const r = await geocodificar(draft.nome.trim());
-            if (r) {
-              const e2 = draft.endereco ?? {
-                cep: '', logradouro: '', bairro: '', cidade: '', uf: '',
-              };
-              onSalvar({ ...draft, endereco: { ...e2, lat: r.lat, lng: r.lng } });
-              return;
-            }
-          }
-          onSalvar(draft);
+          void salvar();
         }}
         style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18, maxWidth: 720 }}
       >
@@ -547,63 +555,74 @@ function HospitalForm({ inicial, coresUsadas, onSalvar, onCancelar, onRemover }:
           )}
         </div>
 
-        <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 10, marginTop: 14 }}>
-          <button
-            type="submit"
-            disabled={!valido}
-            style={{
-              font: '600 13px/1 var(--font-body)',
-              padding: '12px 22px',
-              borderRadius: 999,
-              border: 'none',
-              background: 'var(--ink)',
-              color: 'var(--bg)',
-              cursor: 'pointer',
-              opacity: valido ? 1 : 0.5,
-            }}
-          >
-            {inicial ? 'salvar' : 'criar hospital'}
-          </button>
-          <button
-            type="button"
-            onClick={onCancelar}
-            style={{
-              font: '600 13px/1 var(--font-body)',
-              padding: '12px 22px',
-              borderRadius: 999,
-              border: '1px solid var(--line)',
-              background: 'transparent',
-              color: 'var(--ink-2)',
-              cursor: 'pointer',
-            }}
-          >
-            cancelar
-          </button>
-          <span style={{ flex: 1 }} />
-          {onRemover && (
-            <button
-              type="button"
-              onClick={() => {
-                if (confirm('remover este hospital? plantões antigos vão perder a cor e a regra.')) {
-                  onRemover();
-                }
-              }}
-              style={{
-                font: '600 13px/1 var(--font-body)',
-                padding: '12px 22px',
-                borderRadius: 999,
-                border: '1px solid var(--coral)',
-                background: 'transparent',
-                color: 'var(--coral-ink)',
-                cursor: 'pointer',
-              }}
-            >
-              remover hospital
-            </button>
-          )}
-        </div>
       </form>
       )}
+
+      <div
+        style={{
+          display: 'flex',
+          gap: 10,
+          marginTop: 24,
+          paddingTop: 18,
+          borderTop: '1px solid var(--line)',
+          maxWidth: 720,
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => void salvar()}
+          disabled={!valido}
+          style={{
+            font: '600 13px/1 var(--font-body)',
+            padding: '12px 22px',
+            borderRadius: 999,
+            border: 'none',
+            background: 'var(--ink)',
+            color: 'var(--bg)',
+            cursor: valido ? 'pointer' : 'not-allowed',
+            opacity: valido ? 1 : 0.5,
+          }}
+        >
+          {inicial ? 'salvar' : 'criar hospital'}
+        </button>
+        <button
+          type="button"
+          onClick={onCancelar}
+          style={{
+            font: '600 13px/1 var(--font-body)',
+            padding: '12px 22px',
+            borderRadius: 999,
+            border: '1px solid var(--line)',
+            background: 'transparent',
+            color: 'var(--ink-2)',
+            cursor: 'pointer',
+          }}
+        >
+          cancelar
+        </button>
+        <span style={{ flex: 1 }} />
+        {onRemover && (
+          <button
+            type="button"
+            onClick={() => {
+              if (confirm('remover este hospital? plantões antigos vão perder a cor e a regra.')) {
+                onRemover();
+              }
+            }}
+            style={{
+              font: '600 13px/1 var(--font-body)',
+              padding: '12px 22px',
+              borderRadius: 999,
+              border: '1px solid var(--coral)',
+              background: 'transparent',
+              color: 'var(--coral-ink)',
+              cursor: 'pointer',
+            }}
+          >
+            remover hospital
+          </button>
+        )}
+      </div>
     </>
   );
 }
@@ -939,6 +958,20 @@ function BlocoJanelas({
         <Mono style={{ color: 'var(--ink-3)', fontSize: 11 }}>
           edite ou adicione conforme a escala do hospital
         </Mono>
+      </div>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 90px 90px 36px',
+          gap: 8,
+          marginBottom: 4,
+          paddingLeft: 4,
+        }}
+      >
+        <Eyebrow>rótulo</Eyebrow>
+        <Eyebrow>início (h)</Eyebrow>
+        <Eyebrow>duração (h)</Eyebrow>
+        <span />
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {janelas.map((j, i) => (
