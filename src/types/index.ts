@@ -41,6 +41,18 @@ export interface RegrasHospital {
   /** @deprecated mantido pra retrocompat — janelas agora ficam em Hospital.janelas. */
   janelas: string[];
   maxPorMes: number;
+  /** CLT · mínimo de horas/semana exigido pelo contrato. */
+  minHorasPorSemana?: number;
+  /** Limite de horas/semana antes de cair em irregularidade ou recusar plantão. */
+  maxHorasPorSemana?: number;
+  /** Quantidade máxima de fins-de-semana de plantão por mês. */
+  maxFimDeSemana?: number;
+  /** Multiplicador de pagamento em feriados (ex: 2 = paga dobrado). */
+  feriadoMultiplicador?: number;
+  /** Multiplicador adicional pra plantão de FDS (ex: 1.3 = +30%). */
+  bonusFimDeSemana?: number;
+  /** Regras que a IA não conseguiu mapear pra campos estruturados. */
+  regrasLivres?: string[];
 }
 
 export interface EnderecoHospital {
@@ -68,8 +80,6 @@ export interface Hospital {
   regras: RegrasHospital;
   /** Janelas reais detectadas/cadastradas (ex: HSLz tem 5: manhã, tarde 1+2, noitinha, noite). */
   janelas?: Janela[];
-  /** Texto livre · regras informais que o solver não captura sozinho (futuro: vira input pra IA). */
-  observacoes?: string;
   endereco?: EnderecoHospital;
 }
 

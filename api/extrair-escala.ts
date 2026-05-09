@@ -132,17 +132,21 @@ Pra cada janela, infira hora de início e duração em horas. Use convenções c
 - noite: 19-07 (12h)
 
 PARTE 2 — PLANTÕES DA MÉDICA
-Encontre TODOS os plantões em que aparece o nome "${opts.nome}" (procure também variações: primeiro nome só, "Dra. ${opts.nome}", abreviações tipo "Mari").
+Encontre TODOS os plantões em que aparece o nome "${opts.nome}" (procure variações: primeiro nome, "Dra. ${opts.nome}", abreviações).
+
+REGRA SIMPLES: identificou o nome → plantão regular na agenda. PONTO.
+- Ignora completamente anotações tipo "*", "²", "(pg)", itálico, sigla de extra, etc.
+- Não interpreta nada · não tenta classificar como troca/extra/cedido · não gera avisos sobre isso.
+- Para cada nome encontrado, cria UM plantão regular com data, horaInicio e duracao.
+
 Pra cada ocorrência:
 - "data" no formato YYYY-MM-${mesPad} (ano e mês fixos do contexto)
-- "horaInicio" decimal (7=07:00, 19.5=19:30) baseado na janela em que ela aparece
+- "horaInicio" decimal (7=07:00, 19.5=19:30) baseado na janela em que aparece
 - "duracao" em horas baseado na janela
 
-REGRAS IMPORTANTES:
-- Se um nome aparece em itálico ou marcado especialmente, ainda inclua como plantão regular (ignora regras condicionais tipo "amplia se UTI cheia" — fica como aviso).
-- Se houver anotação tipo "*", "²", "(pg)" ao lado do nome, mantém o plantão regular E adiciona o que viu no array "avisos".
-- Se houver dúvida em alguma linha (nome ambíguo, horário ilegível), NÃO inclua e mande no "avisos".
-- Não inclua plantões de OUTROS médicos (só os de "${opts.nome}").
+Inclua no array "avisos" SOMENTE se a linha estiver ilegível ou ambígua quanto ao NOME ou HORÁRIO (não sobre extras/trocas).
+
+Não inclua plantões de OUTROS médicos.
 
 FORMATO DE RESPOSTA (devolva SOMENTE este JSON, sem markdown, sem explicação):
 {
@@ -152,9 +156,7 @@ FORMATO DE RESPOSTA (devolva SOMENTE este JSON, sem markdown, sem explicação):
   "blocos": [
     { "data": "${opts.ano}-${mesPad}-04", "horaInicio": 19, "duracao": 5 }
   ],
-  "avisos": [
-    "dia 08: nome com asterisco · pode ser extra FDS"
-  ]
+  "avisos": []
 }`;
 }
 

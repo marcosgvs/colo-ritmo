@@ -34,6 +34,13 @@ function parseDecimal(s: string): number {
   return isNaN(n) ? 0 : n;
 }
 
+interface ChatMsg {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+type AbaForm = 'dados' | 'regras';
+
 interface HospitaisProps {
   hospitais: HospitaisMap;
   onSalvar: (id: string, h: Hospital) => void;
@@ -182,11 +189,11 @@ function HospitalForm({ inicial, coresUsadas, onSalvar, onCancelar, onRemover }:
         maxPorMes: 8,
       },
       janelas: JANELAS_DEFAULT,
-      observacoes: '',
     },
   );
 
   const [enderecoAberto, setEnderecoAberto] = useState(false);
+  const [aba, setAba] = useState<AbaForm>('dados');
   const ehPublico = draft.tipo === 'publico';
 
   function setJanelas(novas: Janela[]) {
@@ -256,6 +263,27 @@ function HospitalForm({ inicial, coresUsadas, onSalvar, onCancelar, onRemover }:
         titulo={inicial ? draft.nome || 'sem nome' : 'cadastrar hospital'}
       />
 
+      <div style={{ display: 'flex', gap: 4, marginBottom: 18 }}>
+        <AbaBtn ativa={aba === 'dados'} onClick={() => setAba('dados')}>
+          dados
+        </AbaBtn>
+        <AbaBtn ativa={aba === 'regras'} onClick={() => setAba('regras')}>
+          regras
+        </AbaBtn>
+      </div>
+
+      {aba === 'regras' && (
+        <RegrasChat
+          nomeHospital={draft.nome || 'esse hospital'}
+          tipoHospital={draft.tipo}
+          regrasAtuais={draft.regras}
+          onAplicarRegras={(novas) =>
+            setDraft((d) => ({ ...d, regras: { ...d.regras, ...novas } }))
+          }
+        />
+      )}
+
+      {aba === 'dados' && (
       <form
         onSubmit={async (e) => {
           e.preventDefault();
@@ -469,23 +497,6 @@ function HospitalForm({ inicial, coresUsadas, onSalvar, onCancelar, onRemover }:
         </div>
 
         <div style={{ gridColumn: '1 / -1' }}>
-          <Field label="observações (opcional)">
-            <textarea
-              value={draft.observacoes ?? ''}
-              onChange={(e) => setCampo('observacoes', e.target.value)}
-              placeholder="ex: feriado conta dobrado · mês de jul tem semana de férias · plantão de sábado paga +30%"
-              rows={3}
-              style={{
-                ...input,
-                width: '100%',
-                resize: 'vertical',
-                fontFamily: 'var(--font-body)',
-              }}
-            />
-          </Field>
-        </div>
-
-        <div style={{ gridColumn: '1 / -1' }}>
           <button
             type="button"
             onClick={() => setEnderecoAberto((v) => !v)}
@@ -592,7 +603,291 @@ function HospitalForm({ inicial, coresUsadas, onSalvar, onCancelar, onRemover }:
           )}
         </div>
       </form>
+      )}
     </>
+  );
+}
+
+function AbaBtn({
+  ativa,
+  onClick,
+  children,
+}: {
+  ativa: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        font: '600 13px/1 var(--font-body)',
+        padding: '10px 18px',
+        borderRadius: 999,
+        border: ativa ? '1px solid var(--ink)' : '1px solid var(--line)',
+        background: ativa ? 'var(--ink)' : 'transparent',
+        color: ativa ? 'var(--bg)' : 'var(--ink-2)',
+        cursor: 'pointer',
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+interface RegrasChatProps {
+  nomeHospital: string;
+  tipoHospital: TipoHospital;
+  regrasAtuais: import('@/types').RegrasHospital;
+  onAplicarRegras: (parciais: Partial<import('@/types').RegrasHospital>) => void;
+}
+
+function RegrasChat({
+  nomeHospital,
+  tipoHospital,
+  regrasAtuais,
+  onAplicarRegras,
+}: RegrasChatProps) {
+  const [mensagens, setMensagens] = useState<ChatMsg[]>([]);
+  const [rascunho, setRascunho] = useState('');
+  const [estado, setEstado] = useState<'parado' | 'enviando' | 'erro'>('parado');
+  const [erro, setErro] = useState<string | null>(null);
+  const [propostas, setPropostas] =
+    useState<Partial<import('@/types').RegrasHospital> | null>(null);
+
+  async function enviar(texto: string) {
+    if (!texto.trim()) return;
+    const proximas: ChatMsg[] = [...mensagens, { role: 'user', content: texto.trim() }];
+    setMensagens(proximas);
+    setRascunho('');
+    setEstado('enviando');
+    setErro(null);
+    try {
+      const r = await fetch('/api/regras-parse', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          hospitalNome: nomeHospital,
+          hospitalTipo: tipoHospital,
+          mensagens: proximas,
+          regrasAtuais: regrasAtuais,
+        }),
+      });
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        setErro(err?.erro ?? `${r.status}`);
+        setEstado('erro');
+        return;
+      }
+      const json = (await r.json()) as {
+        resposta: string;
+        regrasPropostas: Partial<import('@/types').RegrasHospital> | null;
+      };
+      setMensagens((m) => [...m, { role: 'assistant', content: json.resposta }]);
+      if (json.regrasPropostas) setPropostas(json.regrasPropostas);
+      setEstado('parado');
+    } catch (e) {
+      setErro((e as Error).message);
+      setEstado('erro');
+    }
+  }
+
+  function aplicar() {
+    if (!propostas) return;
+    onAplicarRegras(propostas);
+    setMensagens((m) => [
+      ...m,
+      { role: 'assistant', content: 'beleza · regras aplicadas. quer ajustar mais alguma coisa?' },
+    ]);
+    setPropostas(null);
+  }
+
+  return (
+    <div
+      style={{
+        background: 'var(--bg)',
+        border: '1px solid var(--line)',
+        borderRadius: 16,
+        padding: '18px 20px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 12,
+        maxWidth: 720,
+      }}
+    >
+      <Eyebrow>regras com ajuda da ia</Eyebrow>
+      <Mono style={{ color: 'var(--ink-3)', display: 'block', fontSize: 12 }}>
+        conta como o hospital funciona em texto livre · a ia faz perguntas e
+        estrutura o que der no fim.
+      </Mono>
+
+      {mensagens.length === 0 && (
+        <div
+          style={{
+            background: 'var(--lavender-surface)',
+            borderRadius: 'var(--r-md)',
+            padding: '14px 16px',
+            color: 'var(--ink-2)',
+            font: '500 14px/1.4 var(--font-body)',
+          }}
+        >
+          oi · me conta como funciona a escala do{' '}
+          <strong>{nomeHospital}</strong>. quantos plantões por semana, FDS
+          obrigatório, regra de feriado · qualquer coisa serve. eu vou
+          perguntando o que faltar e estruturo no final.
+        </div>
+      )}
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {mensagens.map((m, i) => (
+          <div
+            key={i}
+            style={{
+              alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
+              maxWidth: '85%',
+              background:
+                m.role === 'user' ? 'var(--ink)' : 'var(--lavender-surface)',
+              color: m.role === 'user' ? 'var(--bg)' : 'var(--ink)',
+              borderRadius: 'var(--r-md)',
+              padding: '10px 14px',
+              font: '500 14px/1.45 var(--font-body)',
+              whiteSpace: 'pre-wrap',
+            }}
+          >
+            {m.content}
+          </div>
+        ))}
+        {estado === 'enviando' && (
+          <Mono style={{ color: 'var(--ink-3)' }}>pensando…</Mono>
+        )}
+      </div>
+
+      {propostas && (
+        <div
+          style={{
+            background: 'var(--sage-surface)',
+            borderLeft: '3px solid var(--sage-ink)',
+            padding: '12px 14px',
+            borderRadius: 'var(--r-md)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 8,
+          }}
+        >
+          <Eyebrow color="var(--sage-ink)">regras propostas</Eyebrow>
+          <PreviewRegras r={propostas} />
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              type="button"
+              onClick={aplicar}
+              style={{
+                font: '600 13px/1 var(--font-body)',
+                padding: '10px 18px',
+                borderRadius: 999,
+                border: 'none',
+                background: 'var(--sage-ink)',
+                color: 'var(--bg)',
+                cursor: 'pointer',
+              }}
+            >
+              aplicar
+            </button>
+            <button
+              type="button"
+              onClick={() => setPropostas(null)}
+              style={{
+                font: '600 13px/1 var(--font-body)',
+                padding: '10px 18px',
+                borderRadius: 999,
+                border: '1px solid var(--line)',
+                background: 'transparent',
+                color: 'var(--ink-2)',
+                cursor: 'pointer',
+              }}
+            >
+              continuar conversando
+            </button>
+          </div>
+        </div>
+      )}
+
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          enviar(rascunho);
+        }}
+        style={{ display: 'flex', gap: 8 }}
+      >
+        <input
+          value={rascunho}
+          onChange={(e) => setRascunho(e.target.value)}
+          placeholder="manda em português normal · ex: '2 plantões/sem · 1 FDS obrigatório'"
+          disabled={estado === 'enviando'}
+          style={{ ...input, flex: 1 }}
+        />
+        <button
+          type="submit"
+          disabled={!rascunho.trim() || estado === 'enviando'}
+          style={{
+            font: '600 13px/1 var(--font-body)',
+            padding: '10px 18px',
+            borderRadius: 999,
+            border: 'none',
+            background: 'var(--ink)',
+            color: 'var(--bg)',
+            cursor: 'pointer',
+            opacity: !rascunho.trim() || estado === 'enviando' ? 0.5 : 1,
+          }}
+        >
+          enviar
+        </button>
+      </form>
+      {erro && (
+        <Mono style={{ color: 'var(--coral-ink)' }}>{erro}</Mono>
+      )}
+    </div>
+  );
+}
+
+function PreviewRegras({
+  r,
+}: {
+  r: Partial<import('@/types').RegrasHospital>;
+}) {
+  const linhas: string[] = [];
+  if (r.maxPorSemana) linhas.push(`máx ${r.maxPorSemana} plantões/sem`);
+  if (r.maxPorMes) linhas.push(`máx ${r.maxPorMes} plantões/mês`);
+  if (r.minHorasPorSemana) linhas.push(`mín ${r.minHorasPorSemana}h/sem`);
+  if (r.maxHorasPorSemana) linhas.push(`máx ${r.maxHorasPorSemana}h/sem`);
+  if (r.minFimDeSemana) linhas.push(`mín ${r.minFimDeSemana} FDS/mês`);
+  if (r.maxFimDeSemana) linhas.push(`máx ${r.maxFimDeSemana} FDS/mês`);
+  if (r.intervaloMinHoras) linhas.push(`descanso mín ${r.intervaloMinHoras}h entre plantões`);
+  if (r.duracaoPlantao) linhas.push(`plantão padrão ${r.duracaoPlantao}h`);
+  if (r.feriadoMultiplicador && r.feriadoMultiplicador !== 1)
+    linhas.push(`feriado paga ${r.feriadoMultiplicador}×`);
+  if (r.bonusFimDeSemana && r.bonusFimDeSemana !== 1)
+    linhas.push(`FDS paga ${r.bonusFimDeSemana}×`);
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      {linhas.map((l, i) => (
+        <Mono key={i} style={{ color: 'var(--ink-2)', fontSize: 12 }}>
+          · {l}
+        </Mono>
+      ))}
+      {r.regrasLivres && r.regrasLivres.length > 0 && (
+        <>
+          <Mono style={{ color: 'var(--ink-3)', fontSize: 11, marginTop: 4 }}>
+            outras regras (livre):
+          </Mono>
+          {r.regrasLivres.map((l, i) => (
+            <Mono key={`l${i}`} style={{ color: 'var(--ink-2)', fontSize: 12 }}>
+              · {l}
+            </Mono>
+          ))}
+        </>
+      )}
+    </div>
   );
 }
 
