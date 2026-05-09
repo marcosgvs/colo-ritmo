@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { envObrigatorio } from './_shared/env.js';
-import { fuzzyMatch } from '@/lib/fuzzyMatch.js';
+import { fuzzyMatch } from '../src/lib/fuzzyMatch.js';
 
 /**
  * /api/extrair-escala · OCR + extração estruturada via Claude Vision (tool use).
