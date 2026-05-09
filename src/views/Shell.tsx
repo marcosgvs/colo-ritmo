@@ -20,6 +20,8 @@ interface ShellProps {
   onAdd?: (t: AddTipo) => void;
   onTrocar?: (b: Bloco) => void;
   onCeder?: (b: Bloco) => void;
+  onEditar?: (b: Bloco) => void;
+  onRemover?: (id: number | string) => void;
   notificacoes?: Notificacao[];
   onMarcarLida?: (id: string) => void;
   children: ReactNode;
@@ -43,6 +45,8 @@ export function Shell({
   onAdd,
   onTrocar,
   onCeder,
+  onEditar,
+  onRemover,
   notificacoes,
   onMarcarLida,
   children,
@@ -84,6 +88,8 @@ export function Shell({
         onTrocar={onTrocar}
         onCeder={onCeder}
         onAbrirDetalhe={abrirDetalhe}
+        onEditar={onEditar}
+        onRemover={onRemover}
       />
     </div>
   );

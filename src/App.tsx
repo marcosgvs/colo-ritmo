@@ -14,7 +14,7 @@ import { registrarServiceWorker } from '@/lib/push';
 import { Login } from '@/views/Login';
 import { Shell } from '@/views/Shell';
 import { Semana } from '@/views/Semana';
-import { AdicionarBloco } from '@/views/AdicionarBloco';
+import { AdicionarBloco, ehTipoEditavel } from '@/views/AdicionarBloco';
 import { TrocaCederModal, type RegistroTroca } from '@/views/TrocaCederModal';
 import type { AddTipo } from '@/components/shell';
 
@@ -63,6 +63,7 @@ export function App() {
   const [detalheBloco, setDetalheBloco] = useState<Bloco | null>(null);
   const [pulouOnboarding, setPulouOnboarding] = useState(false);
   const [adicionando, setAdicionando] = useState<AddTipo | null>(null);
+  const [editandoBloco, setEditandoBloco] = useState<Bloco | null>(null);
   const [trocaCeder, setTrocaCeder] = useState<{ modo: 'trocar' | 'ceder'; bloco: BlocoPlantao } | null>(null);
 
   // Cookie de preview força o mode (Marcos vendo como X sem login real).
@@ -99,6 +100,19 @@ export function App() {
 
   const removerBloco = (id: number | string) => {
     userState.setState({ blocos: userState.state.blocos.filter((b) => b.id !== id) });
+  };
+
+  const salvarEdicaoBloco = (b: Bloco) => {
+    userState.setState({
+      blocos: userState.state.blocos.map((x) => (x.id === b.id ? b : x)),
+    });
+    setEditandoBloco(null);
+  };
+
+  const removerBlocoEditando = () => {
+    if (!editandoBloco) return;
+    removerBloco(editandoBloco.id);
+    setEditandoBloco(null);
   };
 
   const aplicarTrocaCeder = (reg: RegistroTroca) => {
@@ -239,6 +253,14 @@ export function App() {
                 setSelecionado(null);
                 setTrocaCeder({ modo: 'ceder', bloco: b });
               }}
+              onEditar={(b) => {
+                setEditandoBloco(b);
+                setSelecionado(null);
+              }}
+              onRemover={(id) => {
+                removerBloco(id);
+                setSelecionado(null);
+              }}
               onAdd={(t) => setAdicionando(t)}
               notificacoes={notif.notificacoes}
               onMarcarLida={notif.marcarLida}
@@ -270,6 +292,18 @@ export function App() {
               blocosAtuais={userState.state.blocos}
               onSalvar={adicionarBloco}
               onCancelar={() => setAdicionando(null)}
+            />
+          )}
+
+          {editandoBloco && ehTipoEditavel(editandoBloco.tipo) && (
+            <AdicionarBloco
+              tipo={editandoBloco.tipo}
+              hospitais={userState.state.hospitais}
+              blocosAtuais={userState.state.blocos}
+              blocoExistente={editandoBloco}
+              onSalvar={salvarEdicaoBloco}
+              onRemover={removerBlocoEditando}
+              onCancelar={() => setEditandoBloco(null)}
             />
           )}
 

@@ -10,7 +10,21 @@ interface BlockDrawerProps {
   onTrocar?: (b: Bloco) => void;
   onCeder?: (b: Bloco) => void;
   onAbrirDetalhe?: (b: Bloco) => void;
+  /** Editar abre o form com todos os campos preenchidos. */
+  onEditar?: (b: Bloco) => void;
+  /** Remover tira da agenda. Caller cuida da confirmação se quiser. */
+  onRemover?: (id: number | string) => void;
 }
+
+const TIPOS_EDITAVEIS = new Set([
+  'plantao',
+  'sono',
+  'bloqueio',
+  'consulta',
+  'estudo',
+  'pessoal',
+  'outros',
+]);
 
 /**
  * BlockDrawer · overlay lateral à direita (480px desktop · bottom sheet
@@ -27,6 +41,8 @@ export function BlockDrawer({
   onTrocar,
   onCeder,
   onAbrirDetalhe,
+  onEditar,
+  onRemover,
 }: BlockDrawerProps) {
   // ESC fecha
   useEffect(() => {
@@ -226,6 +242,43 @@ export function BlockDrawer({
             )}
             {onTrocar && <Btn onClick={() => onTrocar(bloco)}>pedir troca</Btn>}
             {onCeder && <Btn onClick={() => onCeder(bloco)}>ceder pra alguém</Btn>}
+          </div>
+        )}
+
+        {(onEditar || onRemover) && (
+          <div
+            style={{
+              display: 'flex',
+              gap: 10,
+              flexWrap: 'wrap',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              paddingTop: 10,
+              borderTop: '1px dashed var(--line-2)',
+            }}
+          >
+            {onEditar && TIPOS_EDITAVEIS.has(bloco.tipo) ? (
+              <Btn onClick={() => onEditar(bloco)}>editar</Btn>
+            ) : (
+              <span />
+            )}
+            {onRemover && (
+              <button
+                type="button"
+                onClick={() => onRemover(bloco.id)}
+                style={{
+                  font: '600 12px/1 var(--font-body)',
+                  padding: '10px 16px',
+                  borderRadius: 999,
+                  border: '1px solid var(--coral-ink)',
+                  background: 'transparent',
+                  color: 'var(--coral-ink)',
+                  cursor: 'pointer',
+                }}
+              >
+                remover da agenda
+              </button>
+            )}
           </div>
         )}
 

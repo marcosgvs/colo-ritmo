@@ -11,11 +11,14 @@ interface AdicionarBlocoProps {
   blocosAtuais: Bloco[];
   /** ISO sugerido (default = hoje no calendário sample). */
   dataInicial?: string;
+  /** Se presente, abre em modo "editar" — preserva id, oferece botão remover. */
+  blocoExistente?: Bloco;
   onSalvar: (b: Bloco) => void;
+  onRemover?: () => void;
   onCancelar: () => void;
 }
 
-const TITULO: Record<AddTipo, string> = {
+const TITULO_CRIAR: Record<AddTipo, string> = {
   plantao: 'novo plantão',
   sono: 'janela de sono',
   bloqueio: 'dia bloqueado',
@@ -23,6 +26,16 @@ const TITULO: Record<AddTipo, string> = {
   estudo: 'estudo / curso',
   pessoal: 'compromisso pessoal',
   outros: 'outro evento',
+};
+
+const TITULO_EDITAR: Record<AddTipo, string> = {
+  plantao: 'editar plantão',
+  sono: 'editar janela de sono',
+  bloqueio: 'editar bloqueio',
+  consulta: 'editar consulta',
+  estudo: 'editar estudo',
+  pessoal: 'editar compromisso',
+  outros: 'editar evento',
 };
 
 const HAND_HINT: Record<AddTipo, string> = {
@@ -34,6 +47,22 @@ const HAND_HINT: Record<AddTipo, string> = {
   pessoal: 'fora da medicina',
   outros: 'qualquer outro evento',
 };
+
+/** Tipos que o AdicionarBloco/Editor cobre. Outros (cedido/trocado/deslocamento)
+ * são resultados de ações específicas e não passam por aqui. */
+const TIPOS_EDITAVEIS: AddTipo[] = [
+  'plantao',
+  'sono',
+  'bloqueio',
+  'consulta',
+  'estudo',
+  'pessoal',
+  'outros',
+];
+
+export function ehTipoEditavel(t: Bloco['tipo']): t is AddTipo {
+  return (TIPOS_EDITAVEIS as string[]).includes(t);
+}
 
 /**
  * Modal full-overlay que substitui o stub `console.info('FAB:', tipo)`
@@ -48,20 +77,41 @@ export function AdicionarBloco({
   hospitais,
   blocosAtuais,
   dataInicial,
+  blocoExistente,
   onSalvar,
+  onRemover,
   onCancelar,
 }: AdicionarBlocoProps) {
+  const modoEditar = !!blocoExistente;
   const hojeISO = dataInicial ?? new Date().toISOString().slice(0, 10);
 
   const hospitaisLista = Object.values(hospitais);
-  const [data, setData] = useState(hojeISO);
-  const [horaInicio, setHoraInicio] = useState(tipo === 'plantao' ? 7 : tipo === 'sono' ? 22 : 19);
-  const [duracao, setDuracao] = useState(tipo === 'sono' ? 8 : tipo === 'bloqueio' ? 24 : 12);
-  const [hospitalId, setHospitalId] = useState(hospitaisLista[0]?.id ?? '');
-  const [setor, setSetor] = useState('');
-  const [titulo, setTitulo] = useState('');
-  const [motivo, setMotivo] = useState('');
-  const [local, setLocal] = useState('');
+  const [data, setData] = useState(blocoExistente?.data ?? hojeISO);
+  const [horaInicio, setHoraInicio] = useState(
+    blocoExistente?.horaInicio ?? (tipo === 'plantao' ? 7 : tipo === 'sono' ? 22 : 19),
+  );
+  const [duracao, setDuracao] = useState(
+    blocoExistente?.duracao ?? (tipo === 'sono' ? 8 : tipo === 'bloqueio' ? 24 : 12),
+  );
+  const [hospitalId, setHospitalId] = useState(
+    blocoExistente?.tipo === 'plantao' ? blocoExistente.hospitalId : hospitaisLista[0]?.id ?? '',
+  );
+  const [setor, setSetor] = useState(
+    blocoExistente?.tipo === 'plantao' ? blocoExistente.setor : '',
+  );
+  const [titulo, setTitulo] = useState(
+    blocoExistente?.tipo === 'estudo' ||
+      blocoExistente?.tipo === 'pessoal' ||
+      blocoExistente?.tipo === 'outros'
+      ? blocoExistente.titulo ?? ''
+      : '',
+  );
+  const [motivo, setMotivo] = useState(
+    blocoExistente?.tipo === 'bloqueio' ? blocoExistente.motivo ?? '' : '',
+  );
+  const [local, setLocal] = useState(
+    blocoExistente?.tipo === 'consulta' ? blocoExistente.local ?? '' : '',
+  );
 
   // Atalho · setor segue o primeiro do hospital escolhido se ainda vazio
   useEffect(() => {
@@ -71,7 +121,7 @@ export function AdicionarBloco({
   }, [hospitalId, tipo, hospitais, setor]);
 
   const novoBloco: Bloco = useMemo(() => {
-    const id = `manual-${Date.now()}`;
+    const id = blocoExistente?.id ?? `manual-${Date.now()}`;
     if (tipo === 'plantao') {
       return {
         id,
@@ -89,7 +139,7 @@ export function AdicionarBloco({
     if (tipo === 'estudo') return { id, tipo: 'estudo', data, horaInicio, duracao, titulo };
     if (tipo === 'pessoal') return { id, tipo: 'pessoal', data, horaInicio, duracao, titulo };
     return { id, tipo: 'outros', data, horaInicio, duracao, titulo };
-  }, [tipo, hospitalId, data, horaInicio, duracao, setor, motivo, local, titulo, hospitais]);
+  }, [tipo, hospitalId, data, horaInicio, duracao, setor, motivo, local, titulo, hospitais, blocoExistente]);
 
   const conflitos = useMemo(() => {
     if (tipo !== 'plantao') return [];
@@ -129,7 +179,7 @@ export function AdicionarBloco({
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-          <Eyebrow>{tipo}</Eyebrow>
+          <Eyebrow>{modoEditar ? `editar · ${tipo}` : tipo}</Eyebrow>
           <button
             type="button"
             onClick={onCancelar}
@@ -158,7 +208,7 @@ export function AdicionarBloco({
             margin: '8px 0 6px',
           }}
         >
-          {TITULO[tipo]}
+          {(modoEditar ? TITULO_EDITAR : TITULO_CRIAR)[tipo]}
         </h2>
         <Hand color="var(--ink-2)" size={16} style={{ display: 'block', marginBottom: 18 }}>
           {HAND_HINT[tipo]}
@@ -306,39 +356,67 @@ export function AdicionarBloco({
           </div>
         )}
 
-        <div style={{ display: 'flex', gap: 10, marginTop: 22 }}>
-          <button
-            type="button"
-            onClick={() => onSalvar(novoBloco)}
-            disabled={!podeSalvar}
-            style={{
-              font: '600 13px/1 var(--font-body)',
-              padding: '12px 22px',
-              borderRadius: 999,
-              border: 'none',
-              background: 'var(--ink)',
-              color: 'var(--bg)',
-              cursor: podeSalvar ? 'pointer' : 'not-allowed',
-              opacity: podeSalvar ? 1 : 0.5,
-            }}
-          >
-            adicionar
-          </button>
-          <button
-            type="button"
-            onClick={onCancelar}
-            style={{
-              font: '600 13px/1 var(--font-body)',
-              padding: '12px 22px',
-              borderRadius: 999,
-              border: '1px solid var(--line)',
-              background: 'transparent',
-              color: 'var(--ink-2)',
-              cursor: 'pointer',
-            }}
-          >
-            cancelar
-          </button>
+        <div
+          style={{
+            display: 'flex',
+            gap: 10,
+            marginTop: 22,
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+          }}
+        >
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={() => onSalvar(novoBloco)}
+              disabled={!podeSalvar}
+              style={{
+                font: '600 13px/1 var(--font-body)',
+                padding: '12px 22px',
+                borderRadius: 999,
+                border: 'none',
+                background: 'var(--ink)',
+                color: 'var(--bg)',
+                cursor: podeSalvar ? 'pointer' : 'not-allowed',
+                opacity: podeSalvar ? 1 : 0.5,
+              }}
+            >
+              {modoEditar ? 'salvar alterações' : 'adicionar'}
+            </button>
+            <button
+              type="button"
+              onClick={onCancelar}
+              style={{
+                font: '600 13px/1 var(--font-body)',
+                padding: '12px 22px',
+                borderRadius: 999,
+                border: '1px solid var(--line)',
+                background: 'transparent',
+                color: 'var(--ink-2)',
+                cursor: 'pointer',
+              }}
+            >
+              cancelar
+            </button>
+          </div>
+          {modoEditar && onRemover && (
+            <button
+              type="button"
+              onClick={onRemover}
+              style={{
+                font: '600 12px/1 var(--font-body)',
+                padding: '10px 16px',
+                borderRadius: 999,
+                border: '1px solid var(--coral-ink)',
+                background: 'transparent',
+                color: 'var(--coral-ink)',
+                cursor: 'pointer',
+              }}
+            >
+              remover da agenda
+            </button>
+          )}
         </div>
       </div>
     </div>
