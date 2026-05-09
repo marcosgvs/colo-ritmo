@@ -368,6 +368,9 @@ interface ResumoMesProps {
 
 function ResumoMes({ blocos, hospitais, mesAno }: ResumoMesProps) {
   const plantoes = blocos.filter((b): b is BlocoPlantao => b.tipo === 'plantao');
+  const plantoesFuturos = plantoes
+    .filter((p) => p.data >= HOJE)
+    .sort((a, b) => a.data.localeCompare(b.data) || a.horaInicio - b.horaInicio);
   const porHosp = new Map<string, { qt: number; horas: number }>();
   for (const p of plantoes) {
     const r = porHosp.get(p.hospitalId) ?? { qt: 0, horas: 0 };
@@ -447,10 +450,10 @@ function ResumoMes({ blocos, hospitais, mesAno }: ResumoMesProps) {
           <Pill kind="lavender">{plantoes.length} plantões</Pill>
         </div>
       )}
-      {plantoes[0] && (
+      {plantoesFuturos[0] && (
         <Hand color="var(--ink-2)" size={16} style={{ display: 'block', marginTop: 14 }}>
-          próximo: {fmtDate(plantoes[0].data)}
-          {dayOfWeek(plantoes[0].data) === 6 ? ' · final de semana' : ''}
+          próximo: {fmtDate(plantoesFuturos[0].data)}
+          {dayOfWeek(plantoesFuturos[0].data) === 6 ? ' · final de semana' : ''}
         </Hand>
       )}
     </div>

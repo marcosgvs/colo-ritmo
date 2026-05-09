@@ -204,13 +204,42 @@ export function useUserState(userId: string | null): UserStateAPI {
     };
   }, [userId, persistir]);
 
-  // State enriquecido · blocos com `conflito: true` marcados a partir de
-  // detectarConflitos. Sem isso, o calendário não pinta vermelho os blocos
-  // em sobreposição/sem-descanso (apesar do contador no header somar certo).
-  const stateEnriquecido = useMemo<UserStateValor>(
-    () => ({ ...state, blocos: marcarConflitos(state.blocos, state.hospitais) }),
-    [state],
-  );
+  // State enriquecido:
+  //   1. Garante que hospitais referenciados por plantões antigos existam
+  //      no map ativo (preenche com defaults pra evitar plantões "fantasmas"
+  //      sem nome/regras/valor).
+  //   2. Marca `conflito: true` nos plantões em sobreposição/sem-descanso
+  //      pra UI pintar vermelho.
+  const stateEnriquecido = useMemo<UserStateValor>(() => {
+    const hospitaisFinal = preencherFantasmas(state.blocos, state.hospitais);
+    return {
+      ...state,
+      hospitais: hospitaisFinal,
+      blocos: marcarConflitos(state.blocos, hospitaisFinal),
+    };
+  }, [state]);
 
   return { status, erro, state: stateEnriquecido, setState, flushSave };
+}
+
+/**
+ * Quando um plantão antigo aponta pra hospitalId que não está no map
+ * (porque o usuário removeu o hospital mas o plantão sobreviveu), busca
+ * no `HOSPITAIS` default. Sem isso, calcRemuneracaoBloco devolve 0 e o
+ * solver nem considera o hospital.
+ */
+function preencherFantasmas(
+  blocos: Bloco[],
+  atuais: Record<string, Hospital>,
+): Record<string, Hospital> {
+  const idsUsados = new Set<string>();
+  for (const b of blocos) {
+    if (b.tipo === 'plantao' || b.tipo === 'cedido') idsUsados.add(b.hospitalId);
+  }
+  const extras: Record<string, Hospital> = {};
+  for (const id of idsUsados) {
+    if (!atuais[id] && HOSPITAIS[id]) extras[id] = HOSPITAIS[id]!;
+  }
+  if (Object.keys(extras).length === 0) return atuais;
+  return { ...extras, ...atuais };
 }
