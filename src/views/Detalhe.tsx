@@ -1,6 +1,5 @@
 import type { Bloco, HospitaisMap } from '@/types';
 import {
-  calcRemuneracaoBloco,
   fmtDate,
   fmtRange,
   getHospital,
@@ -26,7 +25,6 @@ export function Detalhe({ bloco, hospitais: _h, voltar, onTrocar, onCeder }: Det
   const hosp =
     bloco.tipo === 'plantao' || bloco.tipo === 'cedido' ? getHospital(bloco.hospitalId) : undefined;
   const noturno = bloco.tipo === 'plantao' ? ehNoturno(bloco) : false;
-  const remuneracao = bloco.tipo === 'plantao' && hosp ? calcRemuneracaoBloco(bloco, hosp) : null;
 
   const titulo =
     bloco.tipo === 'plantao' && hosp
@@ -203,26 +201,6 @@ export function Detalhe({ bloco, hospitais: _h, voltar, onTrocar, onCeder }: Det
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          {remuneracao && (
-            <Card title="remuneração estimada" eyebrow="por este plantão">
-              <p
-                style={{
-                  fontFamily: 'var(--font-display)',
-                  fontWeight: 500,
-                  fontSize: 32,
-                  letterSpacing: '-0.015em',
-                  margin: 0,
-                  color: 'var(--sage-ink)',
-                }}
-              >
-                R$ {remuneracao.liquido.toLocaleString('pt-BR')}
-              </p>
-              <Mono style={{ display: 'block', marginTop: 6, color: 'var(--ink-3)' }}>
-                líquido · bruto R$ {remuneracao.bruto.toLocaleString('pt-BR')}
-              </Mono>
-            </Card>
-          )}
-
           {bloco.tipo === 'plantao' && (
             <Card title="ações" eyebrow="se o dia mudar">
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>

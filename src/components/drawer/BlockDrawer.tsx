@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import type { Bloco, HospitaisMap } from '@/types';
-import { calcRemuneracaoBloco, fmtDate, fmtRange, getHospital } from '@/lib/data';
+import { ehNoturno, fmtDate, fmtRange, getHospital } from '@/lib/data';
 import { Eyebrow, Hand, Mono, Pill } from '@/components/atoms';
 
 interface BlockDrawerProps {
@@ -73,8 +73,6 @@ export function BlockDrawer({
     return bloco.tipo;
   })();
 
-  const remuneracao =
-    bloco.tipo === 'plantao' && hosp ? calcRemuneracaoBloco(bloco, hosp) : null;
 
   return (
     <div
@@ -171,43 +169,8 @@ export function BlockDrawer({
           </Section>
         )}
 
-        {remuneracao && (
-          <Section eyebrow="remuneração estimada">
-            <div style={{ display: 'flex', gap: 24 }}>
-              <div>
-                <Mono style={{ display: 'block', color: 'var(--ink-3)' }}>bruto</Mono>
-                <span
-                  style={{
-                    fontFamily: 'var(--font-display)',
-                    fontWeight: 500,
-                    fontSize: 22,
-                    letterSpacing: '-0.01em',
-                  }}
-                >
-                  R$ {remuneracao.bruto.toLocaleString('pt-BR')}
-                </span>
-              </div>
-              <div>
-                <Mono style={{ display: 'block', color: 'var(--ink-3)' }}>líquido (estimado)</Mono>
-                <span
-                  style={{
-                    fontFamily: 'var(--font-display)',
-                    fontWeight: 500,
-                    fontSize: 22,
-                    letterSpacing: '-0.01em',
-                    color: 'var(--sage-ink)',
-                  }}
-                >
-                  R$ {remuneracao.liquido.toLocaleString('pt-BR')}
-                </span>
-              </div>
-              {remuneracao.noturno && (
-                <div style={{ alignSelf: 'center' }}>
-                  <Pill kind="info">noturno</Pill>
-                </div>
-              )}
-            </div>
-          </Section>
+        {bloco.tipo === 'plantao' && ehNoturno(bloco) && (
+          <Pill kind="info">noturno</Pill>
         )}
 
         {bloco.tipo === 'cedido' && (
