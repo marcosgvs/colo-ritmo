@@ -4,12 +4,11 @@ import type { Bloco, BlocoPlantao, HospitaisMap } from '@/types';
  * Conflitos detectáveis automaticamente. Cada conflito tem um par (a, b)
  * — quando faz sentido — e um tipo. A UI usa o tipo pra escolher copy:
  *   sobreposicao    — dois plantões no mesmo intervalo
- *   sem_descanso    — < intervalo mínimo CFM/hospital entre plantões
- *   limite_cfm      — > 60h na mesma semana ISO
+ *   sem_descanso    — < intervalo mínimo do hospital entre plantões
  *   max_semana      — passou do limite definido pelo hospital
  */
 
-export type TipoConflito = 'sobreposicao' | 'sem_descanso' | 'limite_cfm' | 'max_semana';
+export type TipoConflito = 'sobreposicao' | 'sem_descanso' | 'max_semana';
 
 export interface Conflito {
   tipo: TipoConflito;
@@ -20,7 +19,6 @@ export interface Conflito {
 }
 
 const MS_HORA = 60 * 60 * 1000;
-const LIMITE_CFM_SEMANAL = 60;
 
 function abs(b: BlocoPlantao): { ini: number; fim: number } {
   const t = new Date(`${b.data}T00:00:00`).getTime() / MS_HORA;
@@ -94,26 +92,7 @@ export function detectarConflitos(
     }
   }
 
-  // 3. Limite CFM (60h por semana).
-  const porSemana = new Map<string, BlocoPlantao[]>();
-  for (const p of plantoes) {
-    const k = isoWeek(p.data);
-    const arr = porSemana.get(k) ?? [];
-    arr.push(p);
-    porSemana.set(k, arr);
-  }
-  for (const [, lista] of porSemana) {
-    const total = lista.reduce((s, p) => s + p.duracao, 0);
-    if (total > LIMITE_CFM_SEMANAL && lista[0]) {
-      conflitos.push({
-        tipo: 'limite_cfm',
-        a: lista[0],
-        detalhe: `${total}h previstas · CFM 60h/sem`,
-      });
-    }
-  }
-
-  // 4. Limite por hospital (max por semana).
+  // 3. Limite por hospital (max por semana).
   const porSemanaHosp = new Map<string, Map<string, BlocoPlantao[]>>();
   for (const p of plantoes) {
     const k = isoWeek(p.data);

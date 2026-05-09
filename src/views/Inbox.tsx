@@ -5,7 +5,7 @@ import { PageHead } from './_PageHead';
 interface InboxProps {
   pendencias?: Array<{
     id: string;
-    tipo: 'troca' | 'cessao' | 'conflito' | 'limite';
+    tipo: 'troca' | 'cessao' | 'conflito';
     titulo: string;
     detalhe: string;
     de?: string;
@@ -26,13 +26,6 @@ const PENDENCIAS_DEFAULT = [
     titulo: 'Dra. Carla cedeu · qui 7 mai · 7h',
     detalhe: 'aniversário do filho · Ana topou',
     de: 'Dra. Carla',
-  },
-  {
-    id: 'p3',
-    tipo: 'limite' as const,
-    titulo: 'Dr. João previsto em 64h essa semana',
-    detalhe: 'acima do limite CFM · vale conversar',
-    de: 'sistema',
   },
 ];
 
@@ -73,7 +66,7 @@ export function Inbox({ pendencias = PENDENCIAS_DEFAULT }: InboxProps) {
             >
               <div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
-                  <Pill kind={p.tipo === 'limite' ? 'warn' : p.tipo === 'conflito' ? 'err' : 'lavender'}>
+                  <Pill kind={p.tipo === 'conflito' ? 'err' : 'lavender'}>
                     {p.tipo}
                   </Pill>
                   {p.de && <Eyebrow>{p.de}</Eyebrow>}

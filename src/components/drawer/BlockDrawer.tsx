@@ -29,7 +29,6 @@ interface BlockDrawerProps {
 const ROTULO_CONFLITO: Record<string, string> = {
   sobreposicao: 'plantões sobrepostos',
   sem_descanso: 'descanso curto entre plantões',
-  limite_cfm: 'mais de 60h na semana (CFM)',
   max_semana: 'limite de plantões por semana batido',
 };
 

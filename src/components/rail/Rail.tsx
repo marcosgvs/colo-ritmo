@@ -307,21 +307,6 @@ export function Rail({ blocos, mode, analise, blocosDaJanela }: RailProps) {
             </div>
           ))}
         </div>
-        <div
-          style={{
-            marginTop: 14,
-            paddingTop: 12,
-            borderTop: '1px dashed var(--line-2)',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'baseline',
-          }}
-        >
-          <Mono style={{ color: 'var(--ink-3)' }}>limite saudável</Mono>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink-2)' }}>
-            60h/sem · CFM
-          </span>
-        </div>
       </Card>
 
       {(cedidos.length > 0 || trocas.length > 0) && (

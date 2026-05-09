@@ -21,7 +21,8 @@ import { bonusPadrao } from './padroes.js';
  *   equilibrar → comportamento original (pula 2 dias, para na meta,
  *                rejeita invasão de recuperação)
  *   ganhar     → maximiza receita (pula 1 dia, prefere janela noturna
- *                quando paga mais, não para na meta, só esbarra em CFM)
+ *                quando paga mais, não para na meta, só esbarra em
+ *                conflito de agenda ou limite do hospital)
  *
  * Bloqueios e sono entram via `diasOcupados` no `calcularLimites` —
  * solver nunca sugere em dia já ocupado.
@@ -292,7 +293,7 @@ export function sugerirPlantoes(opts: SugerirOpts): SugestaoSolver {
       duracao,
     };
 
-    // Conflito CFM (sobreposição / sem descanso < 11h) · sempre rejeita
+    // Conflito de agenda (sobreposição ou sem descanso) · sempre rejeita
     const conflitos = detectarConflitos(
       [...blocos, ...sugeridos, novo],
       hospitais,

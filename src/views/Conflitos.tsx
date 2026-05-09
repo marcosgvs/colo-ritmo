@@ -15,7 +15,6 @@ interface ConflitosProps {
 const LABEL_TIPO: Record<TipoConflito, string> = {
   sobreposicao: 'sobreposição',
   sem_descanso: 'sem descanso',
-  limite_cfm: 'limite cfm',
   max_semana: 'máx. semana',
 };
 
@@ -30,11 +29,7 @@ const COPY_TIPO: Record<TipoConflito, { titulo: string; recado: string }> = {
   },
   sem_descanso: {
     titulo: 'descanso curto entre plantões',
-    recado: 'menos que o mínimo da regra do hospital · CFM aceita 11h',
-  },
-  limite_cfm: {
-    titulo: 'semana acima de 60h',
-    recado: 'limite saudável CFM · vale conversar com o coordenador',
+    recado: 'menos que o intervalo mínimo configurado pra esse hospital',
   },
   max_semana: {
     titulo: 'passou do limite do hospital',

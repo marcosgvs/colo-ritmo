@@ -144,33 +144,6 @@ describe('detectarConflitos · sem_descanso', () => {
   });
 });
 
-describe('detectarConflitos · limite_cfm', () => {
-  test('semana de 62h vira conflito', () => {
-    // total: 12+12+12+12+14 = 62 → passa de 60
-    const blocos = [
-      plantao(1, 'HBDF', '2026-05-04', 7, 12),
-      plantao(2, 'HBDF', '2026-05-05', 7, 12),
-      plantao(3, 'HBDF', '2026-05-06', 7, 12),
-      plantao(4, 'HBDF', '2026-05-08', 7, 12),
-      plantao(5, 'HBDF', '2026-05-09', 17, 14),
-    ];
-    const c = detectarConflitos(blocos, HOSPITAIS);
-    expect(c.find((x) => x.tipo === 'limite_cfm')).toBeDefined();
-  });
-
-  test('semana com 60h exatas não dispara', () => {
-    const blocos = [
-      plantao(1, 'HBDF', '2026-05-04', 7, 12),
-      plantao(2, 'HBDF', '2026-05-06', 7, 12),
-      plantao(3, 'HBDF', '2026-05-08', 7, 12),
-      plantao(4, 'HBDF', '2026-05-10', 7, 12),
-      plantao(5, 'HSL', '2026-05-09', 7, 12),
-    ];
-    const c = detectarConflitos(blocos, HOSPITAIS);
-    expect(c.find((x) => x.tipo === 'limite_cfm')).toBeUndefined();
-  });
-});
-
 describe('detectarConflitos · max_semana por hospital', () => {
   test('passa do max do hospital', () => {
     const blocos = [
