@@ -14,6 +14,15 @@ import type { Bloco, CargaSemana, Hospital, HospitaisMap, Nivel, Preferencias } 
  * quando o user_state está vazio).
  */
 
+import {
+  MESES,
+  fromISO,
+  adicionaDia,
+  inicioDaSemana,
+  inicioDoMes,
+  fimDoMes,
+} from './dates.js';
+
 export {
   DOWS,
   DOWS_LONG,
@@ -190,7 +199,12 @@ export const SEMANA: readonly string[] = [
   '2026-05-10',
 ];
 
-export const HOJE = '2026-05-08';
+/**
+ * Data de hoje em ISO (YYYY-MM-DD). Avaliada uma vez no carregamento do
+ * módulo · refresh recalcula. Suficiente pra UX (a página recarrega ao
+ * acordar/atualizar).
+ */
+export const HOJE: string = new Date().toISOString().slice(0, 10);
 
 export function getHospital(id: string | undefined): Hospital | undefined {
   return id ? HOSPITAIS[id] : undefined;
@@ -219,10 +233,40 @@ export const BLOCOS_SEMANA: Bloco[] = [
   { id: 9, tipo: 'plantao', hospitalId: 'HCB',  data: '2026-05-10', horaInicio: 7,  duracao: 12 },
 ];
 
-/** Carga das 4 semanas do mês — usado no Rail (ritmo do mês). */
-export const CARGA_MES: CargaSemana[] = [
-  { sem: '4–10 mai',  h: 48, nivel: 'warn' },
-  { sem: '11–17 mai', h: 36, nivel: 'ok' },
-  { sem: '18–24 mai', h: 64, nivel: 'err' },
-  { sem: '25–31 mai', h: 32, nivel: 'ok' },
-];
+/**
+ * Calcula a carga (h de plantão) das semanas SEG–DOM que tocam o mês de
+ * `mesISO`. Cada item vira uma linha no card "ritmo do mês" do Rail.
+ */
+export function cargaSemanasDoMes(
+  blocos: Bloco[],
+  mesISO: string = HOJE,
+): CargaSemana[] {
+  const ini = inicioDaSemana(inicioDoMes(mesISO));
+  const fim = fimDoMes(mesISO);
+  const out: CargaSemana[] = [];
+  let cursor = ini;
+  // Safety cap: 6 iterações (qualquer mês cabe em até 6 semanas).
+  for (let i = 0; i < 6 && cursor <= fim; i++) {
+    const seg = cursor;
+    const dom = adicionaDia(cursor, 6);
+    const horas = blocos.reduce((s, b) => {
+      if (b.tipo !== 'plantao') return s;
+      if (b.data >= seg && b.data <= dom) return s + b.duracao;
+      return s;
+    }, 0);
+    out.push({ sem: labelSemana(seg, dom), h: horas, nivel: nivelCarga(horas) });
+    cursor = adicionaDia(cursor, 7);
+  }
+  return out;
+}
+
+function labelSemana(seg: string, dom: string): string {
+  const dSeg = fromISO(seg);
+  const dDom = fromISO(dom);
+  const diaSeg = dSeg.getDate();
+  const diaDom = dDom.getDate();
+  const mesSeg = MESES[dSeg.getMonth()];
+  const mesDom = MESES[dDom.getMonth()];
+  if (mesSeg === mesDom) return `${diaSeg}–${diaDom} ${mesSeg}`;
+  return `${diaSeg} ${mesSeg} – ${diaDom} ${mesDom}`;
+}

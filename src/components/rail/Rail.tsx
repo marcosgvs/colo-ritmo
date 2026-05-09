@@ -1,6 +1,14 @@
+import { useMemo } from 'react';
 import type { Bloco, BlocoCedido, BlocoPlantao, Mode, Nivel } from '@/types';
 import type { AnaliseDescanso } from '@/lib/data';
-import { CARGA_MES, HOJE, cargaSemanal, fmtDate, fmtRange, getHospital } from '@/lib/data';
+import {
+  HOJE,
+  cargaSemanal,
+  cargaSemanasDoMes,
+  fmtDate,
+  fmtRange,
+  getHospital,
+} from '@/lib/data';
 import { Eyebrow, Hand, Mono } from '@/components/atoms';
 import { Card } from './Card';
 
@@ -268,6 +276,8 @@ export function Rail({ blocos, mode, analise, blocosDaJanela }: RailProps) {
 
   const cargaJanela = blocosDaJanela ? cargaSemanal(blocosDaJanela) : null;
 
+  const cargaMes = useMemo(() => cargaSemanasDoMes(blocos, HOJE), [blocos]);
+
   return (
     <aside style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       {analise && (
@@ -275,9 +285,9 @@ export function Rail({ blocos, mode, analise, blocosDaJanela }: RailProps) {
       )}
       {proximoDestaque && <ProximoCard b={proximoDestaque} mode={mode} />}
 
-      <Card title="ritmo do mês" eyebrow="carga · 4 semanas">
+      <Card title="ritmo do mês" eyebrow={`carga · ${cargaMes.length} semanas`}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {CARGA_MES.map((sem, i) => (
+          {cargaMes.map((sem, i) => (
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <Mono style={{ width: 78, fontSize: 11, color: 'var(--ink-3)' }}>{sem.sem}</Mono>
               <CargaBar h={sem.h} nivel={sem.nivel} />
