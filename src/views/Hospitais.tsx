@@ -1,7 +1,11 @@
-import { useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import type { CorFamilia, EnderecoHospital, Hospital, HospitaisMap, TipoHospital } from '@/types';
 import { buscarCep, geocodificar } from '@/lib/geo';
-import { Eyebrow, Hand, Mono, Pill } from '@/components/atoms';
+import {
+  buscarSugestoesHospitais,
+  type SugestaoHospital,
+} from '@/lib/hospitaisBrasilia';
+import { Eyebrow, Mono, Pill } from '@/components/atoms';
 import { EmptyState } from '@/components/empty';
 import { PageHead } from './_PageHead';
 
@@ -154,11 +158,39 @@ function HospitalForm({ inicial, coresUsadas, onSalvar, onCancelar, onRemover }:
     },
   );
 
+  // Autocomplete por nome contra a lista curada de Brasília + entorno
+  const [sugestoesAbertas, setSugestoesAbertas] = useState(false);
+  const fechaSugestoesTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sugestoes = useMemo(
+    () => (sugestoesAbertas ? buscarSugestoesHospitais(draft.nome) : []),
+    [draft.nome, sugestoesAbertas],
+  );
+
   function setCampo<K extends keyof Hospital>(k: K, v: Hospital[K]) {
     setDraft((d) => ({ ...d, [k]: v }));
   }
   function setRegra<K extends keyof Hospital['regras']>(k: K, v: Hospital['regras'][K]) {
     setDraft((d) => ({ ...d, regras: { ...d.regras, [k]: v } }));
+  }
+
+  function selecionarSugestao(s: SugestaoHospital) {
+    setDraft((d) => ({
+      ...d,
+      nome: s.nome,
+      // Se ela já digitou uma abreviação custom, respeita; senão usa a sugerida
+      abrev: d.abrev.trim() ? d.abrev : s.abrev,
+      tipo: s.tipo,
+      endereco: {
+        cep: s.endereco.cep ?? '',
+        logradouro: s.endereco.logradouro,
+        bairro: s.endereco.bairro,
+        cidade: s.endereco.cidade,
+        uf: s.endereco.uf,
+        lat: s.endereco.lat,
+        lng: s.endereco.lng,
+      },
+    }));
+    setSugestoesAbertas(false);
   }
 
   const valido = draft.nome.trim().length > 0 && draft.abrev.trim().length > 0;
@@ -211,12 +243,85 @@ function HospitalForm({ inicial, coresUsadas, onSalvar, onCancelar, onRemover }:
         style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18, maxWidth: 720 }}
       >
         <Field label="nome">
-          <input
-            value={draft.nome}
-            onChange={(e) => setCampo('nome', e.target.value)}
-            placeholder="Hospital Santa Lúcia"
-            style={input}
-          />
+          <div style={{ position: 'relative' }}>
+            <input
+              value={draft.nome}
+              onChange={(e) => {
+                setCampo('nome', e.target.value);
+                setSugestoesAbertas(true);
+              }}
+              onFocus={() => setSugestoesAbertas(true)}
+              onBlur={() => {
+                // Delay pequeno pra permitir click numa sugestão antes de fechar
+                fechaSugestoesTimer.current = setTimeout(
+                  () => setSugestoesAbertas(false),
+                  150,
+                );
+              }}
+              placeholder="começa a digitar · sugiro hospitais de Brasília"
+              autoComplete="off"
+              style={{ ...input, width: '100%' }}
+            />
+            {sugestoesAbertas && sugestoes.length > 0 && (
+              <ul
+                style={{
+                  position: 'absolute',
+                  top: 'calc(100% + 4px)',
+                  left: 0,
+                  right: 0,
+                  zIndex: 10,
+                  listStyle: 'none',
+                  margin: 0,
+                  padding: 6,
+                  background: 'var(--bg)',
+                  border: '1px solid var(--line)',
+                  borderRadius: 'var(--r-md)',
+                  boxShadow: 'var(--shadow-lg)',
+                  maxHeight: 280,
+                  overflowY: 'auto',
+                }}
+              >
+                {sugestoes.map((s) => (
+                  <li key={`${s.abrev}-${s.endereco.cidade}`}>
+                    <button
+                      type="button"
+                      onMouseDown={(e) => {
+                        // mousedown antes do blur — evita perder o click
+                        e.preventDefault();
+                        if (fechaSugestoesTimer.current) {
+                          clearTimeout(fechaSugestoesTimer.current);
+                        }
+                        selecionarSugestao(s);
+                      }}
+                      style={{
+                        display: 'block',
+                        width: '100%',
+                        textAlign: 'left',
+                        padding: '8px 10px',
+                        background: 'transparent',
+                        border: 'none',
+                        borderRadius: 'var(--r-sm)',
+                        cursor: 'pointer',
+                        color: 'var(--ink)',
+                        font: '500 13px/1.3 var(--font-body)',
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.background = 'var(--bg-alt)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.background = 'transparent';
+                      }}
+                    >
+                      <div style={{ fontWeight: 500 }}>{s.nome}</div>
+                      <Mono style={{ color: 'var(--ink-3)', fontSize: 11 }}>
+                        {s.endereco.bairro} · {s.endereco.cidade} · {s.endereco.uf}
+                      </Mono>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </Field>
         <Field label="abreviação">
           <input
@@ -402,8 +507,9 @@ interface BlocoEnderecoProps {
 }
 
 function BlocoEndereco({ endereco, onChange, nomeHospital }: BlocoEnderecoProps) {
-  const [estado, setEstado] = useState<'parado' | 'buscando-cep' | 'buscando-geo' | 'erro'>('parado');
+  const [estado, setEstado] = useState<'parado' | 'buscando-cep' | 'erro'>('parado');
   const [erro, setErro] = useState<string | null>(null);
+  void nomeHospital;
 
   const e: EnderecoHospital = endereco ?? {
     cep: '', logradouro: '', bairro: '', cidade: '', uf: '',
@@ -432,27 +538,6 @@ function BlocoEndereco({ endereco, onChange, nomeHospital }: BlocoEnderecoProps)
         cidade: r.cidade,
         uf: r.uf,
       });
-      setEstado('parado');
-    } catch (err) {
-      setEstado('erro');
-      setErro((err as Error).message);
-    }
-  }
-
-  async function lookupGeo() {
-    const query = [nomeHospital, e.logradouro, e.bairro, e.cidade, e.uf]
-      .filter(Boolean).join(', ');
-    if (!query) return;
-    setEstado('buscando-geo');
-    setErro(null);
-    try {
-      const r = await geocodificar(query);
-      if (!r) {
-        setEstado('erro');
-        setErro('endereço não encontrado no openstreetmap');
-        return;
-      }
-      onChange({ ...e, lat: r.lat, lng: r.lng });
       setEstado('parado');
     } catch (err) {
       setEstado('erro');
@@ -536,32 +621,11 @@ function BlocoEndereco({ endereco, onChange, nomeHospital }: BlocoEnderecoProps)
         </Field>
       </div>
 
-      <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-        <button
-          type="button"
-          onClick={lookupGeo}
-          disabled={estado === 'buscando-geo' || (!e.logradouro && !nomeHospital)}
-          style={{
-            font: '600 12px/1 var(--font-body)',
-            padding: '8px 14px',
-            borderRadius: 999,
-            border: '1px solid var(--line)',
-            background: 'var(--bg)',
-            color: 'var(--ink-2)',
-            cursor: 'pointer',
-          }}
-        >
-          {estado === 'buscando-geo' ? 'consultando…' : 'buscar coordenadas'}
-        </button>
-        {e.lat !== undefined && e.lng !== undefined && (
-          <Hand color="var(--sage-ink)" size={14}>
-            geo: {e.lat.toFixed(4)}, {e.lng.toFixed(4)}
-          </Hand>
-        )}
-        {erro && (
-          <Mono style={{ color: 'var(--coral-ink)' }}>{erro}</Mono>
-        )}
-      </div>
+      {erro && (
+        <Mono style={{ color: 'var(--coral-ink)', display: 'block', marginTop: 10 }}>
+          {erro}
+        </Mono>
+      )}
     </div>
   );
 }
