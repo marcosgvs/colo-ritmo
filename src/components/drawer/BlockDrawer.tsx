@@ -245,7 +245,7 @@ export function BlockDrawer({
                       flexWrap: 'wrap',
                     }}
                   >
-                    <div style={{ flex: 1, minWidth: 160 }}>
+                    <div style={{ flex: 1, minWidth: 200 }}>
                       <Eyebrow color={`var(--${cor}-ink)`}>
                         {hospOutro?.abrev ?? outro.hospitalId}
                       </Eyebrow>
@@ -262,23 +262,36 @@ export function BlockDrawer({
                         {ROTULO_CONFLITO[conflito.tipo] ?? conflito.tipo} · {conflito.detalhe}
                       </Mono>
                     </div>
-                    {onRemover && (
-                      <button
-                        type="button"
-                        onClick={() => onRemover(outro.id)}
-                        style={{
-                          font: '600 12px/1 var(--font-body)',
-                          padding: '8px 14px',
-                          borderRadius: 999,
-                          border: '1px solid var(--coral-ink)',
-                          background: 'transparent',
-                          color: 'var(--coral-ink)',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        remover este
-                      </button>
-                    )}
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {onEditar && TIPOS_EDITAVEIS.has(outro.tipo) && (
+                        <ConflitoAcao
+                          label="editar"
+                          variant="ghost"
+                          onClick={() => onEditar(outro)}
+                        />
+                      )}
+                      {onTrocar && (
+                        <ConflitoAcao
+                          label="trocar"
+                          variant="ghost"
+                          onClick={() => onTrocar(outro)}
+                        />
+                      )}
+                      {onCeder && (
+                        <ConflitoAcao
+                          label="ceder"
+                          variant="ghost"
+                          onClick={() => onCeder(outro)}
+                        />
+                      )}
+                      {onRemover && (
+                        <ConflitoAcao
+                          label="remover"
+                          variant="coral"
+                          onClick={() => onRemover(outro.id)}
+                        />
+                      )}
+                    </div>
                   </div>
                 );
               })}
@@ -395,6 +408,36 @@ function Btn({
       }}
     >
       {children}
+    </button>
+  );
+}
+
+function ConflitoAcao({
+  label,
+  variant,
+  onClick,
+}: {
+  label: string;
+  variant: 'ghost' | 'coral';
+  onClick: () => void;
+}) {
+  const isCoral = variant === 'coral';
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        font: '600 11px/1 var(--font-body)',
+        padding: '7px 12px',
+        borderRadius: 999,
+        border: `1px solid ${isCoral ? 'var(--coral-ink)' : 'var(--line)'}`,
+        background: 'var(--bg)',
+        color: isCoral ? 'var(--coral-ink)' : 'var(--ink-2)',
+        cursor: 'pointer',
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {label}
     </button>
   );
 }
