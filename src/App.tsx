@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import type {
   Bloco,
   BlocoPlantao,
+  CelulaEscala,
   Hospital,
   Janela,
   Mode,
@@ -196,15 +197,18 @@ export function App() {
   /**
    * Aplica uma escala oficial importada de PDF · substitui plantões
    * existentes do mês×hospital, preserva trocas/cedidos manuais, mescla
-   * janelas no hospital, e recalcula padrões observados.
+   * janelas no hospital, recalcula padrões observados, e arquiva a
+   * transcrição completa do PDF (todos os médicos, não só a Mariana)
+   * pra alimentar futuramente o "padrão do chefe".
    */
   const aplicarEscala = (data: {
     hospitalId: string;
     mesISO: string;
     blocos: BlocoPlantao[];
     janelas: Janela[];
+    celulas?: CelulaEscala[];
   }) => {
-    const { hospitalId, mesISO, blocos, janelas } = data;
+    const { hospitalId, mesISO, blocos, janelas, celulas } = data;
     // Remove plantões REGULARES existentes do mesmo mês×hospital (preserva cedidos/trocados/extras manuais)
     const semOficiaisAntigos = userState.state.blocos.filter((b) => {
       if (b.tipo !== 'plantao') return true; // sono, bloqueio, cedido, deslocamento, etc
@@ -227,10 +231,32 @@ export function App() {
     // Recalcula padrões observados com a base de blocos atualizada
     const padroes = calcularPadroes(novosBlocos);
 
+    // Arquiva a transcrição completa · re-importar mesmo (hospital, ano, mes) substitui.
+    let escalasImportadas = userState.state.escalasImportadas;
+    if (celulas && celulas.length > 0) {
+      const [anoStr, mesStr] = mesISO.split('-');
+      const ano = parseInt(anoStr ?? '0', 10);
+      const mes = parseInt(mesStr ?? '0', 10);
+      escalasImportadas = [
+        ...escalasImportadas.filter(
+          (e) => !(e.hospitalId === hospitalId && e.ano === ano && e.mes === mes),
+        ),
+        {
+          hospitalId,
+          ano,
+          mes,
+          importadaEm: new Date().toISOString(),
+          janelas,
+          celulas,
+        },
+      ];
+    }
+
     userState.setState({
       blocos: novosBlocos,
       hospitais: hospitaisAtualizados,
       padroes,
+      escalasImportadas,
     });
   };
 
@@ -413,6 +439,7 @@ interface ViewSwitchProps {
     mesISO: string;
     blocos: BlocoPlantao[];
     janelas: Janela[];
+    celulas?: CelulaEscala[];
   }) => void;
 }
 

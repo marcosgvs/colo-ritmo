@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { RealtimeChannel } from '@supabase/supabase-js';
-import type { Bloco, Hospital, PadraoMedica, Preferencias, PropostaSalva } from '@/types';
+import type {
+  Bloco,
+  EscalaImportada,
+  Hospital,
+  PadraoMedica,
+  Preferencias,
+  PropostaSalva,
+} from '@/types';
 import { supabase } from '@/lib/supabase';
 import { BLOCOS_SEMANA, HOSPITAIS, PREFERENCIAS_ME, marcarConflitos } from '@/lib/data';
 
@@ -16,6 +23,7 @@ export interface UserStateBlob {
   preferencias?: Preferencias;
   propostas?: PropostaSalva[];
   padroes?: PadraoMedica[];
+  escalasImportadas?: EscalaImportada[];
   updatedAt?: string;
 }
 
@@ -27,6 +35,7 @@ export interface UserStateValor {
   preferencias: Preferencias;
   propostas: PropostaSalva[];
   padroes: PadraoMedica[];
+  escalasImportadas: EscalaImportada[];
 }
 
 export interface UserStateAPI {
@@ -47,6 +56,7 @@ const FALLBACK: UserStateValor = {
   preferencias: PREFERENCIAS_ME,
   propostas: [],
   padroes: [],
+  escalasImportadas: [],
 };
 
 /**
@@ -74,6 +84,7 @@ export function useUserState(userId: string | null): UserStateAPI {
         preferencias: valor.preferencias,
         propostas: valor.propostas,
         padroes: valor.padroes,
+        escalasImportadas: valor.escalasImportadas,
         updatedAt: new Date().toISOString(),
       };
       const { error } = await supabase()
@@ -105,6 +116,7 @@ export function useUserState(userId: string | null): UserStateAPI {
           preferencias: next.preferencias ?? prev.preferencias,
           propostas: next.propostas ?? prev.propostas,
           padroes: next.padroes ?? prev.padroes,
+          escalasImportadas: next.escalasImportadas ?? prev.escalasImportadas,
         };
         pendingRef.current = merged;
         if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -150,6 +162,7 @@ export function useUserState(userId: string | null): UserStateAPI {
             preferencias: blob.preferencias ?? FALLBACK.preferencias,
             propostas: blob.propostas ?? [],
             padroes: blob.padroes ?? [],
+            escalasImportadas: blob.escalasImportadas ?? [],
           });
         } else {
           // Primeiro acesso · semeia com defaults pra Mariana ver agenda.
@@ -179,6 +192,7 @@ export function useUserState(userId: string | null): UserStateAPI {
             preferencias: novoState.preferencias ?? prev.preferencias,
             propostas: novoState.propostas ?? prev.propostas,
             padroes: novoState.padroes ?? prev.padroes,
+            escalasImportadas: novoState.escalasImportadas ?? prev.escalasImportadas,
           }));
         },
       )

@@ -1,5 +1,5 @@
 import { useState, type ChangeEvent } from 'react';
-import type { Bloco, BlocoPlantao, HospitaisMap, Janela } from '@/types';
+import type { Bloco, BlocoPlantao, CelulaEscala, HospitaisMap, Janela } from '@/types';
 import {
   eventoParaBloco,
   fmtDate,
@@ -15,12 +15,13 @@ interface SyncProps {
   blocos: Bloco[];
   hospitais: HospitaisMap;
   onAdicionarBlocos: (b: BlocoPlantao[]) => void;
-  /** Aplicar uma escala importada de PDF · substitui mês×hospital + atualiza janelas. */
+  /** Aplicar uma escala importada de PDF · substitui mês×hospital + atualiza janelas + arquiva celulas. */
   onAplicarEscala?: (data: {
     hospitalId: string;
     mesISO: string;
     blocos: BlocoPlantao[];
     janelas: Janela[];
+    celulas?: CelulaEscala[];
   }) => void;
   /** ICS token público do user · gerado server-side. */
   icsToken?: string | null;
@@ -33,8 +34,10 @@ interface Resultado {
   blocos: BlocoPlantao[];
   janelas: Janela[];
   avisos: string[];
-  /** Diferenciamos: ICS = só blocos, PDF = blocos + janelas */
+  /** Diferenciamos: ICS = só blocos, PDF = blocos + janelas + celulas */
   origem: 'ics' | 'pdf';
+  /** Transcrição completa do PDF · só vem em import de PDF. */
+  celulas?: CelulaEscala[];
   /** Texto bruto que o modelo devolveu quando não conseguimos organizar a resposta. */
   respostaCrua?: string;
 }
@@ -93,6 +96,7 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
       const json = (await resp.json()) as {
         blocos: BlocoPlantao[];
         janelas?: Janela[];
+        celulas?: CelulaEscala[];
         avisos?: string[];
         respostaCrua?: string;
       };
@@ -101,6 +105,7 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
         janelas: json.janelas ?? [],
         avisos: json.avisos ?? [],
         origem: 'pdf',
+        celulas: json.celulas,
         respostaCrua: json.respostaCrua,
       });
       setEstado('pronto');
@@ -137,12 +142,13 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
   function confirmarImport() {
     if (!resultado) return;
     if (resultado.origem === 'pdf' && onAplicarEscala) {
-      // PDF · substitui mês×hospital + atualiza janelas + recalcula padrões
+      // PDF · substitui mês×hospital + atualiza janelas + arquiva transcrição
       onAplicarEscala({
         hospitalId,
         mesISO: mes,
         blocos: resultado.blocos,
         janelas: resultado.janelas,
+        celulas: resultado.celulas,
       });
     } else {
       // ICS · só adiciona blocos

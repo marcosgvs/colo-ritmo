@@ -232,3 +232,33 @@ export interface PropostaSalva {
   exportadaEm?: string;
   exportadaParaChefes?: Record<string, string>;
 }
+
+/**
+ * Uma célula da escala oficial · todos os médicos que aparecem juntos
+ * num turno específico de um dia específico. Guardamos a transcrição
+ * completa pra alimentar futuramente o "padrão do chefe".
+ */
+export interface CelulaEscala {
+  /** YYYY-MM-DD. */
+  data: string;
+  /** Rótulo do turno como aparece no PDF (manhã, tarde, tarde 1, noitinha, noite, etc). */
+  turno: string;
+  /** Nomes EXATAMENTE como vêm na célula, na ordem em que aparecem. */
+  nomes: string[];
+}
+
+/**
+ * Transcrição completa de um PDF de escala importado · guardada pra
+ * análise posterior (padrão do chefe, etc). Repositório passivo hoje.
+ *
+ * Re-importar substitui a entrada anterior do mesmo (hospital, ano, mes).
+ */
+export interface EscalaImportada {
+  hospitalId: string;
+  ano: number;
+  /** 1-12. */
+  mes: number;
+  importadaEm: string;
+  janelas: Janela[];
+  celulas: CelulaEscala[];
+}

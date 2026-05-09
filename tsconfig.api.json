@@ -31,6 +31,7 @@
     "src/lib/remuneracao.ts",
     "src/lib/ics.ts",
     "src/lib/geo.ts",
-    "src/lib/hmac.ts"
+    "src/lib/hmac.ts",
+    "src/lib/fuzzyMatch.ts"
   ]
 }

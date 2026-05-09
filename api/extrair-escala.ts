@@ -1,28 +1,41 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { envObrigatorio } from './_shared/env.js';
+import { fuzzyMatch } from '@/lib/fuzzyMatch.js';
 
 /**
  * /api/extrair-escala · OCR + extração estruturada via Claude Vision (tool use).
  *
+ * Estratégia · "modelo só transcreve, código filtra":
+ *   1. O modelo recebe o PDF e devolve, via tool use, a transcrição
+ *      completa da tabela — uma entrada por (dia, turno) com a lista de
+ *      todos os nomes que aparecem na célula.
+ *   2. O servidor faz fuzzyMatch (acento, case, typo, sufixo) em código
+ *      pra encontrar a médica e produzir os plantões.
+ *   3. A transcrição inteira volta pro frontend pra ser guardada — vai
+ *      alimentar futuramente o "padrão do chefe" no Montar.
+ *
+ * Por que assim · pedir pro modelo "filtrar pelo nome" se mostrou frágil:
+ * tabela densa do HCB faz ele perder nomes ou alucinar. Transcrever é
+ * tarefa simples (visão pura) e o filtro fica determinístico no código.
+ *
  * Body:
  *   {
- *     pdfBase64: string,           // PDF bruto em base64
- *     hospitalId: string,          // contexto pra Claude saber o hospital
- *     hospitalAbrev: string,       // ex: "HCB", aparece no PDF pra dar dica
- *     nome: string,                // nome completo do usuário
- *     apelidoNaEscala?: string,    // apelido específico desse hospital (Mpinheiro, Mariana, etc) · cai pra `nome` se vazio
- *     ano: number, mes: number,    // mês de referência
+ *     pdfBase64: string,
+ *     hospitalId: string,
+ *     hospitalAbrev: string,
+ *     nome: string,                // nome completo do usuário (fallback)
+ *     apelidoNaEscala?: string,    // como aparece no PDF (ex: Mpinheiro)
+ *     ano: number, mes: number,
  *   }
  *
  * Resposta:
  *   {
- *     blocos: BlocoPlantao[],      // só os plantões da médica
- *     janelas: Janela[],           // turnos reconhecidos no cabeçalho
- *     avisos: string[],            // ambiguidades detectadas
- *     respostaCrua?: string,       // só presente se o modelo não devolveu o tool · pra debug
+ *     blocos: BlocoPlantao[],      // plantões da médica (após fuzzyMatch)
+ *     janelas: Janela[],           // turnos identificados no cabeçalho
+ *     celulas: CelulaEscala[],     // transcrição completa (todos os médicos)
+ *     avisos: string[],
+ *     respostaCrua?: string,       // só presente se o tool não veio · debug
  *   }
- *
- * Modelo: claude-sonnet-4-6 com tool use (saída JSON estruturada e garantida).
  */
 
 interface ExtractBody {
@@ -37,17 +50,19 @@ interface ExtractBody {
 
 interface ToolInput {
   janelas?: Array<{ rotulo: string; inicio: number; duracao: number }>;
-  blocos?: Array<{ data: string; horaInicio: number; duracao: number }>;
+  celulas?: Array<{ data: string; turno: string; nomes: string[] }>;
   avisos?: string[];
 }
 
 const MODELO = 'claude-sonnet-4-6';
-const MAX_TOKENS = 8192;
+// Cell-based output é mais verboso · bumpando pra caber HCB com 30 dias
+// × 4 colunas × até 17 nomes/célula. ~7k tokens em prática · folga até 16k.
+const MAX_TOKENS = 16384;
 
 const FERRAMENTA = {
-  name: 'registrar_escala',
+  name: 'transcrever_escala',
   description:
-    'Registra os plantões da médica encontrados no PDF da escala oficial, junto com as janelas de turno usadas pelo hospital.',
+    'Transcreve a tabela completa da escala oficial do PDF, listando todos os médicos por (dia, turno). Não filtra nada — a filtragem é feita no servidor.',
   input_schema: {
     type: 'object',
     properties: {
@@ -60,48 +75,45 @@ const FERRAMENTA = {
           properties: {
             rotulo: {
               type: 'string',
-              description: 'nome do turno em minúsculo, ex: manhã, tarde, tarde 1, noitinha, noite',
+              description: 'nome do turno em minúsculo, ex: manhã, tarde 1, noite',
             },
-            inicio: {
-              type: 'number',
-              description: 'hora de início, decimal (7=07:00, 19.5=19:30)',
-            },
+            inicio: { type: 'number', description: 'hora de início decimal (7=07:00)' },
             duracao: { type: 'number', description: 'duração em horas' },
           },
           required: ['rotulo', 'inicio', 'duracao'],
         },
       },
-      blocos: {
+      celulas: {
         type: 'array',
-        description: 'Cada plantão da médica encontrado no PDF (uma célula = um bloco).',
+        description:
+          'TODAS as células da tabela. Uma entrada por (dia, turno). Inclua TODOS os nomes que aparecem na célula, na ordem em que aparecem. Não pule nenhuma célula. Não pule nomes em células densas (15+ nomes). Não filtre por nenhum critério — transcreva tudo.',
         items: {
           type: 'object',
           properties: {
             data: {
               type: 'string',
-              description:
-                'data no formato YYYY-MM-DD. PODE estar fora do mês de referência se a tabela emendar dias do mês seguinte/anterior.',
+              description: 'data no formato YYYY-MM-DD. Pode ser do mês de referência ou do mês seguinte se a tabela emendar.',
             },
-            horaInicio: {
-              type: 'number',
-              description: 'hora de início baseada na coluna onde a célula está',
+            turno: {
+              type: 'string',
+              description: 'rótulo do turno conforme o cabeçalho (manhã, tarde, tarde 1, noitinha, noite, etc)',
             },
-            duracao: {
-              type: 'number',
-              description: 'duração em horas baseada na coluna onde a célula está',
+            nomes: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Nomes EXATAMENTE como aparecem no PDF, na ordem em que aparecem na célula. Inclua sufixos (BHP, CRO, BHN, CEP, CP, Pr) e marcadores (* ²) se estiverem junto do nome. Não normalize. Liste TODOS os nomes da célula — não pare na metade.',
             },
           },
-          required: ['data', 'horaInicio', 'duracao'],
+          required: ['data', 'turno', 'nomes'],
         },
       },
       avisos: {
         type: 'array',
-        description:
-          'Linhas ilegíveis ou ambíguas SOMENTE quanto a nome ou horário (não sobre extras/trocas).',
+        description: 'Linhas ou células ilegíveis ou ambíguas que valham mencionar.',
         items: { type: 'string' },
       },
     },
-    required: ['janelas', 'blocos', 'avisos'],
+    required: ['janelas', 'celulas', 'avisos'],
   },
 } as const;
 
@@ -122,11 +134,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   }
 
   const apiKey = envObrigatorio('ANTHROPIC_API_KEY');
-  const nomeBusca = apelidoNaEscala?.trim() || nome;
+  const apelido = apelidoNaEscala?.trim() || nome;
   const prompt = montarPrompt({
     hospitalAbrev: hospitalAbrev ?? hospitalId,
-    nomeBusca,
-    nomeCompleto: nome,
     ano,
     mes,
   });
@@ -175,13 +185,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       res.status(200).json({
         blocos: [],
         janelas: [],
-        avisos: ['tive dificuldade pra organizar a resposta dessa vez · veja abaixo o que recebi e tenta de novo'],
+        celulas: [],
+        avisos: ['tive dificuldade pra organizar a resposta · veja abaixo o que recebi e tenta de novo'],
         respostaCrua: texto || '(resposta vazia)',
       });
       return;
     }
 
-    const parsed = construirResposta(tool.input as ToolInput, hospitalId);
+    const parsed = construirResposta(tool.input as ToolInput, hospitalId, apelido);
     res.status(200).json(parsed);
   } catch (err) {
     console.error('extrair-escala: exceção', err);
@@ -189,7 +200,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   }
 }
 
-function construirResposta(input: ToolInput, hospitalId: string): {
+function construirResposta(
+  input: ToolInput,
+  hospitalId: string,
+  apelido: string,
+): {
   blocos: Array<{
     id: string;
     tipo: 'plantao';
@@ -199,87 +214,101 @@ function construirResposta(input: ToolInput, hospitalId: string): {
     duracao: number;
   }>;
   janelas: Array<{ rotulo: string; inicio: number; duracao: number }>;
+  celulas: Array<{ data: string; turno: string; nomes: string[] }>;
   avisos: string[];
 } {
-  const blocos = (input.blocos ?? []).map((b, i) => ({
-    id: `import-${Date.now()}-${i}`,
-    tipo: 'plantao' as const,
-    hospitalId,
-    data: String(b.data),
-    horaInicio: Number(b.horaInicio),
-    duracao: Number(b.duracao),
-  }));
   const janelas = (input.janelas ?? []).map((j) => ({
     rotulo: String(j.rotulo).toLowerCase().trim(),
     inicio: Number(j.inicio),
     duracao: Number(j.duracao),
   }));
-  return { blocos, janelas, avisos: input.avisos ?? [] };
+  const celulas = (input.celulas ?? []).map((c) => ({
+    data: String(c.data),
+    turno: String(c.turno).toLowerCase().trim(),
+    nomes: Array.isArray(c.nomes) ? c.nomes.map((n) => String(n)) : [],
+  }));
+
+  const avisos = [...(input.avisos ?? [])];
+
+  // Pra cada célula, descobre se a médica está lá (fuzzyMatch sobre cada nome).
+  // Se sim, mapeia o turno → janela pra calcular horaInicio/duracao.
+  const janelaPor = new Map(janelas.map((j) => [j.rotulo, j]));
+  const blocos: Array<{
+    id: string;
+    tipo: 'plantao';
+    hospitalId: string;
+    data: string;
+    horaInicio: number;
+    duracao: number;
+  }> = [];
+  const baseId = Date.now();
+  for (const c of celulas) {
+    const matched = c.nomes.some((n) => fuzzyMatch(n, apelido));
+    if (!matched) continue;
+    const janela = janelaPor.get(c.turno);
+    if (!janela) {
+      avisos.push(
+        `dia ${c.data} · turno "${c.turno}" sem janela correspondente — plantão não foi importado, confira manualmente`,
+      );
+      continue;
+    }
+    blocos.push({
+      id: `import-${baseId}-${blocos.length}`,
+      tipo: 'plantao',
+      hospitalId,
+      data: c.data,
+      horaInicio: janela.inicio,
+      duracao: janela.duracao,
+    });
+  }
+
+  return { blocos, janelas, celulas, avisos };
 }
 
 function diaDaSemana(ano: number, mes: number, dia: number): string {
   const d = new Date(Date.UTC(ano, mes - 1, dia));
-  return ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'][d.getUTCDay()];
+  return ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'][d.getUTCDay()]!;
 }
 
-function montarPrompt(opts: {
-  hospitalAbrev: string;
-  nomeBusca: string;
-  nomeCompleto: string;
-  ano: number;
-  mes: number;
-}): string {
+function montarPrompt(opts: { hospitalAbrev: string; ano: number; mes: number }): string {
   const mesPad = String(opts.mes).padStart(2, '0');
   const mesSeguinte = opts.mes === 12 ? 1 : opts.mes + 1;
   const anoSeguinte = opts.mes === 12 ? opts.ano + 1 : opts.ano;
   const mesSeguintePad = String(mesSeguinte).padStart(2, '0');
   const diaUm = diaDaSemana(opts.ano, opts.mes, 1);
-  const apelidoExtra =
-    opts.nomeBusca !== opts.nomeCompleto
-      ? `; nome completo da médica é "${opts.nomeCompleto}" — útil só pra confirmar`
-      : '';
 
   return `Você está lendo a escala mensal de plantões do hospital "${opts.hospitalAbrev}" referente a ${mesPad}/${opts.ano}.
+
+SUA TAREFA · TRANSCREVER A TABELA COMPLETA
+Você NÃO precisa filtrar por nenhum nome. Sua única tarefa é TRANSCREVER fielmente a tabela do PDF na ferramenta \`transcrever_escala\`. O servidor faz a filtragem depois.
 
 CONTEXTO PRA ÂNCORA DE DATAS
 - Mês de referência: ${mesPad}/${opts.ano}.
 - O dia 1 desse mês é ${diaUm}-feira (${opts.ano}-${mesPad}-01).
 - ALGUMAS escalas só mostram dia da semana (SEGUNDA, TERÇA...) sem o número do dia. Use a âncora acima pra contar dia 1, 2, 3... a partir da primeira linha.
-- ALGUMAS escalas trazem dias do MÊS SEGUINTE de carona no fim. Inclua esses normalmente, mas com a data REAL do mês seguinte (${anoSeguinte}-${mesSeguintePad}-DD), nunca colando como se fossem do mês de referência.
+- ALGUMAS escalas trazem dias do MÊS SEGUINTE de carona no fim. Inclua esses normalmente, com a data REAL (${anoSeguinte}-${mesSeguintePad}-DD).
 
-PARTE 1 — JANELAS DE TURNO
-Identifique no cabeçalho as janelas/turnos usadas pelo hospital. Convenções comuns se não estiver explícito:
+PARTE 1 · JANELAS DE TURNO
+Identifique o cabeçalho com as colunas/turnos do hospital. Inferir hora de início e duração se não estiver explícito:
 - manhã: 7-13 (6h)
 - tarde / tarde 1 / tarde 2: 13-19 (6h)
 - noitinha: 19-00 (5h)
 - noite: 19-07 (12h)
 
-PARTE 2 — PLANTÕES DA MÉDICA
-Encontre TODAS as células onde aparece "${opts.nomeBusca}"${apelidoExtra}.
+PARTE 2 · CÉLULAS
+Pra CADA célula da tabela (combinação de um dia × uma coluna de turno), produza uma entrada com:
+- data: YYYY-MM-DD da linha
+- turno: rótulo da coluna (manhã, tarde, tarde 1, etc)
+- nomes: TODOS os nomes que aparecem na célula, na ordem em que aparecem
 
-Match case-insensitive. Considere variações: com/sem acento, prefixos "Dra.", abreviações.
+REGRAS RÍGIDAS DE TRANSCRIÇÃO:
+1. **Não pule células.** Se um turno tem coluna no cabeçalho, gere uma entrada por dia, mesmo que a célula esteja vazia (nomes: []).
+2. **Não pule nomes em células densas.** Se uma célula tem 15-17 nomes empilhados, liste TODOS os 15-17. Não pare no 5º.
+3. **Mantenha a grafia exata.** Não normalize "MPinheiro" pra "Mpinheiro" · não tire sufixos (BHP, BHN, CRO, CEP, CP, Pr) · não tire marcadores (* ² (pg)). Esses fazem parte do nome no PDF.
+4. **Nome com "+" ou "," é uma célula com múltiplos nomes:** "Bruna + Mariana" → nomes: ["Bruna", "Mariana"]. Quebre eles separadamente.
+5. **Não invente nomes.** Se não tem certeza do nome, melhor adicionar um aviso do que arriscar.
+6. **Não filtre por nenhum nome específico.** Liste TUDO. O servidor filtra depois.
+7. **Inclua a "seção compactada"** que alguns PDFs trazem no fim com os últimos dias do mês — não pare na primeira parte.
 
-REGRA CRÍTICA · MÚLTIPLOS NOMES NA MESMA CÉLULA:
-Uma célula pode ter VÁRIOS médicos juntos com "+", ",", "/" ou empilhados. Exemplos:
-- "Bruna + Mariana" → Mariana TEM plantão nessa célula
-- "Lucas, Carol" → ambos têm plantão
-- nomes empilhados verticalmente numa célula com 10+ médicos → cada um é um plantão se o nome bater
-
-Não pule a célula só porque ela tem outros nomes junto.
-
-REGRA SIMPLES POR CÉLULA: identificou o nome → 1 plantão regular. PONTO.
-- Mesmo que o nome esteja em itálico, com "*", "²", "(pg)", sufixos como "BHP", "BHN", "CRO", "CEP", "CP" ou outra anotação → é plantão regular.
-- Não interpreta · não classifica como troca/extra/cedido · não gera avisos sobre isso.
-- Cada CÉLULA distinta da tabela onde o nome aparece = 1 plantão. Mesmo dia pode ter 2+ plantões em colunas diferentes (manhã + noite, tarde 2 + noitinha, etc).
-
-Pra cada plantão encontrado:
-- "data" no formato YYYY-MM-DD (mês livre — pode ser ${mesPad} ou ${mesSeguintePad} dependendo da linha)
-- "horaInicio" decimal baseado na coluna (janela) onde está
-- "duracao" em horas baseado na coluna
-
-Inclua em "avisos" SOMENTE se uma linha estiver ilegível ou ambígua quanto a NOME ou HORÁRIO. Não avise sobre marcadores de troca/extra.
-
-Não inclua plantões de OUTROS médicos.
-
-VARRA TODA A TABELA · cada coluna e cada linha. Cada célula visível precisa ser checada. Não pule a "seção compactada" que alguns PDFs trazem no fim com os últimos dias do mês.`;
+Avisos só pra linha ilegível, célula ambígua, ou casos onde a estrutura da tabela não dava pra entender. Não avise sobre marcadores de extra/troca.`;
 }
