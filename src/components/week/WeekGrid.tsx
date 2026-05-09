@@ -36,7 +36,14 @@ export function WeekGrid({
   const totalH = VIEW_HORAS * density;
   const expandidos = expandirBlocos(blocos);
   const recPorDia = faixasRecuperacaoNaSemana(blocos, semanaIso);
-  const handleSelect = onSelectBloco ?? (() => {});
+  // Click num segmento (madrugada/início) deve abrir o bloco ORIGINAL
+  // — sem isso, drawer mostra "00:00 → 07:00 · 7h" em vez de
+  // "19:00 → 07:00 · 12h" do plantão noturno completo.
+  const handleSelect = (b: Bloco) => {
+    if (!onSelectBloco) return;
+    const original = blocos.find((x) => x.id === b.id) ?? b;
+    onSelectBloco(original);
+  };
 
   return (
     <div
