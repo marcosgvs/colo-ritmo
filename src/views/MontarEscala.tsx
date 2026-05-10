@@ -188,13 +188,24 @@ export function MontarEscala({
     });
   }
 
+  const mesNomeExtenso = useMemo(() => {
+    const [a, m] = mes.split('-');
+    const idx = parseInt(m ?? '1', 10) - 1;
+    return `${MESES[idx] ?? ''} ${a}`;
+  }, [mes]);
+
+  const metaEfetiva = useMemo(() => {
+    const o = metaOverride.trim() ? parseInt(metaOverride, 10) : NaN;
+    return isFinite(o) ? o : preferencias.metaMensal;
+  }, [metaOverride, preferencias.metaMensal]);
+
   return (
     <>
       <PageHead
         eyebrow="montar"
         titulo={
           estado === 'pronto'
-            ? `proposta pronta · ${resultado?.plantoes.length ?? 0} plantões`
+            ? `${mesNomeExtenso} · ${resultado?.plantoes.length ?? 0} plantões`
             : 'proposta de escala.'
         }
         hand={
@@ -225,6 +236,7 @@ export function MontarEscala({
       {estado === 'pronto' && resultado && (
         <PreviewBlock
           mes={mes}
+          metaEfetiva={metaEfetiva}
           resultado={resultado}
           hospitais={hospitais}
           preferencias={preferencias}
@@ -429,6 +441,7 @@ function SetupCard({
 
 interface PreviewBlockProps {
   mes: string;
+  metaEfetiva: number;
   resultado: PropostaResultado;
   hospitais: HospitaisMap;
   preferencias: Preferencias;
@@ -439,6 +452,7 @@ interface PreviewBlockProps {
 
 function PreviewBlock({
   mes,
+  metaEfetiva,
   resultado,
   hospitais,
   preferencias,
@@ -489,7 +503,7 @@ function PreviewBlock({
             />
             <Linha
               rotulo="meta"
-              valor={`R$ ${preferencias.metaMensal.toLocaleString('pt-BR')}`}
+              valor={`R$ ${metaEfetiva.toLocaleString('pt-BR')}`}
             />
           </div>
         </Card>

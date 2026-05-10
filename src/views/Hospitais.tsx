@@ -151,7 +151,8 @@ export function Hospitais({ hospitais, onSalvar, onRemover }: HospitaisProps) {
                 {h.nome}
               </p>
               <Mono style={{ color: 'var(--ink-3)' }}>
-                R$ {(h.valorPlantao ?? 0).toLocaleString('pt-BR')} · até {h.regras.maxPorSemana}/sem
+                R$ {(h.valorPlantao ?? 0).toLocaleString('pt-BR')}
+                {h.regras.maxPorSemana ? ` · até ${h.regras.maxPorSemana}/sem` : ''}
               </Mono>
             </button>
           ))}
@@ -180,12 +181,7 @@ function HospitalForm({ inicial, coresUsadas, onSalvar, onCancelar, onRemover }:
       valorPlantao: 0,
       valorFixo: 0,
       adicionalNoite: 200,
-      regras: {
-        maxPorSemana: 2,
-        minFimDeSemana: 0,
-        duracaoPlantao: 12,
-        maxPorMes: 8,
-      },
+      regras: {},
       janelas: JANELAS_DEFAULT,
     },
   );
@@ -290,14 +286,35 @@ function HospitalForm({ inicial, coresUsadas, onSalvar, onCancelar, onRemover }:
       </div>
 
       {aba === 'regras' && (
-        <RegrasChat
-          nomeHospital={draft.nome || 'esse hospital'}
-          tipoHospital={draft.tipo}
-          regrasAtuais={draft.regras}
-          onAplicarRegras={(novas) =>
-            setDraft((d) => ({ ...d, regras: { ...d.regras, ...novas } }))
-          }
-        />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <RegrasAtivas
+            r={draft.regras}
+            onRemover={(campo) =>
+              setDraft((d) => {
+                const next = { ...d.regras };
+                delete next[campo];
+                return { ...d, regras: next };
+              })
+            }
+            onRemoverLivre={(idx) =>
+              setDraft((d) => {
+                const livres = (d.regras.regrasLivres ?? []).filter((_, i) => i !== idx);
+                const next = { ...d.regras };
+                if (livres.length === 0) delete next.regrasLivres;
+                else next.regrasLivres = livres;
+                return { ...d, regras: next };
+              })
+            }
+          />
+          <RegrasChat
+            nomeHospital={draft.nome || 'esse hospital'}
+            tipoHospital={draft.tipo}
+            regrasAtuais={draft.regras}
+            onAplicarRegras={(novas) =>
+              setDraft((d) => ({ ...d, regras: { ...d.regras, ...novas } }))
+            }
+          />
+        </div>
       )}
 
       {aba === 'dados' && (
@@ -826,6 +843,179 @@ function RegrasChat({
       </form>
       {erro && (
         <Mono style={{ color: 'var(--coral-ink)' }}>{erro}</Mono>
+      )}
+    </div>
+  );
+}
+
+// --- RegrasAtivas · resumo das regras já cadastradas, com X pra remover ---
+
+type CampoRegra = Exclude<keyof import('@/types').RegrasHospital, 'janelas' | 'regrasLivres'>;
+
+const ROTULOS: Record<CampoRegra, (v: number) => string> = {
+  maxPorSemana: (v) => `máx ${v} plantões/sem`,
+  maxPorMes: (v) => `máx ${v} plantões/mês`,
+  minHorasPorSemana: (v) => `mín ${v}h/sem`,
+  maxHorasPorSemana: (v) => `máx ${v}h/sem`,
+  minHorasPorMes: (v) => `mín ${v}h/mês`,
+  maxHorasPorMes: (v) => `máx ${v}h/mês`,
+  minFimDeSemana: (v) => `mín ${v} FDS/mês`,
+  maxFimDeSemana: (v) => `máx ${v} FDS/mês`,
+  duracaoPlantao: (v) => `plantão padrão ${v}h`,
+  duracaoMaximaDia: (v) => `máx ${v}h por dia`,
+  feriadoMultiplicador: (v) => `feriado paga ${v}×`,
+  bonusFimDeSemana: (v) => `FDS paga ${v}×`,
+};
+
+const ORDEM: CampoRegra[] = [
+  'maxPorSemana',
+  'maxPorMes',
+  'minHorasPorSemana',
+  'maxHorasPorSemana',
+  'minHorasPorMes',
+  'maxHorasPorMes',
+  'minFimDeSemana',
+  'maxFimDeSemana',
+  'duracaoPlantao',
+  'duracaoMaximaDia',
+  'feriadoMultiplicador',
+  'bonusFimDeSemana',
+];
+
+function RegrasAtivas({
+  r,
+  onRemover,
+  onRemoverLivre,
+}: {
+  r: Partial<import('@/types').RegrasHospital>;
+  onRemover: (campo: CampoRegra) => void;
+  onRemoverLivre: (idx: number) => void;
+}) {
+  const itens = ORDEM.filter((k) => {
+    const v = r[k];
+    if (v == null) return false;
+    if ((k === 'feriadoMultiplicador' || k === 'bonusFimDeSemana') && v === 1) return false;
+    return true;
+  });
+  const livres = r.regrasLivres ?? [];
+
+  if (itens.length === 0 && livres.length === 0) {
+    return (
+      <div
+        style={{
+          padding: '14px 16px',
+          background: 'var(--bg-alt)',
+          border: '1px dashed var(--line-2)',
+          borderRadius: 'var(--r-md)',
+        }}
+      >
+        <Mono style={{ color: 'var(--ink-3)' }}>
+          nenhuma regra cadastrada · use o chat abaixo pra contar como o hospital funciona
+        </Mono>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      style={{
+        padding: '14px 16px',
+        background: 'var(--bg)',
+        border: '1px solid var(--line)',
+        borderRadius: 'var(--r-md)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 8,
+      }}
+    >
+      <Eyebrow>regras já cadastradas</Eyebrow>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        {itens.map((k) => {
+          const valor = r[k] as number;
+          return (
+            <div
+              key={k}
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '4px 0',
+              }}
+            >
+              <Mono style={{ color: 'var(--ink-2)', fontSize: 13 }}>
+                · {ROTULOS[k](valor)}
+              </Mono>
+              <button
+                type="button"
+                onClick={() => onRemover(k)}
+                aria-label={`remover ${ROTULOS[k](valor)}`}
+                title="remover"
+                style={{
+                  width: 22,
+                  height: 22,
+                  borderRadius: 999,
+                  border: '1px solid var(--line-2)',
+                  background: 'transparent',
+                  color: 'var(--ink-3)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+                  <path d="M6 6l12 12M18 6L6 18" />
+                </svg>
+              </button>
+            </div>
+          );
+        })}
+      </div>
+      {livres.length > 0 && (
+        <>
+          <Mono style={{ color: 'var(--ink-3)', fontSize: 11, marginTop: 4 }}>
+            outras regras (livre):
+          </Mono>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {livres.map((l, i) => (
+              <div
+                key={`l${i}`}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '4px 0',
+                  gap: 12,
+                }}
+              >
+                <Mono style={{ color: 'var(--ink-2)', fontSize: 13, flex: 1 }}>· {l}</Mono>
+                <button
+                  type="button"
+                  onClick={() => onRemoverLivre(i)}
+                  aria-label="remover regra"
+                  title="remover"
+                  style={{
+                    width: 22,
+                    height: 22,
+                    borderRadius: 999,
+                    border: '1px solid var(--line-2)',
+                    background: 'transparent',
+                    color: 'var(--ink-3)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                  }}
+                >
+                  <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+                    <path d="M6 6l12 12M18 6L6 18" />
+                  </svg>
+                </button>
+              </div>
+            ))}
+          </div>
+        </>
       )}
     </div>
   );
