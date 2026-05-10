@@ -196,8 +196,9 @@ export function App() {
     blocos: BlocoPlantao[];
     janelas: Janela[];
     celulas?: CelulaEscala[];
+    apelidoUsado?: string;
   }) => {
-    const { hospitalId, mesISO, blocos, janelas, celulas } = data;
+    const { hospitalId, mesISO, blocos, janelas, celulas, apelidoUsado } = data;
     // Remove plantões REGULARES existentes do mesmo mês×hospital (preserva cedidos/trocados/extras manuais)
     const semOficiaisAntigos = userState.state.blocos.filter((b) => {
       if (b.tipo !== 'plantao') return true; // sono, bloqueio, cedido, deslocamento, etc
@@ -234,6 +235,7 @@ export function App() {
           importadaEm: new Date().toISOString(),
           janelas,
           celulas,
+          apelidoUsado,
         },
       ];
     }

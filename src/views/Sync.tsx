@@ -23,6 +23,7 @@ interface SyncProps {
     blocos: BlocoPlantao[];
     janelas: Janela[];
     celulas?: CelulaEscala[];
+    apelidoUsado?: string;
   }) => void;
   /** ICS token público do user · gerado server-side. */
   icsToken?: string | null;
@@ -150,6 +151,7 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
         blocos: resultado.blocos,
         janelas: resultado.janelas,
         celulas: resultado.celulas,
+        apelidoUsado: apelidoNaEscala.trim() || undefined,
       });
     } else {
       // ICS · só adiciona blocos

@@ -229,4 +229,14 @@ export interface EscalaImportada {
   importadaEm: string;
   janelas: Janela[];
   celulas: CelulaEscala[];
+  /**
+   * Apelido EXATO que a médica digitou no campo "seu nome na escala" no
+   * momento desse import. Salvo por escala (não por hospital) porque o
+   * chefe pode rebatizar entre meses (ex: chega outra Mariana Pinheiro
+   * e o chefe muda a primeira pra "MariAraujo"). Sem isso não dá pra
+   * extrair "padrão do chefe" das celulas com fuzzy match confiável.
+   *
+   * Opcional pra retrocompatibilidade · escalas antigas não têm.
+   */
+  apelidoUsado?: string;
 }

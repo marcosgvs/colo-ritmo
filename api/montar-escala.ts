@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { envObrigatorio } from './_shared/env.js';
+import { fuzzyMatch } from '../src/lib/fuzzyMatch.js';
 
 /**
  * /api/montar-escala · gera proposta de escala via Claude com tool_use.
@@ -92,6 +93,7 @@ interface EscalaImportada {
   importadaEm: string;
   janelas: Janela[];
   celulas: CelulaEscala[];
+  apelidoUsado?: string;
 }
 
 interface Bloco {
@@ -412,15 +414,45 @@ function montarPrompt(opts: {
       partes.push('Histórico nesse hospital: nenhum plantão passado.');
     }
 
-    // Padrão do chefe (das escalas importadas) — todas as cells onde o nome dela poderia estar.
-    // Não temos como filtrar pelo apelido nesse MVP, então não usamos os celulas[] aqui.
-    // (Quando armazenarmos o apelido por hospital em EscalaImportada, dá pra ativar.)
+    // Padrão do chefe · da intenção dele nas escalas oficiais importadas
+    // (antes de trocas/cessões). Diferente do histórico real (acima),
+    // que vem dos blocos depois das trocas. Aqui buscamos por fuzzyMatch
+    // o apelidoUsado em cada célula.
     const escalasDesseHosp = opts.escalasImportadas.filter((e) => e.hospitalId === h.id);
     if (escalasDesseHosp.length > 0) {
-      partes.push(
-        `Escalas oficiais importadas: ${escalasDesseHosp.length} mês(es) (${escalasDesseHosp.map((e) => `${String(e.mes).padStart(2, '0')}/${e.ano}`).join(', ')}).`,
-        '  → O histórico acima já reflete o que o chefe escalou pra ela nesses meses.',
-      );
+      const linhasPadrao: string[] = [];
+      for (const esc of escalasDesseHosp) {
+        if (!esc.apelidoUsado) continue;
+        const cellsMariana = esc.celulas.filter((c) =>
+          c.nomes.some((n) => fuzzyMatch(n, esc.apelidoUsado!)),
+        );
+        if (cellsMariana.length === 0) continue;
+        const ordenado = [...cellsMariana].sort(
+          (a, b) => a.data.localeCompare(b.data) || a.turno.localeCompare(b.turno),
+        );
+        const itens = ordenado
+          .map((c) => {
+            const d = new Date(`${c.data}T12:00:00`);
+            const dia = d.getDate();
+            const dow = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'][d.getDay()] ?? '?';
+            return `dia ${dia} (${dow}) ${c.turno}`;
+          })
+          .join(', ');
+        linhasPadrao.push(
+          `  ${String(esc.mes).padStart(2, '0')}/${esc.ano}: ${itens}`,
+        );
+      }
+      if (linhasPadrao.length > 0) {
+        partes.push(
+          `Padrão do chefe nas escalas oficiais importadas (intenção dele, antes de trocas):`,
+          ...linhasPadrao,
+          '  → Use isso pra entender em quais dias/turnos o chefe TENDE A ESCALAR essa médica.',
+        );
+      } else {
+        partes.push(
+          `Escalas oficiais importadas: ${escalasDesseHosp.length} mês(es), mas sem apelido confiável pra extrair padrão do chefe.`,
+        );
+      }
     }
   }
 
