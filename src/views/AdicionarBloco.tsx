@@ -3,7 +3,7 @@ import type { Bloco, BlocoPlantao, HospitaisMap } from '@/types';
 import type { AddTipo } from '@/components/shell';
 import { Eyebrow, Hand, Mono, Pill } from '@/components/atoms';
 import { JanelaPreview } from '@/components/preview';
-import { detectarConflitos, fmtDate, fmtRange } from '@/lib/data';
+import { detectarConflitos, fmtDate, fmtRange, toISO } from '@/lib/data';
 
 interface AdicionarBlocoProps {
   tipo: AddTipo;
@@ -101,7 +101,7 @@ export function AdicionarBloco({
   onCancelar,
 }: AdicionarBlocoProps) {
   const modoEditar = !!blocoExistente;
-  const hojeISO = dataInicial ?? new Date().toISOString().slice(0, 10);
+  const hojeISO = dataInicial ?? toISO(new Date());
 
   const hospitaisLista = Object.values(hospitais);
   // Em modo editar não-plantão, tipo é mutável (select). Plantão sempre fixo.

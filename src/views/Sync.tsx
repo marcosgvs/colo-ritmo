@@ -6,6 +6,7 @@ import {
   fmtRange,
   gerarICS,
   parsearICS,
+  toISO,
 } from '@/lib/data';
 import { Eyebrow, Hand, MonthPicker, Mono, Pill } from '@/components/atoms';
 import { EmptyState } from '@/components/empty';
@@ -165,7 +166,7 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `colo-ritmo-${new Date().toISOString().slice(0, 10)}.ics`;
+    a.download = `colo-ritmo-${toISO(new Date())}.ics`;
     a.click();
     URL.revokeObjectURL(url);
   }

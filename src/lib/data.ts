@@ -17,6 +17,7 @@ import type { Bloco, CargaSemana, Hospital, HospitaisMap, Nivel, Preferencias } 
 import {
   MESES,
   fromISO,
+  toISO,
   adicionaDia,
   inicioDaSemana,
   inicioDoMes,
@@ -177,7 +178,7 @@ export const SEMANA: readonly string[] = [
  * módulo · refresh recalcula. Suficiente pra UX (a página recarrega ao
  * acordar/atualizar).
  */
-export const HOJE: string = new Date().toISOString().slice(0, 10);
+export const HOJE: string = toISO(new Date());
 
 /**
  * Map de hospitais do usuário em runtime · setado pelo App.tsx quando o

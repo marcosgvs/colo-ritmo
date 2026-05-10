@@ -10,6 +10,7 @@ import {
   HOJE,
   inicioDoMes,
   semanaDe,
+  toISO,
 } from '@/lib/data';
 import { Eyebrow, Hand, Mono, Pill } from '@/components/atoms';
 
@@ -47,7 +48,7 @@ export function Mes({ blocos, hospitais, onSelectBloco }: MesProps) {
       // próxima semana = adicionar 7 dias da segunda atual
       const proxSeg = new Date(`${cursor}T12:00:00`);
       proxSeg.setDate(proxSeg.getDate() + 7);
-      cursor = proxSeg.toISOString().slice(0, 10);
+      cursor = toISO(proxSeg);
     }
     return out;
   }, [refIso]);
@@ -296,7 +297,7 @@ function NavMes({ refIso, setRefIso }: NavMesProps) {
   function ajusta(deltaMeses: number) {
     const d = fromISO(refIso);
     d.setMonth(d.getMonth() + deltaMeses, 1);
-    setRefIso(d.toISOString().slice(0, 10));
+    setRefIso(toISO(d));
   }
 
   return (
