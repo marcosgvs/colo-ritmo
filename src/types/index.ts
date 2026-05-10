@@ -44,10 +44,14 @@ export interface RegrasHospital {
   maxPorSemana?: number;
   /** Quantidade máxima de plantões no mês. */
   maxPorMes?: number;
-  /** Mínimo de fins-de-semana com plantão por mês (obrigação). */
+  /** Mínimo de fins-de-semana COM PLANTÃO por mês (em quantidade de FDS, não horas). */
   minFimDeSemana?: number;
   /** Máximo de fins-de-semana com plantão por mês. */
   maxFimDeSemana?: number;
+  /** Mínimo de horas de plantão em FDS por mês. Diferente de `minFimDeSemana` que conta dias. */
+  minHorasPorFimDeSemana?: number;
+  /** Máximo de horas de plantão em FDS por mês. */
+  maxHorasPorFimDeSemana?: number;
   /** Mínimo de horas/semana exigidas pelo contrato (CLT). */
   minHorasPorSemana?: number;
   /** Máximo de horas/semana permitidas. */

@@ -40,6 +40,8 @@ interface RegrasHospital {
   maxPorMes?: number;
   minFimDeSemana?: number;
   maxFimDeSemana?: number;
+  minHorasPorFimDeSemana?: number;
+  maxHorasPorFimDeSemana?: number;
   minHorasPorSemana?: number;
   maxHorasPorSemana?: number;
   minHorasPorMes?: number;
@@ -81,12 +83,21 @@ const TOOL_DEFINIR_REGRAS = {
       minFimDeSemana: {
         type: 'number',
         description:
-          'Quantos fins-de-semana com plantão são OBRIGATÓRIOS por mês. Espere algo entre 0 e 4. NÃO confundir com horas em FDS.',
+          'Quantos fins-de-semana com plantão são OBRIGATÓRIOS por mês (em DIAS de FDS, não horas). Espere algo entre 0 e 4. Se o usuário fala em HORAS de FDS, use minHorasPorFimDeSemana.',
       },
       maxFimDeSemana: {
         type: 'number',
         description:
-          'Quantos fins-de-semana com plantão são PERMITIDOS por mês (limite). Espere algo entre 0 e 4.',
+          'Quantos fins-de-semana com plantão são PERMITIDOS por mês (em DIAS, não horas). Espere algo entre 0 e 4.',
+      },
+      minHorasPorFimDeSemana: {
+        type: 'number',
+        description:
+          'Mínimo de HORAS de plantão em fins-de-semana por mês. Use isso quando o usuário fala "X horas em FDS por mês". NÃO confundir com minFimDeSemana que conta dias.',
+      },
+      maxHorasPorFimDeSemana: {
+        type: 'number',
+        description: 'Máximo de horas de plantão em fins-de-semana por mês.',
       },
       minHorasPorSemana: {
         type: 'number',
@@ -159,9 +170,10 @@ function montarSystem(opts: {
     '- "X plantões por mês" → maxPorMes=X',
     '- "X horas por semana" → pergunte se é mín ou máx → minHorasPorSemana ou maxHorasPorSemana',
     '- "X horas por mês" → pergunte se é mín ou máx → minHorasPorMes ou maxHorasPorMes',
-    '- "X horas em FDS por mês" → regrasLivres (não tem campo específico)',
-    '- "Y fins-de-semana obrigatórios" → minFimDeSemana=Y',
+    '- "X horas em FDS por mês" (mín ou máx) → minHorasPorFimDeSemana=X ou maxHorasPorFimDeSemana=X (pergunte qual)',
+    '- "Y fins-de-semana obrigatórios" / "Y FDS por mês" → minFimDeSemana=Y (em DIAS de FDS)',
     '- "Y fins-de-semana máximo" → maxFimDeSemana=Y',
+    '- ATENÇÃO: "30h no FDS" é HORAS, vai pra minHorasPorFimDeSemana (não pra minFimDeSemana=3).',
     '- "duração de cada plantão é X" → duracaoPlantao=X',
     '- "máximo de Z horas combinadas no dia" / "não pode pegar dois plantões seguidos" → duracaoMaximaDia=Z',
     '- "feriado paga em dobro" → feriadoMultiplicador=2',

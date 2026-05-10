@@ -859,8 +859,10 @@ const ROTULOS: Record<CampoRegra, (v: number) => string> = {
   maxHorasPorSemana: (v) => `máx ${v}h/sem`,
   minHorasPorMes: (v) => `mín ${v}h/mês`,
   maxHorasPorMes: (v) => `máx ${v}h/mês`,
-  minFimDeSemana: (v) => `mín ${v} FDS/mês`,
-  maxFimDeSemana: (v) => `máx ${v} FDS/mês`,
+  minFimDeSemana: (v) => `mín ${v} FDS/mês (em dias)`,
+  maxFimDeSemana: (v) => `máx ${v} FDS/mês (em dias)`,
+  minHorasPorFimDeSemana: (v) => `mín ${v}h em FDS/mês`,
+  maxHorasPorFimDeSemana: (v) => `máx ${v}h em FDS/mês`,
   duracaoPlantao: (v) => `plantão padrão ${v}h`,
   duracaoMaximaDia: (v) => `máx ${v}h por dia`,
   feriadoMultiplicador: (v) => `feriado paga ${v}×`,
@@ -876,6 +878,8 @@ const ORDEM: CampoRegra[] = [
   'maxHorasPorMes',
   'minFimDeSemana',
   'maxFimDeSemana',
+  'minHorasPorFimDeSemana',
+  'maxHorasPorFimDeSemana',
   'duracaoPlantao',
   'duracaoMaximaDia',
   'feriadoMultiplicador',
@@ -1035,6 +1039,8 @@ function PreviewRegras({
   if (r.maxHorasPorMes) linhas.push(`máx ${r.maxHorasPorMes}h/mês`);
   if (r.minFimDeSemana) linhas.push(`mín ${r.minFimDeSemana} FDS/mês`);
   if (r.maxFimDeSemana) linhas.push(`máx ${r.maxFimDeSemana} FDS/mês`);
+  if (r.minHorasPorFimDeSemana) linhas.push(`mín ${r.minHorasPorFimDeSemana}h em FDS/mês`);
+  if (r.maxHorasPorFimDeSemana) linhas.push(`máx ${r.maxHorasPorFimDeSemana}h em FDS/mês`);
   if (r.duracaoPlantao) linhas.push(`plantão padrão ${r.duracaoPlantao}h`);
   if (r.duracaoMaximaDia) linhas.push(`máx ${r.duracaoMaximaDia}h por dia`);
   if (r.feriadoMultiplicador && r.feriadoMultiplicador !== 1)

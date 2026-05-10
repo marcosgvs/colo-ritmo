@@ -45,6 +45,8 @@ interface RegrasHospital {
   maxPorMes?: number;
   minFimDeSemana?: number;
   maxFimDeSemana?: number;
+  minHorasPorFimDeSemana?: number;
+  maxHorasPorFimDeSemana?: number;
   minHorasPorSemana?: number;
   maxHorasPorSemana?: number;
   minHorasPorMes?: number;
@@ -376,8 +378,10 @@ function montarPrompt(opts: {
     if (r.maxHorasPorSemana != null) regraLinhas.push(`máx ${r.maxHorasPorSemana}h/sem`);
     if (r.minHorasPorMes != null) regraLinhas.push(`mín ${r.minHorasPorMes}h/mês`);
     if (r.maxHorasPorMes != null) regraLinhas.push(`máx ${r.maxHorasPorMes}h/mês`);
-    if (r.minFimDeSemana != null) regraLinhas.push(`mín ${r.minFimDeSemana} FDS/mês`);
-    if (r.maxFimDeSemana != null) regraLinhas.push(`máx ${r.maxFimDeSemana} FDS/mês`);
+    if (r.minFimDeSemana != null) regraLinhas.push(`mín ${r.minFimDeSemana} FDS/mês (em dias)`);
+    if (r.maxFimDeSemana != null) regraLinhas.push(`máx ${r.maxFimDeSemana} FDS/mês (em dias)`);
+    if (r.minHorasPorFimDeSemana != null) regraLinhas.push(`mín ${r.minHorasPorFimDeSemana}h em FDS/mês`);
+    if (r.maxHorasPorFimDeSemana != null) regraLinhas.push(`máx ${r.maxHorasPorFimDeSemana}h em FDS/mês`);
     if (r.duracaoPlantao != null) regraLinhas.push(`plantão padrão ${r.duracaoPlantao}h`);
     if (r.duracaoMaximaDia != null) regraLinhas.push(`máx ${r.duracaoMaximaDia}h por dia`);
     if (r.feriadoMultiplicador != null && r.feriadoMultiplicador !== 1)
@@ -503,10 +507,11 @@ function montarPrompt(opts: {
     '## VALIDAÇÃO ANTES DE DEVOLVER',
     'Antes de chamar a ferramenta, faça essa checagem MENTAL pra cada hospital:',
     '1. Conte os plantões que você propôs nesse hospital · está dentro do `maxPorMes`?',
-    '2. Conte FDS (sábados+domingos) com plantão NESSE hospital · está atingindo `minFimDeSemana`?',
-    '3. Some as horas dos plantões nesse hospital · está dentro de `minHorasPorMes`/`maxHorasPorMes` e `minHorasPorSemana`/`maxHorasPorSemana`?',
-    '4. Para cada `regrasLivres` em texto, leia e confira se a sua proposta atende.',
-    '5. Para cada bloqueio listado · seu plantão proposto NÃO sobrepõe o horário do bloqueio?',
+    '2. Conte DIAS de FDS (sábados+domingos) com plantão NESSE hospital · está atingindo `minFimDeSemana`?',
+    '3. Some as HORAS dos plantões em FDS nesse hospital · está dentro de `minHorasPorFimDeSemana`/`maxHorasPorFimDeSemana`?',
+    '4. Some as horas totais dos plantões nesse hospital · está dentro de `minHorasPorMes`/`maxHorasPorMes` e `minHorasPorSemana`/`maxHorasPorSemana`?',
+    '5. Para cada `regrasLivres` em texto, leia e confira se a sua proposta atende.',
+    '6. Para cada bloqueio listado · seu plantão proposto NÃO sobrepõe o horário do bloqueio?',
     'Se algum item NÃO bater, AJUSTE a proposta antes de chamar o tool. Regras contratuais (CLT) são OBRIGATÓRIAS, mesmo na lente "ganhar". Se a meta financeira só for batida violando uma regra, fica abaixo da meta E menciona no `avisos`.',
     '',
     '## INSTRUÇÕES DE SAÍDA',
