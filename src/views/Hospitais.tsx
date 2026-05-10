@@ -930,6 +930,7 @@ function RegrasAtivas({
         display: 'flex',
         flexDirection: 'column',
         gap: 8,
+        maxWidth: 380,
       }}
     >
       <Eyebrow>regras já cadastradas</Eyebrow>
