@@ -295,7 +295,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return true;
     });
 
-    const avisosFinais = [...(inp.avisos ?? []), ...removidos];
+    // Validação numérica de horas/plantões/FDS por hospital · servidor é a
+    // fonte de verdade (modelo escreve estimativas que às vezes não batem
+    // com soma real, ex: "138h" quando a soma é 150h).
+    const validacaoLinhas = validarPorHospital(plantoesValidos, hospitais);
+
+    const avisosFinais = [...(inp.avisos ?? []), ...removidos, ...validacaoLinhas];
 
     res.status(200).json({
       plantoes: plantoesValidos,
@@ -363,12 +368,12 @@ function montarPrompt(opts: {
     '- Cada plantão pertence a UM hospital. Use SOMENTE as regras desse hospital pra esse plantão.',
     '- NUNCA aplique regras de um hospital nos plantões de outro.',
     '- Use APENAS as janelas (turnos) cadastradas pra cada hospital · não invente horários.',
-    '- DURAÇÃO PADRÃO · prefira plantões com a `duracaoPlantao` cadastrada do hospital (geralmente 12h). Plantões partidos curtos (manhã 6h, tarde 6h) só quando indispensáveis pra cumprir uma regra obrigatória (ex: minHorasPorMes, minHorasPorFimDeSemana). Não use 6h só pra "encaixar mais um" — é irreal · não bate com a rotina.',
+    '- DURAÇÃO · use a `duracaoPlantao` cadastrada (geralmente 12h) como base · plantões partidos de 5-6h (manhã, tarde, noitinha) existem e são válidos, mas use-os com moderação · uma escala que vira metade plantões curtos vira irreal · prefira completar uma jornada com 12h, e usar partidos quando faz sentido (fechar gap de horas, fim de semana específico, etc).',
     '- BLOQUEIOS · não proponha plantão se o horário do plantão sobrepõe um bloqueio listado abaixo. Bloqueios podem ser parciais (ex: 14h-17h) · não invalidam o dia inteiro mas invalidam o turno que conflita. Se duracao do bloqueio é 24h, o dia inteiro está fora.',
     '- Não duplique plantão (mesmo dia + mesmo hospital + mesmo turno).',
     '- minFimDeSemana de um hospital significa que a médica DEVE fazer pelo menos N fins-de-semana COM PLANTÃO NESSE HOSPITAL no mês (em DIAS de FDS). Conte sábados E domingos · cada FDS conta uma vez se tiver pelo menos 1 plantão no sáb OU dom desse hospital. NÃO cumpra com plantão de outro hospital.',
     '- minHorasPorFimDeSemana é a soma de HORAS dos plantões que caem em sábado/domingo desse hospital. Cumpra somando duracao de plantões em FDS, não em DIAS.',
-    '- minHorasPorMes · esse é OBRIGATÓRIO em hospitais públicos (CLT). Se você está abaixo, ADICIONE plantões até bater. Prefira esticar um plantão pra noite (12h) em vez de pegar 4 plantões partidos de 6h. Use partidos só quando 12h não cabe.',
+    '- minHorasPorMes · esse é OBRIGATÓRIO em hospitais públicos (CLT). Se você está abaixo, ADICIONE plantões até bater. Prefira plantão noturno (12h) · partidos de 6h são válidos pra ajustar a soma final, mas não em massa.',
     '- Se um campo de regra está em branco, não invente um valor "comum" — apenas ignore esse limite.',
     '',
   );
@@ -504,17 +509,9 @@ function montarPrompt(opts: {
   // Preferências
   partes.push('', '## PREFERÊNCIAS DA MÉDICA');
   partes.push(`- Meta líquida: R$ ${opts.metaEfetiva.toLocaleString('pt-BR')}`);
-  if (opts.preferencias.diasPreferidos && opts.preferencias.diasPreferidos.length > 0)
-    partes.push(`- Dias preferidos: ${opts.preferencias.diasPreferidos.join(', ')}`);
-  if (opts.preferencias.diasEvitar && opts.preferencias.diasEvitar.length > 0)
-    partes.push(`- Dias a evitar: ${opts.preferencias.diasEvitar.join(', ')}`);
   if (opts.preferencias.hospitaisPreferidos && opts.preferencias.hospitaisPreferidos.length > 0)
     partes.push(`- Hospitais favoritos: ${opts.preferencias.hospitaisPreferidos.join(', ')}`);
   if (opts.preferencias.evitar24hCorrido) partes.push('- Evita 24h corridas (manhã+tarde+noite no mesmo dia).');
-  if (opts.preferencias.maxPlantoesPorSemana)
-    partes.push(`- Limite pessoal: máx ${opts.preferencias.maxPlantoesPorSemana} plantões/semana.`);
-  if (opts.preferencias.janelaPreferida)
-    partes.push(`- Janela preferida: ${opts.preferencias.janelaPreferida}`);
 
   // Bloqueios
   partes.push('', '## BLOQUEIOS NO MÊS ALVO');
@@ -627,4 +624,54 @@ function intervalosSobrepoem(
   const a = intervaloAbs(dA, hA, durA);
   const b = intervaloAbs(dB, hB, durB);
   return a.ini < b.fim && b.ini < a.fim;
+}
+
+/**
+ * Soma horas/plantões/FDS por hospital e compara com as regras cadastradas.
+ * Retorna linhas de aviso (vazio se tudo passa). Servidor é a fonte de
+ * verdade · não confia na estimativa do modelo.
+ */
+function validarPorHospital(
+  plantoes: Array<{ hospitalId: string; data: string; horaInicio: number; duracao: number }>,
+  hospitais: Hospital[],
+): string[] {
+  const avisos: string[] = [];
+  for (const h of hospitais) {
+    const meus = plantoes.filter((p) => p.hospitalId === h.id);
+    if (meus.length === 0 && Object.keys(h.regras ?? {}).length === 0) continue;
+
+    const totalH = meus.reduce((s, p) => s + p.duracao, 0);
+    const totalN = meus.length;
+
+    // FDS: sábado(6) ou domingo(0) em JS getUTCDay
+    const dowSet = (d: string) => new Date(`${d}T12:00:00Z`).getUTCDay();
+    const isFDS = (d: string) => {
+      const w = dowSet(d);
+      return w === 0 || w === 6;
+    };
+    const fdsPlantoes = meus.filter((p) => isFDS(p.data));
+    const horasFDS = fdsPlantoes.reduce((s, p) => s + p.duracao, 0);
+    const diasFDSUnicos = new Set(fdsPlantoes.map((p) => p.data)).size;
+
+    const linhas: string[] = [];
+    const r = h.regras ?? {};
+
+    linhas.push(`${h.abrev ?? h.nome}: ${totalN} plantões · ${totalH}h · ${diasFDSUnicos} dias FDS · ${horasFDS}h em FDS`);
+
+    if (r.maxPorMes != null && totalN > r.maxPorMes)
+      linhas.push(`  ⚠ ${totalN} plantões excede maxPorMes=${r.maxPorMes}`);
+    if (r.minHorasPorMes != null && totalH < r.minHorasPorMes)
+      linhas.push(`  ⚠ ${totalH}h abaixo de minHorasPorMes=${r.minHorasPorMes}`);
+    if (r.maxHorasPorMes != null && totalH > r.maxHorasPorMes)
+      linhas.push(`  ⚠ ${totalH}h acima de maxHorasPorMes=${r.maxHorasPorMes}`);
+    if (r.minFimDeSemana != null && diasFDSUnicos < r.minFimDeSemana)
+      linhas.push(`  ⚠ ${diasFDSUnicos} dias de FDS abaixo de minFimDeSemana=${r.minFimDeSemana}`);
+    if (r.minHorasPorFimDeSemana != null && horasFDS < r.minHorasPorFimDeSemana)
+      linhas.push(`  ⚠ ${horasFDS}h em FDS abaixo de minHorasPorFimDeSemana=${r.minHorasPorFimDeSemana}`);
+    if (r.maxHorasPorFimDeSemana != null && horasFDS > r.maxHorasPorFimDeSemana)
+      linhas.push(`  ⚠ ${horasFDS}h em FDS acima de maxHorasPorFimDeSemana=${r.maxHorasPorFimDeSemana}`);
+
+    avisos.push(linhas.join('\n'));
+  }
+  return avisos;
 }

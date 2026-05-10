@@ -190,8 +190,10 @@ export interface Preferencias {
   nome: string;
   telefone?: string;
   metaMensal: number;
-  diasPreferidos: string[];
-  diasEvitar: string[];
+  /** @deprecated removido · use bloqueios na agenda quando quiser barrar um dia. */
+  diasPreferidos?: string[];
+  /** @deprecated removido · use bloqueios na agenda quando quiser barrar um dia. */
+  diasEvitar?: string[];
   hospitaisPreferidos: string[];
   evitar24hCorrido: boolean;
   maxPlantoesPorSemana: number;
