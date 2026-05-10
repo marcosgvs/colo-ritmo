@@ -16,7 +16,6 @@ const HOSPITAIS: HospitaisMap = {
     regras: {
       maxPorSemana: 2,
       minFimDeSemana: 0,
-      intervaloMinHoras: 12,
       duracaoPlantao: 12,
       janelas: [],
       maxPorMes: 10,
@@ -35,7 +34,6 @@ const HOSPITAIS: HospitaisMap = {
     regras: {
       maxPorSemana: 1,
       minFimDeSemana: 0,
-      intervaloMinHoras: 11,
       duracaoPlantao: 12,
       janelas: [],
       maxPorMes: 8,
@@ -89,68 +87,22 @@ describe('detectarConflitos · sobreposicao', () => {
     const c = detectarConflitos(blocos, HOSPITAIS);
     expect(c.find((x) => x.tipo === 'sobreposicao')).toBeUndefined();
   });
-});
 
-describe('detectarConflitos · sem_descanso', () => {
-  test('gap < intervalo mínimo do hospital', () => {
+  test('gap apertado entre plantões NÃO dispara conflito (regras viraram insumo do Montar)', () => {
     const blocos = [
       plantao(1, 'HBDF', '2026-05-04', 7, 12), // 7→19
-      plantao(2, 'HBDF', '2026-05-05', 0, 12), // 5h gap < 12h
+      plantao(2, 'HBDF', '2026-05-05', 0, 12), // 5h de gap
     ];
     const c = detectarConflitos(blocos, HOSPITAIS);
-    const semDescanso = c.find((x) => x.tipo === 'sem_descanso');
-    expect(semDescanso).toBeDefined();
-    expect(semDescanso?.detalhe).toMatch(/5\.0h/);
+    expect(c).toHaveLength(0);
   });
 
-  test('gap suficiente · sem conflito', () => {
-    const blocos = [
-      plantao(1, 'HBDF', '2026-05-04', 7, 6), // 7→13
-      plantao(2, 'HBDF', '2026-05-05', 7, 6), // 18h gap
-    ];
-    const c = detectarConflitos(blocos, HOSPITAIS);
-    expect(c.find((x) => x.tipo === 'sem_descanso')).toBeUndefined();
-  });
-
-  test('jornada estendida no mesmo hospital · não é conflito (manhã + tarde)', () => {
-    const blocos = [
-      plantao(1, 'HBDF', '2026-05-04', 7, 6), // manhã 7→13
-      plantao(2, 'HBDF', '2026-05-04', 13, 6), // tarde 13→19 · gap 0
-    ];
-    const c = detectarConflitos(blocos, HOSPITAIS);
-    expect(c.find((x) => x.tipo === 'sem_descanso')).toBeUndefined();
-  });
-
-  test('jornada estendida com gap pequeno (< 30min) · não é conflito', () => {
-    const blocos = [
-      plantao(1, 'HBDF', '2026-05-04', 7, 6), // 7→13
-      plantao(2, 'HBDF', '2026-05-04', 13.25, 6), // 13:15→19:15 · gap 15min
-    ];
-    const c = detectarConflitos(blocos, HOSPITAIS);
-    expect(c.find((x) => x.tipo === 'sem_descanso')).toBeUndefined();
-  });
-
-  test('hospitais diferentes mesmo com gap zero · ainda é conflito (tem que se deslocar)', () => {
-    const blocos = [
-      plantao(1, 'HBDF', '2026-05-04', 7, 6), // 7→13
-      plantao(2, 'HSL', '2026-05-04', 13, 6), // 13→19 outro hospital
-    ];
-    const c = detectarConflitos(blocos, HOSPITAIS);
-    // O caso de gap=0 entre hospitais diferentes vira sobreposição (porque tempo de deslocamento)
-    // ou sem_descanso · qualquer dos dois é correto sinalizar.
-    expect(
-      c.find((x) => x.tipo === 'sobreposicao' || x.tipo === 'sem_descanso'),
-    ).toBeDefined();
-  });
-});
-
-describe('detectarConflitos · max_semana por hospital', () => {
-  test('passa do max do hospital', () => {
+  test('passar do max por semana do hospital NÃO dispara conflito', () => {
     const blocos = [
       plantao(1, 'HSL', '2026-05-04', 7, 6),
       plantao(2, 'HSL', '2026-05-06', 7, 6), // HSL maxPorSemana = 1
     ];
     const c = detectarConflitos(blocos, HOSPITAIS);
-    expect(c.find((x) => x.tipo === 'max_semana')).toBeDefined();
+    expect(c).toHaveLength(0);
   });
 });

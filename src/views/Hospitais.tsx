@@ -183,7 +183,6 @@ function HospitalForm({ inicial, coresUsadas, onSalvar, onCancelar, onRemover }:
       regras: {
         maxPorSemana: 2,
         minFimDeSemana: 0,
-        intervaloMinHoras: 11,
         duracaoPlantao: 12,
         janelas: [],
         maxPorMes: 8,
@@ -477,14 +476,6 @@ function HospitalForm({ inicial, coresUsadas, onSalvar, onCancelar, onRemover }:
             inputMode="numeric"
             value={String(draft.regras.maxPorMes)}
             onChange={(e) => setRegra('maxPorMes', parseInteiro(e.target.value))}
-            style={input}
-          />
-        </Field>
-        <Field label="descanso mínimo (h)">
-          <input
-            inputMode="numeric"
-            value={String(draft.regras.intervaloMinHoras)}
-            onChange={(e) => setRegra('intervaloMinHoras', parseInteiro(e.target.value))}
             style={input}
           />
         </Field>
@@ -881,7 +872,6 @@ function PreviewRegras({
   if (r.maxHorasPorSemana) linhas.push(`máx ${r.maxHorasPorSemana}h/sem`);
   if (r.minFimDeSemana) linhas.push(`mín ${r.minFimDeSemana} FDS/mês`);
   if (r.maxFimDeSemana) linhas.push(`máx ${r.maxFimDeSemana} FDS/mês`);
-  if (r.intervaloMinHoras) linhas.push(`descanso mín ${r.intervaloMinHoras}h entre plantões`);
   if (r.duracaoPlantao) linhas.push(`plantão padrão ${r.duracaoPlantao}h`);
   if (r.feriadoMultiplicador && r.feriadoMultiplicador !== 1)
     linhas.push(`feriado paga ${r.feriadoMultiplicador}×`);

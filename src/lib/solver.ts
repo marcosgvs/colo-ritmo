@@ -293,14 +293,12 @@ export function sugerirPlantoes(opts: SugerirOpts): SugestaoSolver {
       duracao,
     };
 
-    // Conflito de agenda (sobreposição ou sem descanso) · sempre rejeita
+    // Sobreposição de plantões · sempre rejeita
     const conflitos = detectarConflitos(
       [...blocos, ...sugeridos, novo],
       hospitais,
-    ).filter((c) => c.a.id === novo.id || c.b?.id === novo.id);
-    const fatal = conflitos.find(
-      (c) => c.tipo === 'sobreposicao' || c.tipo === 'sem_descanso',
-    );
+    ).filter((c) => c.a.id === novo.id || c.b.id === novo.id);
+    const fatal = conflitos.find((c) => c.tipo === 'sobreposicao');
     if (fatal) {
       motivos.push(`${cursor} pulado · ${fatal.tipo}`);
       cursor = adicionaDia(cursor, 1);

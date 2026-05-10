@@ -14,8 +14,6 @@ interface ConflitosProps {
 
 const LABEL_TIPO: Record<TipoConflito, string> = {
   sobreposicao: 'sobreposição',
-  sem_descanso: 'sem descanso',
-  max_semana: 'máx. semana',
 };
 
 function labelTipo(t: TipoConflito): string {
@@ -26,14 +24,6 @@ const COPY_TIPO: Record<TipoConflito, { titulo: string; recado: string }> = {
   sobreposicao: {
     titulo: 'dois plantões sobrepostos',
     recado: 'um vai precisar virar troca · ou ceder',
-  },
-  sem_descanso: {
-    titulo: 'descanso curto entre plantões',
-    recado: 'menos que o intervalo mínimo configurado pra esse hospital',
-  },
-  max_semana: {
-    titulo: 'passou do limite do hospital',
-    recado: 'cada hospital tem máx por semana · esse passou',
   },
 };
 

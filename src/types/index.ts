@@ -36,7 +36,6 @@ export interface Janela {
 export interface RegrasHospital {
   maxPorSemana: number;
   minFimDeSemana: number;
-  intervaloMinHoras: number;
   duracaoPlantao: number;
   /** @deprecated mantido pra retrocompat — janelas agora ficam em Hospital.janelas. */
   janelas: string[];

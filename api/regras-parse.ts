@@ -36,7 +36,6 @@ interface ChatMsg {
 interface RegrasHospital {
   maxPorSemana?: number;
   minFimDeSemana?: number;
-  intervaloMinHoras?: number;
   duracaoPlantao?: number;
   maxPorMes?: number;
   minHorasPorSemana?: number;
@@ -68,7 +67,6 @@ const TOOL_DEFINIR_REGRAS = {
       maxPorMes: { type: 'number', description: 'plantões/mês máximo' },
       minFimDeSemana: { type: 'number', description: 'FDS obrigatórios/mês' },
       maxFimDeSemana: { type: 'number', description: 'FDS máximo/mês' },
-      intervaloMinHoras: { type: 'number', description: 'descanso mín entre plantões (h)' },
       duracaoPlantao: { type: 'number', description: 'duração padrão do plantão (h)' },
       minHorasPorSemana: { type: 'number', description: 'CLT · horas mín/sem' },
       maxHorasPorSemana: { type: 'number', description: 'horas máx/sem' },
@@ -98,11 +96,10 @@ function montarSystem(opts: {
     '',
     'Tom: direto, conversacional, em português brasileiro coloquial. Use linguagem do dia-a-dia médico (plantão, FDS, noitinha, virar madrugada). Sentence-case minúsculo. Sem markdown, sem listas formais — frases curtas.',
     '',
-    'Sua tarefa: coletar regras objetivas que o solver da agenda usa pra propor escalas. Os campos que importam:',
+    'Sua tarefa: coletar regras objetivas que vão alimentar o Montar (proposta de escala). Os campos que importam:',
     '- maxPorSemana, maxPorMes (limite de plantões)',
     '- minHorasPorSemana, maxHorasPorSemana (CLT principalmente)',
     '- minFimDeSemana, maxFimDeSemana (FDS obrigatório/máximo no mês)',
-    '- intervaloMinHoras (descanso mínimo entre plantões)',
     '- duracaoPlantao (duração padrão · 12h é comum)',
     '- feriadoMultiplicador (ex: 2 se paga dobrado em feriado)',
     '- bonusFimDeSemana (ex: 1.3 se FDS paga +30%)',
@@ -116,7 +113,7 @@ function montarSystem(opts: {
       '',
       'COMPORTAMENTO:',
       '- Comece se apresentando rapidamente e fazendo UMA pergunta direta de cada vez (não bombardeie).',
-      '- Pergunte primeiro o essencial: quantos plantões por semana/mês, descanso mínimo, FDS obrigatórios.',
+      '- Pergunte primeiro o essencial: quantos plantões por semana/mês, FDS obrigatórios.',
       '- Depois pergunte sobre feriado, bônus de FDS, e se tem alguma regra "esquisita" do hospital.',
       '- Quando achar que coletou o suficiente OU o usuário sinalizar que terminou, CHAME a ferramenta `definir_regras` com os valores mapeados.',
       '- Se o usuário responder com algo vago ou incerto, pergunte de novo de outro jeito.',

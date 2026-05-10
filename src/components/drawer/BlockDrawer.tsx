@@ -28,8 +28,6 @@ interface BlockDrawerProps {
 
 const ROTULO_CONFLITO: Record<string, string> = {
   sobreposicao: 'plantões sobrepostos',
-  sem_descanso: 'descanso curto entre plantões',
-  max_semana: 'limite de plantões por semana batido',
 };
 
 /** Noitinha · plantão começando 19h e durando 5h (vai até 00h). */

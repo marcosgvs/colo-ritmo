@@ -15,7 +15,6 @@ const HBDF: Hospital = {
   regras: {
     maxPorSemana: 2,
     minFimDeSemana: 0,
-    intervaloMinHoras: 12,
     duracaoPlantao: 12,
     janelas: [],
     maxPorMes: 10,
@@ -35,7 +34,6 @@ const HSL: Hospital = {
   regras: {
     maxPorSemana: 2,
     minFimDeSemana: 0,
-    intervaloMinHoras: 11,
     duracaoPlantao: 12,
     janelas: [],
     maxPorMes: 8,

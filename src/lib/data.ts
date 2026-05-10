@@ -115,7 +115,6 @@ export const HOSPITAIS: HospitaisMap = {
     regras: {
       maxPorSemana: 2,
       minFimDeSemana: 1,
-      intervaloMinHoras: 11,
       duracaoPlantao: 12,
       janelas: ['07:00–19:00', '19:00–07:00'],
       maxPorMes: 8,
@@ -133,7 +132,6 @@ export const HOSPITAIS: HospitaisMap = {
     regras: {
       maxPorSemana: 2,
       minFimDeSemana: 2,
-      intervaloMinHoras: 12,
       duracaoPlantao: 12,
       janelas: ['07:00–19:00', '19:00–07:00', '13:00–19:00'],
       maxPorMes: 10,
@@ -151,7 +149,6 @@ export const HOSPITAIS: HospitaisMap = {
     regras: {
       maxPorSemana: 1,
       minFimDeSemana: 0,
-      intervaloMinHoras: 11,
       duracaoPlantao: 12,
       janelas: ['07:00–19:00', '19:00–07:00'],
       maxPorMes: 6,
@@ -169,7 +166,6 @@ export const HOSPITAIS: HospitaisMap = {
     regras: {
       maxPorSemana: 2,
       minFimDeSemana: 1,
-      intervaloMinHoras: 11,
       duracaoPlantao: 12,
       janelas: ['07:00–19:00', '19:00–07:00'],
       maxPorMes: 8,
