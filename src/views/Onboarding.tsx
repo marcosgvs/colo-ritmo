@@ -7,7 +7,7 @@ interface OnboardingProps {
   onPular?: () => void;
 }
 
-const PASSOS = ['boas-vindas', 'papel', 'hospital-rapido', 'meta'] as const;
+const PASSOS = ['boas-vindas', 'papel', 'hospital-rapido'] as const;
 type Passo = (typeof PASSOS)[number];
 
 export function Onboarding({ onConcluir, onPular }: OnboardingProps) {
@@ -16,7 +16,6 @@ export function Onboarding({ onConcluir, onPular }: OnboardingProps) {
   const [hospitalNome, setHospitalNome] = useState('');
   const [hospitalAbrev, setHospitalAbrev] = useState('');
   const [valorPlantao, setValorPlantao] = useState(1800);
-  const [meta, setMeta] = useState(20000);
 
   const idx = PASSOS.indexOf(passo);
 
@@ -46,7 +45,6 @@ export function Onboarding({ onConcluir, onPular }: OnboardingProps) {
       hospitais,
       preferencias: {
         nome: nome || 'Médica',
-        metaMensal: meta,
       },
     });
   }
@@ -190,34 +188,6 @@ export function Onboarding({ onConcluir, onPular }: OnboardingProps) {
                 />
               </Field>
             </div>
-          </>
-        )}
-
-        {passo === 'meta' && (
-          <>
-            <Eyebrow>uma meta de horizonte</Eyebrow>
-            <h2
-              style={{
-                fontFamily: 'var(--font-display)',
-                fontWeight: 500,
-                fontSize: 'clamp(24px, 3vw, 32px)',
-                letterSpacing: '-0.015em',
-                margin: 0,
-              }}
-            >
-              quanto faria sentido por mês?
-            </h2>
-            <Hand color="var(--ink-2)" size={18}>
-              valor líquido · só pra te lembrar do limite, sem virar pressão.
-            </Hand>
-            <Field label="meta líquida (R$)">
-              <input
-                type="number"
-                value={meta}
-                onChange={(e) => setMeta(Number(e.target.value))}
-                style={input}
-              />
-            </Field>
           </>
         )}
 

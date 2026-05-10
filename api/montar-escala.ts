@@ -68,13 +68,7 @@ interface Hospital {
 
 interface Preferencias {
   nome: string;
-  metaMensal: number;
-  diasPreferidos?: string[];
-  diasEvitar?: string[];
   hospitaisPreferidos?: string[];
-  evitar24hCorrido?: boolean;
-  maxPlantoesPorSemana?: number;
-  janelaPreferida?: 'dia' | 'noite' | 'mista';
 }
 
 interface CelulaEscala {
@@ -209,7 +203,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     ano,
     mes,
     lente,
-    metaEfetiva: metaOverride ?? preferencias.metaMensal,
+    metaEfetiva: metaOverride,
     hospitais,
     preferencias,
     escalasImportadas: escalasImportadas ?? [],
@@ -315,7 +309,7 @@ function montarPrompt(opts: {
   ano: number;
   mes: number;
   lente: 'descansar' | 'equilibrar' | 'ganhar';
-  metaEfetiva: number;
+  metaEfetiva?: number;
   hospitais: Hospital[];
   preferencias: Preferencias;
   escalasImportadas: EscalaImportada[];
@@ -354,7 +348,9 @@ function montarPrompt(opts: {
     `Você está propondo uma escala de plantões para a médica ${opts.preferencias.nome} no mês de ${mesPad}/${opts.ano}.`,
     '',
     `O dia 1/${mesPad} é ${diaUm}-feira.`,
-    `Meta financeira líquida do mês: R$ ${opts.metaEfetiva.toLocaleString('pt-BR')}.`,
+    opts.metaEfetiva != null
+      ? `Meta financeira líquida do mês: R$ ${opts.metaEfetiva.toLocaleString('pt-BR')}. (a médica marcou esse mês como um mês de meta — vale forçar a régua até o limite das regras contratuais pra atingir.)`
+      : 'Sem meta financeira específica esse mês · proponha o que faz sentido respeitando regras contratuais e qualidade de vida.',
     '',
     '## ESTRATÉGIA · ' + opts.lente.toUpperCase(),
     descricaoLente(opts.lente),
@@ -497,10 +493,10 @@ function montarPrompt(opts: {
 
   // Preferências
   partes.push('', '## PREFERÊNCIAS DA MÉDICA');
-  partes.push(`- Meta líquida: R$ ${opts.metaEfetiva.toLocaleString('pt-BR')}`);
+  if (opts.metaEfetiva != null)
+    partes.push(`- Meta líquida: R$ ${opts.metaEfetiva.toLocaleString('pt-BR')}`);
   if (opts.preferencias.hospitaisPreferidos && opts.preferencias.hospitaisPreferidos.length > 0)
     partes.push(`- Hospitais favoritos: ${opts.preferencias.hospitaisPreferidos.join(', ')}`);
-  if (opts.preferencias.evitar24hCorrido) partes.push('- Evita 24h corridas (manhã+tarde+noite no mesmo dia).');
 
   // Bloqueios
   partes.push('', '## BLOQUEIOS NO MÊS ALVO');

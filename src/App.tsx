@@ -478,7 +478,6 @@ function ViewSwitch({
         <Financeiro
           blocos={state.blocos}
           hospitais={state.hospitais}
-          metaMensal={state.preferencias.metaMensal}
         />
       );
 

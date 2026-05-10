@@ -65,33 +65,6 @@ export function Usuario({ email, userId, preferencias, onSalvarPreferencias }: U
             )}
           </Card>
 
-          <Card titulo="agenda" eyebrow="meta + preferências">
-            <Field label="meta mensal (R$)">
-              <input
-                type="number"
-                value={draft.metaMensal}
-                onChange={(e) => setDraft({ ...draft, metaMensal: Number(e.target.value) })}
-                style={input}
-              />
-            </Field>
-            <label
-              style={{
-                display: 'flex',
-                gap: 10,
-                marginTop: 14,
-                font: '500 14px/1.3 var(--font-body)',
-                color: 'var(--ink-2)',
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={draft.evitar24hCorrido}
-                onChange={(e) => setDraft({ ...draft, evitar24hCorrido: e.target.checked })}
-              />
-              evitar 24h corrido (recomendado)
-            </label>
-          </Card>
-
           {sujo && (
             <div style={{ display: 'flex', gap: 10 }}>
               <button

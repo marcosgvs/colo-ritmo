@@ -133,13 +133,7 @@ export const HOSPITAIS: HospitaisMap = {
 
 export const PREFERENCIAS_ME: Preferencias = {
   nome: 'Dra. Mariana',
-  metaMensal: 22000,
-  diasPreferidos: ['ter', 'qua', 'qui'],
-  diasEvitar: ['dom'],
   hospitaisPreferidos: ['HBDF', 'HCB'],
-  evitar24hCorrido: true,
-  maxPlantoesPorSemana: 4,
-  janelaPreferida: 'dia',
 };
 
 /** Semana de referência mockada — segunda 4 mai a domingo 10 mai 2026. */

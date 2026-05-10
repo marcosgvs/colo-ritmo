@@ -25,7 +25,7 @@ const FRASES_MONTAR = [
   'lendo as regras de cada hospital',
   'olhando seu histórico',
   'checando o padrão do chefe',
-  'considerando seus dias preferidos',
+  'respeitando seus bloqueios',
   'espaçando descanso entre plantões',
   'calculando se bate na meta',
   'ajustando a proposta final',
@@ -108,10 +108,10 @@ export function MontarEscala({
     return `${MESES[idx] ?? ''} ${a}`;
   }, [mes]);
 
-  const metaEfetiva = useMemo(() => {
+  const metaEfetiva = useMemo<number | null>(() => {
     const o = metaOverride.trim() ? parseInt(metaOverride, 10) : NaN;
-    return isFinite(o) ? o : preferencias.metaMensal;
-  }, [metaOverride, preferencias.metaMensal]);
+    return isFinite(o) ? o : null;
+  }, [metaOverride]);
 
   function toggleHospital(id: string) {
     setHospitaisSel((prev) => {
@@ -225,7 +225,6 @@ export function MontarEscala({
           setLente={setLente}
           metaOverride={metaOverride}
           setMetaOverride={setMetaOverride}
-          metaPadrao={preferencias.metaMensal}
           erro={erro}
           onAvancar={() => {
             if (hospitaisSel.size === 0) {
@@ -371,7 +370,6 @@ interface SetupCardProps {
   setLente: (l: Lente) => void;
   metaOverride: string;
   setMetaOverride: (s: string) => void;
-  metaPadrao: number;
   erro: string | null;
   onAvancar: () => void;
 }
@@ -386,7 +384,6 @@ function SetupCard({
   setLente,
   metaOverride,
   setMetaOverride,
-  metaPadrao,
   erro,
   onAvancar,
 }: SetupCardProps) {
@@ -471,11 +468,11 @@ function SetupCard({
             inputMode="numeric"
             value={metaOverride}
             onChange={(e) => setMetaOverride(e.target.value.replace(/\D/g, ''))}
-            placeholder={metaPadrao ? `padrão · R$ ${metaPadrao.toLocaleString('pt-BR')}` : 'ex: 25000'}
+            placeholder="opcional · ex: 25000"
             style={{ ...inputBase, width: 220 }}
           />
           <Mono style={{ color: 'var(--ink-3)', fontSize: 11 }}>
-            só pra essa rodada · não muda seu padrão
+            preencha só quando esse mês tem que render mais que o normal
           </Mono>
         </div>
       </Linha>
@@ -817,7 +814,7 @@ function BloqueioFormModal({
 
 interface PreviewBlockProps {
   mes: string;
-  metaEfetiva: number;
+  metaEfetiva: number | null;
   resultado: PropostaResultado;
   hospitais: HospitaisMap;
   blocos: Bloco[];
@@ -868,7 +865,9 @@ function PreviewBlock({
             <Total rotulo="plantões" valor={String(resultado.plantoes.length)} />
             <Total rotulo="horas" valor={`${totalDuracao}h`} />
             <Total rotulo="líquido aprox." valor={`R$ ${resultado.totalEstimadoLiquido.toLocaleString('pt-BR')}`} />
-            <Total rotulo="meta" valor={`R$ ${metaEfetiva.toLocaleString('pt-BR')}`} />
+            {metaEfetiva !== null && (
+              <Total rotulo="meta" valor={`R$ ${metaEfetiva.toLocaleString('pt-BR')}`} />
+            )}
           </div>
         </Card>
 
