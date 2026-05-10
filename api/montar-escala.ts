@@ -332,8 +332,9 @@ function montarPrompt(opts: {
     '- Cada plantão pertence a UM hospital. Use SOMENTE as regras desse hospital pra esse plantão.',
     '- NUNCA aplique regras de um hospital nos plantões de outro.',
     '- Use APENAS as janelas (turnos) cadastradas pra cada hospital · não invente horários.',
-    '- Não proponha plantão em dias com bloqueios (listados abaixo).',
+    '- BLOQUEIOS · não proponha plantão se o horário do plantão sobrepõe um bloqueio listado abaixo. Bloqueios podem ser parciais (ex: 14h-17h) · não invalidam o dia inteiro mas invalidam o turno que conflita. Se duracao do bloqueio é 24h, o dia inteiro está fora.',
     '- Não duplique plantão (mesmo dia + mesmo hospital + mesmo turno).',
+    '- minFimDeSemana de um hospital significa que a médica DEVE fazer pelo menos N fins-de-semana COM PLANTÃO NESSE HOSPITAL no mês. Conte sábados E domingos · cada FDS conta uma vez se tiver pelo menos 1 plantão no sáb OU dom desse hospital. NÃO cumpra com plantão de outro hospital.',
     '- Se um campo de regra está em branco, não invente um valor "comum" — apenas ignore esse limite.',
     '',
   );

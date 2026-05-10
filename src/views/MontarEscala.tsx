@@ -276,6 +276,7 @@ export function MontarEscala({
           metaEfetiva={metaEfetiva}
           resultado={resultado}
           hospitais={hospitais}
+          blocos={blocos}
           onRemoverPlantao={removerPlantao}
           onAdicionarPlantao={adicionarPlantao}
           onVoltar={() => setEtapa('bloqueios')}
@@ -819,6 +820,7 @@ interface PreviewBlockProps {
   metaEfetiva: number;
   resultado: PropostaResultado;
   hospitais: HospitaisMap;
+  blocos: Bloco[];
   onRemoverPlantao: (id: string) => void;
   onAdicionarPlantao: (data: string, hospitalId: string, janela: Janela) => void;
   onVoltar: () => void;
@@ -831,6 +833,7 @@ function PreviewBlock({
   metaEfetiva,
   resultado,
   hospitais,
+  blocos,
   onRemoverPlantao,
   onAdicionarPlantao,
   onVoltar,
@@ -846,6 +849,7 @@ function PreviewBlock({
         mes={mes}
         plantoes={resultado.plantoes}
         hospitais={hospitais}
+        blocos={blocos}
         diaAberto={diaAberto}
         setDiaAberto={setDiaAberto}
         onRemoverPlantao={onRemoverPlantao}
@@ -1100,6 +1104,7 @@ interface CalendarioPropostaProps {
   mes: string;
   plantoes: PlantaoSugerido[];
   hospitais: HospitaisMap;
+  blocos: Bloco[];
   diaAberto: string | null;
   setDiaAberto: (d: string | null) => void;
   onRemoverPlantao: (id: string) => void;
@@ -1110,6 +1115,7 @@ function CalendarioProposta({
   mes,
   plantoes,
   hospitais,
+  blocos,
   diaAberto,
   setDiaAberto,
   onRemoverPlantao,
@@ -1126,6 +1132,18 @@ function CalendarioProposta({
     }
     return m;
   }, [plantoes]);
+
+  const bloqueiosPorDia = useMemo(() => {
+    const m = new Map<string, Bloco[]>();
+    for (const b of blocos) {
+      if (b.tipo === 'plantao' || b.tipo === 'cedido') continue;
+      if (!b.data.startsWith(mes)) continue;
+      const arr = m.get(b.data) ?? [];
+      arr.push(b);
+      m.set(b.data, arr);
+    }
+    return m;
+  }, [blocos, mes]);
 
   return (
     <div
@@ -1170,6 +1188,28 @@ function CalendarioProposta({
               <span style={{ font: '600 12px/1 var(--font-body)', color: dataMes ? 'var(--ink-2)' : 'var(--ink-3)' }}>
                 {fromISO(iso).getDate()}
               </span>
+              {(bloqueiosPorDia.get(iso) ?? []).map((b) => {
+                const motivo = (b as { motivo?: string; titulo?: string; detalhe?: string }).motivo
+                  ?? (b as { titulo?: string }).titulo
+                  ?? (b as { detalhe?: string }).detalhe
+                  ?? b.tipo;
+                return (
+                  <div
+                    key={String(b.id)}
+                    style={{
+                      padding: '3px 6px',
+                      borderRadius: 'var(--r-xs, 4px)',
+                      background: 'var(--bg-alt)',
+                      borderLeft: '2px solid var(--ink-3)',
+                      font: '500 10px/1.2 var(--font-mono)',
+                      color: 'var(--ink-3)',
+                    }}
+                    title={`${b.tipo} · ${fmtHora(b.horaInicio)}-${fmtHora((b.horaInicio + b.duracao) % 24)}`}
+                  >
+                    {motivo.length > 12 ? `${motivo.slice(0, 12)}…` : motivo}
+                  </div>
+                );
+              })}
               {lista.map((p) => {
                 const h = hospitais[p.hospitalId];
                 const cor = h?.cor ?? 'sand';
