@@ -8,7 +8,17 @@ import {
   parsearICS,
   toISO,
 } from '@/lib/data';
-import { Eyebrow, Hand, MonthPicker, Mono, Pill } from '@/components/atoms';
+import { Eyebrow, Hand, LoadingFrases, MonthPicker, Mono, Pill } from '@/components/atoms';
+
+const FRASES_PDF = [
+  'lendo a tabela do chefe',
+  'encontrando seu nome',
+  'checando os dias um por um',
+  'separando os turnos',
+  'olhando se virou de mês',
+  'validando os plantões encontrados',
+  'quase lá',
+] as const;
 import { EmptyState } from '@/components/empty';
 import { PageHead } from './_PageHead';
 
@@ -242,15 +252,15 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
                 disabled={estado === 'lendo' || estado === 'enviando' || !hospitalId}
                 style={{ display: 'none' }}
               />
-              <p style={{ font: '600 16px/1.3 var(--font-body)', color: 'var(--ink)', margin: 0 }}>
-                {estado === 'enviando'
-                  ? 'olhando a escala…'
-                  : estado === 'lendo'
-                    ? 'lendo arquivo…'
-                    : 'arrasta ou clica pra escolher'}
-              </p>
+              {estado === 'enviando' ? (
+                <LoadingFrases frases={FRASES_PDF} fontSize={16} />
+              ) : (
+                <p style={{ font: '600 16px/1.3 var(--font-body)', color: 'var(--ink)', margin: 0 }}>
+                  {estado === 'lendo' ? 'lendo arquivo…' : 'arrasta ou clica pra escolher'}
+                </p>
+              )}
               <Mono style={{ display: 'block', marginTop: 6, color: 'var(--ink-3)' }}>
-                pdf · até 20mb
+                {estado === 'enviando' ? 'isso pode levar alguns segundos' : 'pdf · até 20mb'}
               </Mono>
             </label>
             {erro && (

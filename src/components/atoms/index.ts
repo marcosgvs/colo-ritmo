@@ -3,6 +3,7 @@ export { ColoMark } from './ColoMark';
 export { Eyebrow } from './Eyebrow';
 export { Hand } from './Hand';
 export { HandVariantContext } from './HandVariantContext';
+export { LoadingFrases } from './LoadingFrases';
 export { MonthPicker } from './MonthPicker';
 export { Mono } from './Mono';
 export { Pill } from './Pill';

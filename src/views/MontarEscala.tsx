@@ -17,7 +17,17 @@ import {
   inicioDaSemana,
   inicioDoMes,
 } from '@/lib/data';
-import { Eyebrow, Hand, MonthPicker, Mono, Pill } from '@/components/atoms';
+import { Eyebrow, Hand, LoadingFrases, MonthPicker, Mono, Pill } from '@/components/atoms';
+
+const FRASES_MONTAR = [
+  'lendo as regras de cada hospital',
+  'olhando seu histórico',
+  'checando o padrão do chefe',
+  'considerando seus dias preferidos',
+  'espaçando descanso entre plantões',
+  'calculando se bate na meta',
+  'ajustando a proposta final',
+] as const;
 import { PageHead } from './_PageHead';
 
 type Lente = 'descansar' | 'equilibrar' | 'ganhar';
@@ -379,7 +389,7 @@ function SetupCard({
             opacity: gerando || hospitaisSel.size === 0 ? 0.5 : 1,
           }}
         >
-          {gerando ? 'tô pensando…' : 'gerar proposta'}
+          {gerando ? 'pensando…' : 'gerar proposta'}
         </button>
         {erro && (
           <span style={{ font: '500 13px/1.4 var(--font-body)', color: 'var(--coral-ink)' }}>
@@ -388,9 +398,29 @@ function SetupCard({
         )}
       </div>
 
-      <Hand color="var(--ink-3)" size={14}>
-        depois de gerada, você edita à vontade · click em qualquer dia abre o detalhe
-      </Hand>
+      {gerando ? (
+        <div
+          style={{
+            padding: '20px 24px',
+            background: 'var(--lavender-surface)',
+            border: '1px dashed var(--lavender-ink)',
+            borderRadius: 'var(--r-md)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 8,
+            alignItems: 'center',
+          }}
+        >
+          <LoadingFrases frases={FRASES_MONTAR} fontSize={15} />
+          <Mono style={{ color: 'var(--ink-3)', fontSize: 11 }}>
+            isso pode levar até uns 30 segundos
+          </Mono>
+        </div>
+      ) : (
+        <Hand color="var(--ink-3)" size={14}>
+          depois de gerada, você edita à vontade · click em qualquer dia abre o detalhe
+        </Hand>
+      )}
     </div>
   );
 }
