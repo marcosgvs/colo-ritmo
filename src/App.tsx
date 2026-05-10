@@ -7,10 +7,8 @@ import type {
   Janela,
   Mode,
   Preferencias,
-  PropostaSalva,
 } from '@/types';
 import { cargaSemanal, setHospitaisRuntime } from '@/lib/data';
-import { calcularPadroes } from '@/lib/padroes';
 import { HandVariantContext } from '@/components/atoms';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserState } from '@/hooks/useUserState';
@@ -110,10 +108,6 @@ export function App() {
     setAdicionando(null);
   };
 
-  const adicionarBlocoPersistente = (b: Bloco) => {
-    userState.setState({ blocos: [...userState.state.blocos, b] });
-  };
-
   const removerBloco = (id: number | string) => {
     userState.setState({ blocos: userState.state.blocos.filter((b) => b.id !== id) });
   };
@@ -190,16 +184,11 @@ export function App() {
     userState.setState({ preferencias: p });
   };
 
-  const atualizarPropostas = (propostas: PropostaSalva[]) => {
-    userState.setState({ propostas });
-  };
-
   /**
    * Aplica uma escala oficial importada de PDF · substitui plantões
    * existentes do mês×hospital, preserva trocas/cedidos manuais, mescla
-   * janelas no hospital, recalcula padrões observados, e arquiva a
-   * transcrição completa do PDF (todos os médicos, não só a Mariana)
-   * pra alimentar futuramente o "padrão do chefe".
+   * janelas no hospital, e arquiva a transcrição completa do PDF (todos
+   * os médicos, não só a Mariana) pra alimentar futuramente o Montar AI.
    */
   const aplicarEscala = (data: {
     hospitalId: string;
@@ -228,9 +217,6 @@ export function App() {
         }
       : userState.state.hospitais;
 
-    // Recalcula padrões observados com a base de blocos atualizada
-    const padroes = calcularPadroes(novosBlocos);
-
     // Arquiva a transcrição completa · re-importar mesmo (hospital, ano, mes) substitui.
     let escalasImportadas = userState.state.escalasImportadas;
     if (celulas && celulas.length > 0) {
@@ -255,7 +241,6 @@ export function App() {
     userState.setState({
       blocos: novosBlocos,
       hospitais: hospitaisAtualizados,
-      padroes,
       escalasImportadas,
     });
   };
@@ -370,12 +355,9 @@ export function App() {
                   email={auth.user?.email ?? (preview.ativo ? `preview · ${preview.as}` : null)}
                   onSelectBloco={setSelecionado}
                   adicionarBlocos={adicionarBlocos}
-                  criarBloco={adicionarBlocoPersistente}
-                  removerBloco={removerBloco}
                   salvarHospital={salvarHospital}
                   removerHospital={removerHospital}
                   salvarPreferencias={salvarPreferencias}
-                  atualizarPropostas={atualizarPropostas}
                   aplicarEscala={aplicarEscala}
                 />
               </Suspense>
@@ -428,12 +410,9 @@ interface ViewSwitchProps {
   email: string | null;
   onSelectBloco: (b: Bloco) => void;
   adicionarBlocos: (novos: BlocoPlantao[]) => void;
-  criarBloco: (b: Bloco) => void;
-  removerBloco: (id: number | string) => void;
   salvarHospital: (id: string, h: Hospital) => void;
   removerHospital: (id: string) => void;
   salvarPreferencias: (p: Preferencias) => void;
-  atualizarPropostas: (propostas: PropostaSalva[]) => void;
   aplicarEscala: (data: {
     hospitalId: string;
     mesISO: string;
@@ -451,16 +430,12 @@ function ViewSwitch({
   email,
   onSelectBloco,
   adicionarBlocos,
-  criarBloco,
-  removerBloco,
   salvarHospital,
   removerHospital,
   salvarPreferencias,
-  atualizarPropostas,
   aplicarEscala,
 }: ViewSwitchProps) {
   const { state, status, erro } = userState;
-  const mesISO = new Date().toISOString().slice(0, 7);
 
   switch (active) {
     case 'agenda':
@@ -537,19 +512,7 @@ function ViewSwitch({
       );
 
     case 'montar':
-      return (
-        <MontarEscala
-          blocos={state.blocos}
-          hospitais={state.hospitais}
-          preferencias={state.preferencias}
-          mesISO={mesISO}
-          onAdicionarBloco={criarBloco}
-          onRemoverBloco={removerBloco}
-          propostas={state.propostas}
-          onAtualizarPropostas={atualizarPropostas}
-          padroes={state.padroes}
-        />
-      );
+      return <MontarEscala />;
 
     case 'usuario':
       return (

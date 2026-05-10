@@ -186,51 +186,6 @@ export interface CargaSemana {
   nivel: Nivel;
 }
 
-export type LenteProposta = 'descansar' | 'equilibrar' | 'ganhar';
-
-/**
- * Padrão observado da médica em um hospital específico — derivado dos
- * plantões importados (escala oficial + ajustes manuais). Usado pelo
- * solver pra dar bônus a candidatos que batem com a rotina natural dela.
- *
- * Ex: "Mariana faz noitinha em 80% das segundas no HSLz"
- */
-export interface PadraoMedica {
-  hospitalId: string;
-  /** 0=domingo, 1=segunda, ..., 6=sábado (segue Date.getDay). */
-  diaDeSemana: 0 | 1 | 2 | 3 | 4 | 5 | 6;
-  /** Hora decimal de início típica (matcha com Janela.inicio). */
-  inicio: number;
-  /** Duração típica desse turno. */
-  duracao: number;
-  /** Quantidade de meses observados em que esse padrão apareceu. */
-  observadoEm: number;
-  /** Total de meses observados naquele hospital (denominador). */
-  totalMeses: number;
-}
-
-/**
- * Proposta salva no histórico do Montar.
- *
- * É um snapshot do que a médica enviou pro chefe — mês × hospitais ×
- * lente × blocos finais (após edição manual). Reabrir não roda solver
- * de novo; mostra exatamente o que foi enviado, com chance de re-exportar.
- *
- * `bloqueioIds` é informacional. Se o bloqueio sumiu da agenda, a proposta
- * reaberta simplesmente não tem ele — não tenta recriar.
- */
-export interface PropostaSalva {
-  id: string;
-  mesISO: string;
-  hospitaisIncluidos: string[];
-  metaUsada: number;
-  bloqueioIds: (string | number)[];
-  lente: LenteProposta;
-  blocos: BlocoPlantao[];
-  criadaEm: string;
-  exportadaEm?: string;
-  exportadaParaChefes?: Record<string, string>;
-}
 
 /**
  * Uma célula da escala oficial · todos os médicos que aparecem juntos

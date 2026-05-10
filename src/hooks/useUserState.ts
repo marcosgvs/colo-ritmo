@@ -4,9 +4,7 @@ import type {
   Bloco,
   EscalaImportada,
   Hospital,
-  PadraoMedica,
   Preferencias,
-  PropostaSalva,
 } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { BLOCOS_SEMANA, HOSPITAIS, PREFERENCIAS_ME, marcarConflitos } from '@/lib/data';
@@ -21,8 +19,6 @@ export interface UserStateBlob {
   blocos: Bloco[];
   hospitais?: Record<string, Hospital>;
   preferencias?: Preferencias;
-  propostas?: PropostaSalva[];
-  padroes?: PadraoMedica[];
   escalasImportadas?: EscalaImportada[];
   updatedAt?: string;
 }
@@ -33,8 +29,6 @@ export interface UserStateValor {
   blocos: Bloco[];
   hospitais: Record<string, Hospital>;
   preferencias: Preferencias;
-  propostas: PropostaSalva[];
-  padroes: PadraoMedica[];
   escalasImportadas: EscalaImportada[];
 }
 
@@ -54,8 +48,6 @@ const FALLBACK: UserStateValor = {
   blocos: BLOCOS_SEMANA,
   hospitais: HOSPITAIS,
   preferencias: PREFERENCIAS_ME,
-  propostas: [],
-  padroes: [],
   escalasImportadas: [],
 };
 
@@ -82,8 +74,6 @@ export function useUserState(userId: string | null): UserStateAPI {
         blocos: valor.blocos,
         hospitais: valor.hospitais,
         preferencias: valor.preferencias,
-        propostas: valor.propostas,
-        padroes: valor.padroes,
         escalasImportadas: valor.escalasImportadas,
         updatedAt: new Date().toISOString(),
       };
@@ -114,8 +104,6 @@ export function useUserState(userId: string | null): UserStateAPI {
           blocos: next.blocos ?? prev.blocos,
           hospitais: next.hospitais ?? prev.hospitais,
           preferencias: next.preferencias ?? prev.preferencias,
-          propostas: next.propostas ?? prev.propostas,
-          padroes: next.padroes ?? prev.padroes,
           escalasImportadas: next.escalasImportadas ?? prev.escalasImportadas,
         };
         pendingRef.current = merged;
@@ -160,8 +148,6 @@ export function useUserState(userId: string | null): UserStateAPI {
             blocos: blob.blocos ?? FALLBACK.blocos,
             hospitais: blob.hospitais ?? FALLBACK.hospitais,
             preferencias: blob.preferencias ?? FALLBACK.preferencias,
-            propostas: blob.propostas ?? [],
-            padroes: blob.padroes ?? [],
             escalasImportadas: blob.escalasImportadas ?? [],
           });
         } else {
@@ -190,8 +176,6 @@ export function useUserState(userId: string | null): UserStateAPI {
             blocos: novoState.blocos ?? prev.blocos,
             hospitais: novoState.hospitais ?? prev.hospitais,
             preferencias: novoState.preferencias ?? prev.preferencias,
-            propostas: novoState.propostas ?? prev.propostas,
-            padroes: novoState.padroes ?? prev.padroes,
             escalasImportadas: novoState.escalasImportadas ?? prev.escalasImportadas,
           }));
         },
