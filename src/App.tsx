@@ -520,6 +520,9 @@ function ViewSwitch({
           preferencias={state.preferencias}
           blocos={state.blocos}
           escalasImportadas={state.escalasImportadas}
+          onCriarBloco={(b) =>
+            userState.setState({ blocos: [...userState.state.blocos, b] })
+          }
         />
       );
 

@@ -278,26 +278,32 @@ export function Rail({ blocos, mode, analise, blocosDaJanela }: RailProps) {
 
   const cargaMes = useMemo(() => cargaSemanasDoMes(blocos, HOJE), [blocos]);
 
+  // Pega só as semanas relevantes (atual + ± 2) pra não poluir o rail
+  const cargaResumida = useMemo(() => {
+    if (cargaMes.length <= 4) return cargaMes;
+    return cargaMes.slice(0, 4);
+  }, [cargaMes]);
+
   return (
-    <aside style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+    <aside style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {analise && (
         <RespiracaoCard analise={analise} carga={cargaJanela} />
       )}
       {proximoDestaque && <ProximoCard b={proximoDestaque} mode={mode} />}
 
-      <Card title="ritmo do mês" eyebrow={`carga · ${cargaMes.length} semanas`}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {cargaMes.map((sem, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <Mono style={{ width: 78, fontSize: 11, color: 'var(--ink-3)' }}>{sem.sem}</Mono>
+      <Card title="ritmo do mês" eyebrow="carga semanal">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {cargaResumida.map((sem, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Mono style={{ width: 64, fontSize: 10, color: 'var(--ink-3)' }}>{sem.sem}</Mono>
               <CargaBar h={sem.h} nivel={sem.nivel} />
               <span
                 style={{
                   fontFamily: 'var(--font-display)',
-                  fontSize: 14,
+                  fontSize: 12,
                   fontWeight: 500,
                   color: nivelColor(sem.nivel),
-                  width: 32,
+                  width: 28,
                   textAlign: 'right',
                   letterSpacing: '-0.01em',
                 }}
@@ -331,26 +337,6 @@ export function Rail({ blocos, mode, analise, blocosDaJanela }: RailProps) {
           ))}
         </Card>
       )}
-
-      <div
-        style={{
-          background: 'var(--sage-surface)',
-          borderRadius: 16,
-          padding: '16px 18px',
-          position: 'relative',
-        }}
-      >
-        <Eyebrow color="var(--sage-ink)" style={{ opacity: 0.7 }}>
-          lembrete
-        </Eyebrow>
-        <Hand
-          color="var(--sage-ink)"
-          size={20}
-          style={{ display: 'block', marginTop: 6, lineHeight: 1.2 }}
-        >
-          o sono protegido começa 19h depois do último plantão de quarta — proteja essa janela
-        </Hand>
-      </div>
     </aside>
   );
 }

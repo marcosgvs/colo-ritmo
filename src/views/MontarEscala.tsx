@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import type {
   Bloco,
+  BlocoPlantao,
   EscalaImportada,
   HospitaisMap,
   Janela,
@@ -17,7 +18,8 @@ import {
   inicioDaSemana,
   inicioDoMes,
 } from '@/lib/data';
-import { Eyebrow, Hand, LoadingFrases, MonthPicker, Mono, Pill } from '@/components/atoms';
+import { Eyebrow, LoadingFrases, MonthPicker, Mono } from '@/components/atoms';
+import { PageHead } from './_PageHead';
 
 const FRASES_MONTAR = [
   'lendo as regras de cada hospital',
@@ -28,10 +30,18 @@ const FRASES_MONTAR = [
   'calculando se bate na meta',
   'ajustando a proposta final',
 ] as const;
-import { PageHead } from './_PageHead';
 
 type Lente = 'descansar' | 'equilibrar' | 'ganhar';
-type Estado = 'parado' | 'gerando' | 'pronto' | 'erro';
+type Etapa = 'setup' | 'bloqueios' | 'gerando' | 'preview' | 'exportar';
+type TipoAtividade = 'bloqueio' | 'sono' | 'consulta' | 'estudo' | 'pessoal' | 'outros';
+
+const ETAPAS: Array<{ id: Etapa; label: string }> = [
+  { id: 'setup', label: 'configurar' },
+  { id: 'bloqueios', label: 'bloqueios' },
+  { id: 'gerando', label: 'gerar' },
+  { id: 'preview', label: 'editar' },
+  { id: 'exportar', label: 'exportar' },
+];
 
 interface PlantaoSugerido {
   id: string;
@@ -55,24 +65,13 @@ interface MontarEscalaProps {
   preferencias: Preferencias;
   blocos: Bloco[];
   escalasImportadas: EscalaImportada[];
+  onCriarBloco: (b: Bloco) => void;
 }
 
 const LENTES: Array<{ id: Lente; titulo: string; recado: string }> = [
-  {
-    id: 'descansar',
-    titulo: 'descansar',
-    recado: 'menos plantões · espaçamento maior · prioriza descanso',
-  },
-  {
-    id: 'equilibrar',
-    titulo: 'equilibrar',
-    recado: 'meta + descanso · mistura turnos · padrão sustentável',
-  },
-  {
-    id: 'ganhar',
-    titulo: 'ganhar',
-    recado: 'maximiza receita · prefere noturno se paga mais',
-  },
+  { id: 'descansar', titulo: 'descansar', recado: 'menos plantões · espaçamento maior · prioriza descanso' },
+  { id: 'equilibrar', titulo: 'equilibrar', recado: 'meta + descanso · mistura turnos · padrão sustentável' },
+  { id: 'ganhar', titulo: 'ganhar', recado: 'maximiza receita · prefere noturno se paga mais' },
 ];
 
 export function MontarEscala({
@@ -80,6 +79,7 @@ export function MontarEscala({
   preferencias,
   blocos,
   escalasImportadas,
+  onCriarBloco,
 }: MontarEscalaProps) {
   const proximoMes = useMemo(() => {
     const hoje = new Date();
@@ -87,19 +87,31 @@ export function MontarEscala({
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   }, []);
 
+  const [etapa, setEtapa] = useState<Etapa>('setup');
   const [mes, setMes] = useState<string>(proximoMes);
   const [hospitaisSel, setHospitaisSel] = useState<Set<string>>(
     () => new Set(Object.keys(hospitais)),
   );
   const [lente, setLente] = useState<Lente>('equilibrar');
   const [metaOverride, setMetaOverride] = useState<string>('');
+  const [chefes, setChefes] = useState<Record<string, string>>({});
 
-  const [estado, setEstado] = useState<Estado>('parado');
   const [resultado, setResultado] = useState<PropostaResultado | null>(null);
   const [erro, setErro] = useState<string | null>(null);
 
   const lista = Object.values(hospitais);
   const hospitaisHabilitados = lista.filter((h) => hospitaisSel.has(h.id));
+
+  const mesNomeExtenso = useMemo(() => {
+    const [a, m] = mes.split('-');
+    const idx = parseInt(m ?? '1', 10) - 1;
+    return `${MESES[idx] ?? ''} ${a}`;
+  }, [mes]);
+
+  const metaEfetiva = useMemo(() => {
+    const o = metaOverride.trim() ? parseInt(metaOverride, 10) : NaN;
+    return isFinite(o) ? o : preferencias.metaMensal;
+  }, [metaOverride, preferencias.metaMensal]);
 
   function toggleHospital(id: string) {
     setHospitaisSel((prev) => {
@@ -115,7 +127,7 @@ export function MontarEscala({
       setErro('escolha pelo menos um hospital');
       return;
     }
-    setEstado('gerando');
+    setEtapa('gerando');
     setErro(null);
     try {
       const [anoStr, mesStr] = mes.split('-');
@@ -139,10 +151,8 @@ export function MontarEscala({
       });
 
       if (!resp.ok) {
-        const txt = await resp.text();
         setErro(`servidor não respondeu bem · ${resp.status}`);
-        setEstado('erro');
-        console.error('montar-escala:', txt);
+        setEtapa('setup');
         return;
       }
 
@@ -155,23 +165,20 @@ export function MontarEscala({
           id: p.id || `sug-${baseId}-${i}`,
         })),
       });
-      setEstado('pronto');
+      setEtapa('preview');
     } catch (err) {
       setErro((err as Error).message);
-      setEstado('erro');
+      setEtapa('setup');
     }
   }
 
   function regerar() {
     setResultado(null);
-    setEstado('parado');
+    setEtapa('setup');
   }
 
   function removerPlantao(id: string) {
-    setResultado((r) => {
-      if (!r) return r;
-      return { ...r, plantoes: r.plantoes.filter((p) => p.id !== id) };
-    });
+    setResultado((r) => (r ? { ...r, plantoes: r.plantoes.filter((p) => p.id !== id) } : r));
   }
 
   function adicionarPlantao(data: string, hospitalId: string, janela: Janela) {
@@ -180,42 +187,34 @@ export function MontarEscala({
       const id = `sug-${Date.now()}-${r.plantoes.length}`;
       return {
         ...r,
-        plantoes: [
-          ...r.plantoes,
-          { id, hospitalId, data, horaInicio: janela.inicio, duracao: janela.duracao },
-        ],
+        plantoes: [...r.plantoes, { id, hospitalId, data, horaInicio: janela.inicio, duracao: janela.duracao }],
       };
     });
   }
-
-  const mesNomeExtenso = useMemo(() => {
-    const [a, m] = mes.split('-');
-    const idx = parseInt(m ?? '1', 10) - 1;
-    return `${MESES[idx] ?? ''} ${a}`;
-  }, [mes]);
-
-  const metaEfetiva = useMemo(() => {
-    const o = metaOverride.trim() ? parseInt(metaOverride, 10) : NaN;
-    return isFinite(o) ? o : preferencias.metaMensal;
-  }, [metaOverride, preferencias.metaMensal]);
 
   return (
     <>
       <PageHead
         eyebrow="montar"
         titulo={
-          estado === 'pronto'
+          etapa === 'preview'
             ? `${mesNomeExtenso} · ${resultado?.plantoes.length ?? 0} plantões`
-            : 'proposta de escala.'
+            : etapa === 'exportar'
+              ? `exportar · ${mesNomeExtenso}`
+              : 'proposta de escala.'
         }
         hand={
-          estado === 'pronto'
+          etapa === 'preview'
             ? 'edita à vontade · clica num dia pra adicionar/remover'
-            : 'configura, escolho o jeito de pensar, e proponho um mês todo'
+            : etapa === 'exportar'
+              ? 'um chefe por vez · escolha o formato'
+              : 'configura, escolho o jeito de pensar, e proponho um mês todo'
         }
       />
 
-      {estado === 'parado' || estado === 'gerando' || estado === 'erro' ? (
+      <StepBar etapa={etapa} />
+
+      {etapa === 'setup' && (
         <SetupCard
           mes={mes}
           setMes={setMes}
@@ -227,29 +226,139 @@ export function MontarEscala({
           metaOverride={metaOverride}
           setMetaOverride={setMetaOverride}
           metaPadrao={preferencias.metaMensal}
-          onGerar={gerar}
-          gerando={estado === 'gerando'}
           erro={erro}
+          onAvancar={() => {
+            if (hospitaisSel.size === 0) {
+              setErro('escolha pelo menos um hospital');
+              return;
+            }
+            setErro(null);
+            setEtapa('bloqueios');
+          }}
         />
-      ) : null}
+      )}
 
-      {estado === 'pronto' && resultado && (
+      {etapa === 'bloqueios' && (
+        <BloqueiosCard
+          mes={mes}
+          blocos={blocos}
+          hospitais={hospitais}
+          onCriarBloco={onCriarBloco}
+          onVoltar={() => setEtapa('setup')}
+          onAvancar={() => void gerar()}
+        />
+      )}
+
+      {etapa === 'gerando' && (
+        <div
+          style={{
+            padding: '40px 32px',
+            background: 'var(--lavender-surface)',
+            border: '1px dashed var(--lavender-ink)',
+            borderRadius: 'var(--r-md)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 8,
+            alignItems: 'center',
+            maxWidth: 720,
+          }}
+        >
+          <LoadingFrases frases={FRASES_MONTAR} fontSize={16} />
+          <Mono style={{ color: 'var(--ink-3)', fontSize: 11 }}>
+            isso pode levar até uns 30 segundos
+          </Mono>
+        </div>
+      )}
+
+      {etapa === 'preview' && resultado && (
         <PreviewBlock
           mes={mes}
           metaEfetiva={metaEfetiva}
           resultado={resultado}
           hospitais={hospitais}
-          preferencias={preferencias}
           onRemoverPlantao={removerPlantao}
           onAdicionarPlantao={adicionarPlantao}
+          onVoltar={() => setEtapa('bloqueios')}
+          onAvancar={() => setEtapa('exportar')}
           onRegerar={regerar}
+        />
+      )}
+
+      {etapa === 'exportar' && resultado && (
+        <ExportarPanel
+          mes={mes}
+          plantoes={resultado.plantoes}
+          hospitais={hospitais}
+          hospitaisSel={hospitaisSel}
+          preferencias={preferencias}
+          chefes={chefes}
+          setChefes={setChefes}
+          onVoltar={() => setEtapa('preview')}
         />
       )}
     </>
   );
 }
 
-// --- Setup -----------------------------------------------------------------
+// --- StepBar ----------------------------------------------------------------
+
+function StepBar({ etapa }: { etapa: Etapa }) {
+  const idx = ETAPAS.findIndex((e) => e.id === etapa);
+  return (
+    <div
+      style={{
+        display: 'flex',
+        gap: 4,
+        marginBottom: 22,
+        alignItems: 'center',
+        flexWrap: 'wrap',
+      }}
+    >
+      {ETAPAS.map((e, i) => {
+        const ativo = i === idx;
+        const passou = i < idx;
+        return (
+          <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span
+              style={{
+                width: 22,
+                height: 22,
+                borderRadius: 999,
+                background: ativo ? 'var(--lavender-ink)' : passou ? 'var(--sage-ink)' : 'var(--line-2)',
+                color: ativo || passou ? 'var(--bg)' : 'var(--ink-3)',
+                font: '600 11px/22px var(--font-body)',
+                textAlign: 'center',
+                flexShrink: 0,
+              }}
+            >
+              {i + 1}
+            </span>
+            <span
+              style={{
+                font: ativo ? '600 12px/1 var(--font-body)' : '500 12px/1 var(--font-body)',
+                color: ativo ? 'var(--ink)' : passou ? 'var(--sage-ink)' : 'var(--ink-3)',
+              }}
+            >
+              {e.label}
+            </span>
+            {i < ETAPAS.length - 1 && (
+              <span
+                style={{
+                  width: 18,
+                  height: 1,
+                  background: 'var(--line-2)',
+                  margin: '0 4px',
+                }}
+              />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// --- Etapa 1 · Setup --------------------------------------------------------
 
 interface SetupCardProps {
   mes: string;
@@ -262,9 +371,8 @@ interface SetupCardProps {
   metaOverride: string;
   setMetaOverride: (s: string) => void;
   metaPadrao: number;
-  onGerar: () => void;
-  gerando: boolean;
   erro: string | null;
+  onAvancar: () => void;
 }
 
 function SetupCard({
@@ -278,9 +386,8 @@ function SetupCard({
   metaOverride,
   setMetaOverride,
   metaPadrao,
-  onGerar,
-  gerando,
   erro,
+  onAvancar,
 }: SetupCardProps) {
   return (
     <div
@@ -296,13 +403,11 @@ function SetupCard({
         maxWidth: 720,
       }}
     >
-      <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr', gap: 16, alignItems: 'center' }}>
-        <Eyebrow>mês</Eyebrow>
+      <Linha rotulo="mês">
         <MonthPicker value={mes} onChange={setMes} janela={12} />
-      </div>
+      </Linha>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr', gap: 16, alignItems: 'baseline' }}>
-        <Eyebrow>hospitais</Eyebrow>
+      <Linha rotulo="hospitais">
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
           {hospitais.map((h) => {
             const ativo = hospitaisSel.has(h.id);
@@ -326,10 +431,9 @@ function SetupCard({
             );
           })}
         </div>
-      </div>
+      </Linha>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr', gap: 16, alignItems: 'baseline' }}>
-        <Eyebrow>jeito de pensar</Eyebrow>
+      <Linha rotulo="jeito de pensar">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {LENTES.map((l) => {
             const ativo = lente === l.id;
@@ -358,38 +462,28 @@ function SetupCard({
             );
           })}
         </div>
-      </div>
+      </Linha>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr', gap: 16, alignItems: 'baseline' }}>
-        <Eyebrow>meta líquida</Eyebrow>
+      <Linha rotulo="meta líquida">
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <input
             inputMode="numeric"
             value={metaOverride}
             onChange={(e) => setMetaOverride(e.target.value.replace(/\D/g, ''))}
-            placeholder={`padrão · R$ ${metaPadrao.toLocaleString('pt-BR')}`}
-            style={{
-              padding: '10px 14px',
-              borderRadius: 'var(--r-md)',
-              border: '1px solid var(--line)',
-              background: 'var(--bg)',
-              font: '500 13px/1.3 var(--font-body)',
-              color: 'var(--ink)',
-              outline: 'none',
-              width: 220,
-            }}
+            placeholder={metaPadrao ? `padrão · R$ ${metaPadrao.toLocaleString('pt-BR')}` : 'ex: 25000'}
+            style={{ ...inputBase, width: 220 }}
           />
           <Mono style={{ color: 'var(--ink-3)', fontSize: 11 }}>
             só pra essa rodada · não muda seu padrão
           </Mono>
         </div>
-      </div>
+      </Linha>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 6 }}>
         <button
           type="button"
-          onClick={onGerar}
-          disabled={gerando || hospitaisSel.size === 0}
+          onClick={onAvancar}
+          disabled={hospitaisSel.size === 0}
           style={{
             font: '600 14px/1 var(--font-body)',
             padding: '13px 22px',
@@ -397,11 +491,11 @@ function SetupCard({
             border: 'none',
             background: 'var(--lavender-ink)',
             color: 'var(--bg)',
-            cursor: gerando || hospitaisSel.size === 0 ? 'not-allowed' : 'pointer',
-            opacity: gerando || hospitaisSel.size === 0 ? 0.5 : 1,
+            cursor: hospitaisSel.size === 0 ? 'not-allowed' : 'pointer',
+            opacity: hospitaisSel.size === 0 ? 0.5 : 1,
           }}
         >
-          {gerando ? 'pensando…' : 'gerar proposta'}
+          avançar
         </button>
         {erro && (
           <span style={{ font: '500 13px/1.4 var(--font-body)', color: 'var(--coral-ink)' }}>
@@ -409,44 +503,326 @@ function SetupCard({
           </span>
         )}
       </div>
+    </div>
+  );
+}
 
-      {gerando ? (
-        <div
+// --- Etapa 2 · Bloqueios ----------------------------------------------------
+
+interface BloqueiosCardProps {
+  mes: string;
+  blocos: Bloco[];
+  hospitais: HospitaisMap;
+  onCriarBloco: (b: Bloco) => void;
+  onVoltar: () => void;
+  onAvancar: () => void;
+}
+
+function BloqueiosCard({ mes, blocos, hospitais, onCriarBloco, onVoltar, onAvancar }: BloqueiosCardProps) {
+  const [diaAberto, setDiaAberto] = useState<string | null>(null);
+
+  const dias = useMemo(() => listarDiasDoMes(mes), [mes]);
+  const bloqueiosMes = useMemo(
+    () => blocos.filter((b) => b.tipo !== 'plantao' && b.tipo !== 'cedido' && b.data.startsWith(mes)),
+    [blocos, mes],
+  );
+  const plantoesMes = useMemo(
+    () => blocos.filter((b): b is BlocoPlantao => b.tipo === 'plantao' && b.data.startsWith(mes)),
+    [blocos, mes],
+  );
+
+  return (
+    <div
+      style={{
+        background: 'var(--bg)',
+        border: '1px solid var(--line)',
+        borderRadius: 'var(--r-lg)',
+        padding: '24px 26px',
+        boxShadow: 'var(--shadow-sm)',
+      }}
+    >
+      <p style={{ font: '400 14px/1.5 var(--font-body)', color: 'var(--ink-2)', margin: '0 0 4px' }}>
+        Quer bloquear algum dia ou parte do dia? Clique no calendário pra adicionar uma atividade
+        (consulta, sono, bloqueio, etc) que não pode ser plantão.
+      </p>
+      <Mono style={{ color: 'var(--ink-3)', fontSize: 11, marginBottom: 16, display: 'block' }}>
+        atividades criadas aqui vão pra sua agenda real e o Montar respeita
+      </Mono>
+
+      <CalendarioBloqueios
+        dias={dias}
+        mes={mes}
+        bloqueios={bloqueiosMes}
+        plantoes={plantoesMes}
+        hospitais={hospitais}
+        onClickDia={setDiaAberto}
+      />
+
+      <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
+        <button
+          type="button"
+          onClick={onVoltar}
           style={{
-            padding: '20px 24px',
-            background: 'var(--lavender-surface)',
-            border: '1px dashed var(--lavender-ink)',
-            borderRadius: 'var(--r-md)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 8,
-            alignItems: 'center',
+            font: '500 13px/1 var(--font-body)',
+            padding: '11px 18px',
+            borderRadius: 999,
+            border: '1px solid var(--line)',
+            background: 'transparent',
+            color: 'var(--ink-2)',
+            cursor: 'pointer',
           }}
         >
-          <LoadingFrases frases={FRASES_MONTAR} fontSize={15} />
-          <Mono style={{ color: 'var(--ink-3)', fontSize: 11 }}>
-            isso pode levar até uns 30 segundos
-          </Mono>
-        </div>
-      ) : (
-        <Hand color="var(--ink-3)" size={14}>
-          depois de gerada, você edita à vontade · click em qualquer dia abre o detalhe
-        </Hand>
+          voltar
+        </button>
+        <button
+          type="button"
+          onClick={onAvancar}
+          style={{
+            font: '600 14px/1 var(--font-body)',
+            padding: '11px 22px',
+            borderRadius: 999,
+            border: 'none',
+            background: 'var(--lavender-ink)',
+            color: 'var(--bg)',
+            cursor: 'pointer',
+          }}
+        >
+          gerar proposta
+        </button>
+      </div>
+
+      {diaAberto && (
+        <BloqueioFormModal
+          iso={diaAberto}
+          onSalvar={(b) => onCriarBloco(b)}
+          onFechar={() => setDiaAberto(null)}
+        />
       )}
     </div>
   );
 }
 
-// --- Preview ----------------------------------------------------------------
+interface CalendarioBloqueiosProps {
+  dias: string[];
+  mes: string;
+  bloqueios: Bloco[];
+  plantoes: BlocoPlantao[];
+  hospitais: HospitaisMap;
+  onClickDia: (iso: string) => void;
+}
+
+function CalendarioBloqueios({ dias, mes, bloqueios, plantoes, hospitais, onClickDia }: CalendarioBloqueiosProps) {
+  const porDia = useMemo(() => {
+    const m = new Map<string, { plantoes: BlocoPlantao[]; bloqueios: Bloco[] }>();
+    for (const p of plantoes) {
+      const e = m.get(p.data) ?? { plantoes: [], bloqueios: [] };
+      e.plantoes.push(p);
+      m.set(p.data, e);
+    }
+    for (const b of bloqueios) {
+      const e = m.get(b.data) ?? { plantoes: [], bloqueios: [] };
+      e.bloqueios.push(b);
+      m.set(b.data, e);
+    }
+    return m;
+  }, [plantoes, bloqueios]);
+
+  return (
+    <div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, marginBottom: 6 }}>
+        {DOWS.map((d) => (
+          <Mono key={d} style={{ color: 'var(--ink-3)', textAlign: 'center', fontSize: 11 }}>
+            {d}
+          </Mono>
+        ))}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
+        {dias.map((iso) => {
+          const dataMes = iso.startsWith(mes);
+          const e = porDia.get(iso) ?? { plantoes: [], bloqueios: [] };
+          return (
+            <button
+              key={iso}
+              type="button"
+              onClick={() => dataMes && onClickDia(iso)}
+              disabled={!dataMes}
+              style={{
+                textAlign: 'left',
+                padding: 8,
+                minHeight: 76,
+                borderRadius: 'var(--r-sm)',
+                border: '1px solid var(--line-2)',
+                background: dataMes ? 'var(--bg)' : 'var(--bg-alt)',
+                opacity: dataMes ? 1 : 0.4,
+                cursor: dataMes ? 'pointer' : 'default',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 4,
+              }}
+            >
+              <span style={{ font: '600 12px/1 var(--font-body)', color: 'var(--ink-2)' }}>
+                {fromISO(iso).getDate()}
+              </span>
+              {e.plantoes.map((p) => {
+                const h = hospitais[p.hospitalId];
+                const cor = h?.cor ?? 'sand';
+                return (
+                  <Mono
+                    key={String(p.id)}
+                    style={{
+                      fontSize: 10,
+                      padding: '2px 4px',
+                      borderRadius: 'var(--r-xs, 4px)',
+                      background: `var(--${cor}-surface)`,
+                      color: `var(--${cor}-ink)`,
+                    }}
+                  >
+                    {h?.abrev} · {fmtHora(p.horaInicio)}
+                  </Mono>
+                );
+              })}
+              {e.bloqueios.map((b) => {
+                const motivo = (b as { motivo?: string; titulo?: string }).motivo
+                  ?? (b as { titulo?: string }).titulo
+                  ?? b.tipo;
+                return (
+                  <Mono
+                    key={String(b.id)}
+                    style={{
+                      fontSize: 10,
+                      padding: '2px 4px',
+                      borderRadius: 'var(--r-xs, 4px)',
+                      background: 'var(--bg-alt)',
+                      color: 'var(--ink-3)',
+                      borderLeft: '2px solid var(--ink-3)',
+                    }}
+                  >
+                    {motivo.length > 14 ? `${motivo.slice(0, 14)}…` : motivo}
+                  </Mono>
+                );
+              })}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// --- Modal · criar atividade pra bloquear o dia ----------------------------
+
+const TIPOS_ATIVIDADE: Array<{ id: TipoAtividade; label: string }> = [
+  { id: 'bloqueio', label: 'bloqueio' },
+  { id: 'sono', label: 'sono protegido' },
+  { id: 'consulta', label: 'consulta' },
+  { id: 'estudo', label: 'estudo' },
+  { id: 'pessoal', label: 'pessoal' },
+  { id: 'outros', label: 'outros' },
+];
+
+function BloqueioFormModal({
+  iso,
+  onSalvar,
+  onFechar,
+}: {
+  iso: string;
+  onSalvar: (b: Bloco) => void;
+  onFechar: () => void;
+}) {
+  const [tipo, setTipo] = useState<TipoAtividade>('bloqueio');
+  const [motivo, setMotivo] = useState('');
+  const [horaInicio, setHoraInicio] = useState(8);
+  const [duracao, setDuracao] = useState(2);
+
+  function salvar() {
+    const id = `act-${Date.now()}`;
+    const base = { id, data: iso, horaInicio, duracao };
+    let bloco: Bloco;
+    if (tipo === 'sono') bloco = { ...base, tipo: 'sono' };
+    else if (tipo === 'bloqueio') bloco = { ...base, tipo: 'bloqueio', motivo: motivo || 'bloqueado' };
+    else if (tipo === 'consulta') bloco = { ...base, tipo: 'consulta', detalhe: motivo || 'consulta' };
+    else if (tipo === 'estudo') bloco = { ...base, tipo: 'estudo', subtipo: motivo || undefined };
+    else if (tipo === 'pessoal') bloco = { ...base, tipo: 'pessoal', titulo: motivo || 'pessoal' };
+    else bloco = { ...base, tipo: 'outros', titulo: motivo || 'compromisso' };
+    onSalvar(bloco);
+    onFechar();
+  }
+
+  return (
+    <Modal onFechar={onFechar}>
+      <Eyebrow>{capitalize(diaSemanaBRLong(iso))}</Eyebrow>
+      <h3 style={{ font: '500 22px/1.2 var(--font-display)', margin: '4px 0 0', color: 'var(--ink)' }}>
+        {fmtDate(iso)}
+      </h3>
+
+      <Field label="tipo">
+        <select value={tipo} onChange={(e) => setTipo(e.target.value as TipoAtividade)} style={inputBase}>
+          {TIPOS_ATIVIDADE.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.label}
+            </option>
+          ))}
+        </select>
+      </Field>
+
+      <Field label={tipo === 'sono' ? 'observação (opcional)' : 'motivo / título'}>
+        <input
+          type="text"
+          value={motivo}
+          onChange={(e) => setMotivo(e.target.value)}
+          placeholder="ex: aniversário do filho · consulta clínica · curso"
+          style={inputBase}
+        />
+      </Field>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <Field label="início">
+          <input
+            type="number"
+            min={0}
+            max={23.5}
+            step={0.5}
+            value={horaInicio}
+            onChange={(e) => setHoraInicio(parseFloat(e.target.value) || 0)}
+            style={inputBase}
+          />
+        </Field>
+        <Field label="duração (h)">
+          <input
+            type="number"
+            min={0.5}
+            max={24}
+            step={0.5}
+            value={duracao}
+            onChange={(e) => setDuracao(parseFloat(e.target.value) || 0.5)}
+            style={inputBase}
+          />
+        </Field>
+      </div>
+
+      <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 6 }}>
+        <button type="button" onClick={onFechar} style={btnSecundario}>
+          cancelar
+        </button>
+        <button type="button" onClick={salvar} style={btnPrimario}>
+          salvar
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+// --- Etapa 4 · Preview --------------------------------------------------------
 
 interface PreviewBlockProps {
   mes: string;
   metaEfetiva: number;
   resultado: PropostaResultado;
   hospitais: HospitaisMap;
-  preferencias: Preferencias;
   onRemoverPlantao: (id: string) => void;
   onAdicionarPlantao: (data: string, hospitalId: string, janela: Janela) => void;
+  onVoltar: () => void;
+  onAvancar: () => void;
   onRegerar: () => void;
 }
 
@@ -455,24 +831,14 @@ function PreviewBlock({
   metaEfetiva,
   resultado,
   hospitais,
-  preferencias,
   onRemoverPlantao,
   onAdicionarPlantao,
+  onVoltar,
+  onAvancar,
   onRegerar,
 }: PreviewBlockProps) {
   const [diaAberto, setDiaAberto] = useState<string | null>(null);
-  const [modalExportarHospital, setModalExportarHospital] = useState<string | null>(null);
-
   const totalDuracao = resultado.plantoes.reduce((s, p) => s + p.duracao, 0);
-  const porHospital = useMemo(() => {
-    const m = new Map<string, PlantaoSugerido[]>();
-    for (const p of resultado.plantoes) {
-      const arr = m.get(p.hospitalId) ?? [];
-      arr.push(p);
-      m.set(p.hospitalId, arr);
-    }
-    return m;
-  }, [resultado.plantoes]);
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 320px', gap: 24, alignItems: 'flex-start' }}>
@@ -495,16 +861,10 @@ function PreviewBlock({
 
         <Card titulo="totais" eyebrow="estimativa">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <Linha rotulo="plantões" valor={String(resultado.plantoes.length)} />
-            <Linha rotulo="horas" valor={`${totalDuracao}h`} />
-            <Linha
-              rotulo="líquido aprox."
-              valor={`R$ ${resultado.totalEstimadoLiquido.toLocaleString('pt-BR')}`}
-            />
-            <Linha
-              rotulo="meta"
-              valor={`R$ ${metaEfetiva.toLocaleString('pt-BR')}`}
-            />
+            <Total rotulo="plantões" valor={String(resultado.plantoes.length)} />
+            <Total rotulo="horas" valor={`${totalDuracao}h`} />
+            <Total rotulo="líquido aprox." valor={`R$ ${resultado.totalEstimadoLiquido.toLocaleString('pt-BR')}`} />
+            <Total rotulo="meta" valor={`R$ ${metaEfetiva.toLocaleString('pt-BR')}`} />
           </div>
         </Card>
 
@@ -542,71 +902,199 @@ function PreviewBlock({
           </Card>
         )}
 
-        <Card titulo="exportar" eyebrow="um chefe por vez">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {Array.from(porHospital.keys()).map((id) => {
-              const h = hospitais[id];
-              if (!h) return null;
-              const qtd = porHospital.get(id)?.length ?? 0;
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => setModalExportarHospital(id)}
-                  style={{
-                    textAlign: 'left',
-                    padding: '10px 14px',
-                    borderRadius: 'var(--r-md)',
-                    border: '1px solid var(--line)',
-                    background: 'transparent',
-                    color: 'var(--ink)',
-                    cursor: 'pointer',
-                    font: '500 13px/1.3 var(--font-body)',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                  }}
-                >
-                  <span>{h.abrev} · {h.nome}</span>
-                  <Pill kind="info">{qtd}</Pill>
-                </button>
-              );
-            })}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <button type="button" onClick={onAvancar} style={btnPrimario}>
+            avançar pra exportar
+          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button type="button" onClick={onVoltar} style={{ ...btnSecundario, flex: 1 }}>
+              voltar
+            </button>
+            <button type="button" onClick={onRegerar} style={{ ...btnSecundario, flex: 1 }}>
+              regerar
+            </button>
           </div>
-        </Card>
-
-        <button
-          type="button"
-          onClick={onRegerar}
-          style={{
-            font: '500 13px/1 var(--font-body)',
-            padding: '11px 18px',
-            borderRadius: 999,
-            border: '1px solid var(--line)',
-            background: 'transparent',
-            color: 'var(--ink-2)',
-            cursor: 'pointer',
-          }}
-        >
-          regerar com outra lente
-        </button>
+        </div>
       </aside>
-
-      {modalExportarHospital && (
-        <ExportarModal
-          hospitalId={modalExportarHospital}
-          hospitais={hospitais}
-          plantoes={porHospital.get(modalExportarHospital) ?? []}
-          preferencias={preferencias}
-          mes={mes}
-          onFechar={() => setModalExportarHospital(null)}
-        />
-      )}
     </div>
   );
 }
 
-// --- Calendário -------------------------------------------------------------
+// --- Etapa 5 · Exportar -----------------------------------------------------
+
+interface ExportarPanelProps {
+  mes: string;
+  plantoes: PlantaoSugerido[];
+  hospitais: HospitaisMap;
+  hospitaisSel: Set<string>;
+  preferencias: Preferencias;
+  chefes: Record<string, string>;
+  setChefes: (c: Record<string, string>) => void;
+  onVoltar: () => void;
+}
+
+function ExportarPanel({
+  mes,
+  plantoes,
+  hospitais,
+  hospitaisSel,
+  preferencias,
+  chefes,
+  setChefes,
+  onVoltar,
+}: ExportarPanelProps) {
+  const porHospital = useMemo(() => {
+    const m = new Map<string, PlantaoSugerido[]>();
+    for (const p of plantoes) {
+      const arr = m.get(p.hospitalId) ?? [];
+      arr.push(p);
+      m.set(p.hospitalId, arr);
+    }
+    return m;
+  }, [plantoes]);
+
+  const [anoStr, mesStr] = mes.split('-');
+  const ano = parseInt(anoStr ?? '0', 10);
+  const mesNum = parseInt(mesStr ?? '0', 10);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 760 }}>
+      {Array.from(hospitaisSel).map((hid) => {
+        const hospital = hospitais[hid];
+        if (!hospital) return null;
+        const plantoesH = porHospital.get(hid) ?? [];
+        return (
+          <ExportarHospitalCard
+            key={hid}
+            hospital={hospital}
+            plantoes={plantoesH}
+            ano={ano}
+            mes={mesNum}
+            preferencias={preferencias}
+            chefe={chefes[hid] ?? ''}
+            setChefe={(v) => setChefes({ ...chefes, [hid]: v })}
+          />
+        );
+      })}
+
+      <button type="button" onClick={onVoltar} style={{ ...btnSecundario, alignSelf: 'flex-start' }}>
+        voltar pra editar
+      </button>
+    </div>
+  );
+}
+
+interface ExportarHospitalCardProps {
+  hospital: HospitaisMap[string];
+  plantoes: PlantaoSugerido[];
+  ano: number;
+  mes: number;
+  preferencias: Preferencias;
+  chefe: string;
+  setChefe: (v: string) => void;
+}
+
+function ExportarHospitalCard({ hospital, plantoes, ano, mes, preferencias, chefe, setChefe }: ExportarHospitalCardProps) {
+  const [statusTexto, setStatusTexto] = useState<'idle' | 'copiado'>('idle');
+  const [exportando, setExportando] = useState<'pdf' | 'xlsx' | null>(null);
+
+  const blocosPlantao: BlocoPlantao[] = plantoes.map((p) => ({
+    id: p.id,
+    tipo: 'plantao',
+    hospitalId: p.hospitalId,
+    data: p.data,
+    horaInicio: p.horaInicio,
+    duracao: p.duracao,
+  }));
+
+  async function copiarTexto() {
+    const mod = await import('@/lib/exportarMontar');
+    const texto = mod.montarMensagem({
+      hospital,
+      plantoes: blocosPlantao,
+      ano,
+      mes,
+      preferencias,
+      chefe: chefe.trim() || undefined,
+    });
+    await navigator.clipboard.writeText(texto);
+    setStatusTexto('copiado');
+    setTimeout(() => setStatusTexto('idle'), 2000);
+  }
+
+  async function baixarPdf() {
+    setExportando('pdf');
+    try {
+      const mod = await import('@/lib/exportarMontar');
+      await mod.baixarPDFMontar({
+        hospital,
+        plantoes: blocosPlantao,
+        ano,
+        mes,
+        preferencias,
+        chefe: chefe.trim() || undefined,
+      });
+    } finally {
+      setExportando(null);
+    }
+  }
+
+  async function baixarExcel() {
+    setExportando('xlsx');
+    try {
+      const mod = await import('@/lib/exportarMontar');
+      await mod.baixarExcelMontar({
+        hospital,
+        plantoes: blocosPlantao,
+        ano,
+        mes,
+        preferencias,
+        chefe: chefe.trim() || undefined,
+      });
+    } finally {
+      setExportando(null);
+    }
+  }
+
+  if (plantoes.length === 0) {
+    return (
+      <Card titulo={`${hospital.abrev ?? '?'} · ${hospital.nome}`} eyebrow="sem plantões">
+        <Mono style={{ color: 'var(--ink-3)' }}>nenhum plantão proposto pra esse hospital · pule</Mono>
+      </Card>
+    );
+  }
+
+  return (
+    <Card
+      titulo={`${hospital.abrev ?? '?'} · ${hospital.nome}`}
+      eyebrow={`${plantoes.length} plantões`}
+    >
+      <Field label="nome do chefe (opcional)">
+        <input
+          type="text"
+          value={chefe}
+          onChange={(e) => setChefe(e.target.value)}
+          placeholder="ex: Paulo · Dra. Carla · etc"
+          style={inputBase}
+        />
+      </Field>
+
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 14 }}>
+        <button type="button" onClick={copiarTexto} style={btnExport(statusTexto === 'copiado')}>
+          {statusTexto === 'copiado' ? 'texto copiado!' : 'copiar texto'}
+        </button>
+        <button type="button" onClick={baixarPdf} disabled={exportando !== null} style={btnExport(false)}>
+          {exportando === 'pdf' ? 'gerando…' : 'baixar pdf'}
+        </button>
+        <button type="button" onClick={baixarExcel} disabled={exportando !== null} style={btnExport(false)}>
+          {exportando === 'xlsx' ? 'gerando…' : 'baixar excel'}
+        </button>
+      </div>
+    </Card>
+  );
+}
+
+// --- Calendário do preview --------------------------------------------------
 
 interface CalendarioPropostaProps {
   mes: string;
@@ -627,18 +1115,7 @@ function CalendarioProposta({
   onRemoverPlantao,
   onAdicionarPlantao,
 }: CalendarioPropostaProps) {
-  const dias = useMemo(() => {
-    const ini = inicioDaSemana(inicioDoMes(`${mes}-01`));
-    const fim = fimDoMes(`${mes}-01`);
-    const out: string[] = [];
-    let cursor = ini;
-    while (cursor <= fim || diaSemanaBR(cursor) !== 0) {
-      out.push(cursor);
-      cursor = adicionaDia(cursor, 1);
-      if (out.length > 42) break; // safety
-    }
-    return out;
-  }, [mes]);
+  const dias = useMemo(() => listarDiasDoMes(mes), [mes]);
 
   const porDia = useMemo(() => {
     const m = new Map<string, PlantaoSugerido[]>();
@@ -690,12 +1167,7 @@ function CalendarioProposta({
                 gap: 4,
               }}
             >
-              <span
-                style={{
-                  font: '600 12px/1 var(--font-body)',
-                  color: dataMes ? 'var(--ink-2)' : 'var(--ink-3)',
-                }}
-              >
+              <span style={{ font: '600 12px/1 var(--font-body)', color: dataMes ? 'var(--ink-2)' : 'var(--ink-3)' }}>
                 {fromISO(iso).getDate()}
               </span>
               {lista.map((p) => {
@@ -736,24 +1208,23 @@ function CalendarioProposta({
   );
 }
 
-function fmtHora(h: number): string {
-  const inteiro = Math.floor(h);
-  const min = Math.round((h - inteiro) * 60);
-  return `${String(inteiro).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
-}
+// --- Detalhe do dia (preview · adicionar/remover plantão) -------------------
 
-// --- Detalhe do dia (modal) -------------------------------------------------
-
-interface DetalheDiaProps {
+function DetalheDia({
+  iso,
+  plantoes,
+  hospitais,
+  onFechar,
+  onRemover,
+  onAdicionar,
+}: {
   iso: string;
   plantoes: PlantaoSugerido[];
   hospitais: HospitaisMap;
   onFechar: () => void;
   onRemover: (id: string) => void;
   onAdicionar: (hospitalId: string, janela: Janela) => void;
-}
-
-function DetalheDia({ iso, plantoes, hospitais, onFechar, onRemover, onAdicionar }: DetalheDiaProps) {
+}) {
   const [adicionando, setAdicionando] = useState(false);
   const lista = Object.values(hospitais);
   const [hospitalEsc, setHospitalEsc] = useState<string>(lista[0]?.id ?? '');
@@ -764,6 +1235,155 @@ function DetalheDia({ iso, plantoes, hospitais, onFechar, onRemover, onAdicionar
     { rotulo: 'noite', inicio: 19, duracao: 12 },
   ];
 
+  return (
+    <Modal onFechar={onFechar}>
+      <Eyebrow>{capitalize(diaSemanaBRLong(iso))}</Eyebrow>
+      <h3 style={{ font: '500 22px/1.2 var(--font-display)', margin: '4px 0 0', color: 'var(--ink)' }}>
+        {fmtDate(iso)}
+      </h3>
+
+      {plantoes.length === 0 ? (
+        <Mono style={{ color: 'var(--ink-3)' }}>nenhum plantão · adicionar?</Mono>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {plantoes.map((p) => {
+            const h = hospitais[p.hospitalId];
+            const cor = h?.cor ?? 'sand';
+            return (
+              <div
+                key={p.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '10px 12px',
+                  background: `var(--${cor}-surface)`,
+                  borderLeft: `3px solid var(--${cor}-ink)`,
+                  borderRadius: 'var(--r-sm)',
+                }}
+              >
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <span style={{ font: '500 13px/1.2 var(--font-body)', color: 'var(--ink)' }}>
+                    {h?.abrev ?? '?'}
+                  </span>
+                  <Mono style={{ color: 'var(--ink-2)', fontSize: 11 }}>
+                    {fmtHora(p.horaInicio)} → {fmtHora((p.horaInicio + p.duracao) % 24)} · {p.duracao}h
+                  </Mono>
+                  {p.razao && (
+                    <Mono style={{ color: 'var(--ink-3)', fontSize: 11, marginTop: 2 }}>{p.razao}</Mono>
+                  )}
+                </div>
+                <button type="button" onClick={() => onRemover(p.id)} style={btnX}>
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+                    <path d="M6 6l12 12M18 6L6 18" />
+                  </svg>
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {!adicionando ? (
+        <button
+          type="button"
+          onClick={() => setAdicionando(true)}
+          style={{
+            padding: '10px 14px',
+            borderRadius: 'var(--r-md)',
+            border: '1px dashed var(--line)',
+            background: 'transparent',
+            color: 'var(--ink-2)',
+            cursor: 'pointer',
+            font: '500 13px/1 var(--font-body)',
+          }}
+        >
+          + adicionar plantão
+        </button>
+      ) : (
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 10,
+            padding: '12px 14px',
+            border: '1px solid var(--line-2)',
+            borderRadius: 'var(--r-md)',
+            background: 'var(--bg-alt)',
+          }}
+        >
+          <Eyebrow>novo plantão</Eyebrow>
+          <select value={hospitalEsc} onChange={(e) => setHospitalEsc(e.target.value)} style={inputBase}>
+            {lista.map((h) => (
+              <option key={h.id} value={h.id}>
+                {h.abrev} · {h.nome}
+              </option>
+            ))}
+          </select>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {janelas.map((j) => (
+              <button
+                key={j.rotulo}
+                type="button"
+                onClick={() => {
+                  onAdicionar(hospitalEsc, j);
+                  setAdicionando(false);
+                }}
+                style={{
+                  font: '500 12px/1 var(--font-body)',
+                  padding: '8px 12px',
+                  borderRadius: 999,
+                  border: '1px solid var(--line)',
+                  background: 'var(--bg)',
+                  color: 'var(--ink-2)',
+                  cursor: 'pointer',
+                }}
+              >
+                {j.rotulo} · {fmtHora(j.inicio)} ({j.duracao}h)
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <button type="button" onClick={onFechar} style={{ ...btnSecundario, alignSelf: 'flex-end' }}>
+        fechar
+      </button>
+    </Modal>
+  );
+}
+
+// --- Helpers visuais --------------------------------------------------------
+
+function listarDiasDoMes(mes: string): string[] {
+  const ini = inicioDaSemana(inicioDoMes(`${mes}-01`));
+  const fim = fimDoMes(`${mes}-01`);
+  const out: string[] = [];
+  let cursor = ini;
+  while (cursor <= fim || diaSemanaBR(cursor) !== 0) {
+    out.push(cursor);
+    cursor = adicionaDia(cursor, 1);
+    if (out.length > 42) break;
+  }
+  return out;
+}
+
+function fmtHora(h: number): string {
+  const inteiro = Math.floor(h);
+  const min = Math.round((h - inteiro) * 60);
+  return `${String(inteiro).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
+}
+
+function diaSemanaBRLong(iso: string): string {
+  const d = fromISO(iso);
+  return ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'][d.getDay()]!;
+}
+
+function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function Modal({ children, onFechar }: { children: React.ReactNode; onFechar: () => void }) {
   return (
     <div
       style={{
@@ -784,230 +1404,6 @@ function DetalheDia({ iso, plantoes, hospitais, onFechar, onRemover, onAdicionar
           borderRadius: 'var(--r-lg)',
           padding: '22px 26px',
           width: 'min(440px, calc(100% - 32px))',
-          maxHeight: '80vh',
-          overflowY: 'auto',
-          boxShadow: 'var(--shadow-lg)',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 14,
-        }}
-      >
-        <div>
-          <Eyebrow>{capitalize(diaSemanaBRLong(iso))}</Eyebrow>
-          <h3 style={{ font: '500 22px/1.2 var(--font-display)', margin: '4px 0 0', color: 'var(--ink)' }}>
-            {fmtDate(iso)}
-          </h3>
-        </div>
-
-        {plantoes.length === 0 ? (
-          <Mono style={{ color: 'var(--ink-3)' }}>nenhum plantão · adicionar?</Mono>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {plantoes.map((p) => {
-              const h = hospitais[p.hospitalId];
-              const cor = h?.cor ?? 'sand';
-              return (
-                <div
-                  key={p.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '10px 12px',
-                    background: `var(--${cor}-surface)`,
-                    borderLeft: `3px solid var(--${cor}-ink)`,
-                    borderRadius: 'var(--r-sm)',
-                  }}
-                >
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    <span style={{ font: '500 13px/1.2 var(--font-body)', color: 'var(--ink)' }}>
-                      {h?.abrev ?? '?'}
-                    </span>
-                    <Mono style={{ color: 'var(--ink-2)', fontSize: 11 }}>
-                      {fmtHora(p.horaInicio)} → {fmtHora((p.horaInicio + p.duracao) % 24)} · {p.duracao}h
-                    </Mono>
-                    {p.razao && (
-                      <Mono style={{ color: 'var(--ink-3)', fontSize: 11, marginTop: 2 }}>
-                        {p.razao}
-                      </Mono>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => onRemover(p.id)}
-                    aria-label="remover"
-                    style={{
-                      width: 28,
-                      height: 28,
-                      borderRadius: 999,
-                      border: '1px solid var(--coral-ink)',
-                      background: 'transparent',
-                      color: 'var(--coral-ink)',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
-                      <path d="M6 6l12 12M18 6L6 18" />
-                    </svg>
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {!adicionando ? (
-          <button
-            type="button"
-            onClick={() => setAdicionando(true)}
-            style={{
-              padding: '10px 14px',
-              borderRadius: 'var(--r-md)',
-              border: '1px dashed var(--line)',
-              background: 'transparent',
-              color: 'var(--ink-2)',
-              cursor: 'pointer',
-              font: '500 13px/1 var(--font-body)',
-            }}
-          >
-            + adicionar plantão
-          </button>
-        ) : (
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 10,
-              padding: '12px 14px',
-              border: '1px solid var(--line-2)',
-              borderRadius: 'var(--r-md)',
-              background: 'var(--bg-alt)',
-            }}
-          >
-            <Eyebrow>novo plantão</Eyebrow>
-            <select
-              value={hospitalEsc}
-              onChange={(e) => setHospitalEsc(e.target.value)}
-              style={inputBase}
-            >
-              {lista.map((h) => (
-                <option key={h.id} value={h.id}>
-                  {h.abrev} · {h.nome}
-                </option>
-              ))}
-            </select>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {janelas.map((j) => (
-                <button
-                  key={j.rotulo}
-                  type="button"
-                  onClick={() => {
-                    onAdicionar(hospitalEsc, j);
-                    setAdicionando(false);
-                  }}
-                  style={{
-                    font: '500 12px/1 var(--font-body)',
-                    padding: '8px 12px',
-                    borderRadius: 999,
-                    border: '1px solid var(--line)',
-                    background: 'var(--bg)',
-                    color: 'var(--ink-2)',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {j.rotulo} · {fmtHora(j.inicio)} ({j.duracao}h)
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <button
-          type="button"
-          onClick={onFechar}
-          style={{
-            font: '500 13px/1 var(--font-body)',
-            padding: '10px 16px',
-            borderRadius: 999,
-            border: '1px solid var(--line)',
-            background: 'transparent',
-            color: 'var(--ink-2)',
-            cursor: 'pointer',
-            alignSelf: 'flex-end',
-          }}
-        >
-          fechar
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// --- Modal exportar (mensagem por hospital) ---------------------------------
-
-interface ExportarModalProps {
-  hospitalId: string;
-  hospitais: HospitaisMap;
-  plantoes: PlantaoSugerido[];
-  preferencias: Preferencias;
-  mes: string;
-  onFechar: () => void;
-}
-
-function ExportarModal({ hospitalId, hospitais, plantoes, preferencias, mes, onFechar }: ExportarModalProps) {
-  const hospital = hospitais[hospitalId];
-  const [copiado, setCopiado] = useState(false);
-
-  const texto = useMemo(() => {
-    const ordenados = [...plantoes].sort(
-      (a, b) => a.data.localeCompare(b.data) || a.horaInicio - b.horaInicio,
-    );
-    const [, mesStr] = mes.split('-');
-    const mesNome = MESES[parseInt(mesStr ?? '1', 10) - 1];
-    const cabecalho = `Olá,\n\nSegue minha proposta de plantões para ${mesNome}/${mes.split('-')[0]} no ${hospital?.nome ?? hospitalId}:\n\n`;
-    const linhas = ordenados.map((p) => {
-      const d = fromISO(p.data);
-      const dow = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'][d.getDay()]!;
-      const dia = d.getDate();
-      const fim = (p.horaInicio + p.duracao) % 24;
-      return `- ${dow} ${dia}/${mesStr} · ${fmtHora(p.horaInicio)} às ${fmtHora(fim)} (${p.duracao}h)`;
-    });
-    const total = ordenados.length;
-    const horas = ordenados.reduce((s, p) => s + p.duracao, 0);
-    const rodape = `\n\nTotal: ${total} plantões, ${horas} horas.\n\nFico no aguardo da escala oficial.\n\nObrigada,\n${preferencias.nome}`;
-    return cabecalho + linhas.join('\n') + rodape;
-  }, [plantoes, hospital, hospitalId, mes, preferencias.nome]);
-
-  function copiar() {
-    void navigator.clipboard.writeText(texto).then(() => {
-      setCopiado(true);
-      setTimeout(() => setCopiado(false), 2000);
-    });
-  }
-
-  return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(0,0,0,0.3)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 100,
-      }}
-      onClick={onFechar}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          background: 'var(--bg)',
-          borderRadius: 'var(--r-lg)',
-          padding: '24px 28px',
-          width: 'min(560px, calc(100% - 32px))',
           maxHeight: '85vh',
           overflowY: 'auto',
           boxShadow: 'var(--shadow-lg)',
@@ -1016,64 +1412,11 @@ function ExportarModal({ hospitalId, hospitais, plantoes, preferencias, mes, onF
           gap: 14,
         }}
       >
-        <div>
-          <Eyebrow>mensagem para o chefe</Eyebrow>
-          <h3 style={{ font: '500 22px/1.2 var(--font-display)', margin: '4px 0 0', color: 'var(--ink)' }}>
-            {hospital?.abrev ?? hospitalId} · {hospital?.nome ?? ''}
-          </h3>
-        </div>
-        <textarea
-          value={texto}
-          readOnly
-          rows={14}
-          style={{
-            ...inputBase,
-            width: '100%',
-            fontFamily: 'var(--font-body)',
-            fontSize: 13,
-            lineHeight: 1.5,
-            resize: 'vertical',
-            minHeight: 280,
-          }}
-        />
-        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-          <button
-            type="button"
-            onClick={onFechar}
-            style={{
-              font: '500 13px/1 var(--font-body)',
-              padding: '11px 18px',
-              borderRadius: 999,
-              border: '1px solid var(--line)',
-              background: 'transparent',
-              color: 'var(--ink-2)',
-              cursor: 'pointer',
-            }}
-          >
-            fechar
-          </button>
-          <button
-            type="button"
-            onClick={copiar}
-            style={{
-              font: '600 13px/1 var(--font-body)',
-              padding: '11px 18px',
-              borderRadius: 999,
-              border: 'none',
-              background: copiado ? 'var(--sage-ink)' : 'var(--ink)',
-              color: 'var(--bg)',
-              cursor: 'pointer',
-            }}
-          >
-            {copiado ? 'copiado!' : 'copiar texto'}
-          </button>
-        </div>
+        {children}
       </div>
     </div>
   );
 }
-
-// --- Helpers UI --------------------------------------------------------------
 
 function Card({ titulo, eyebrow, children }: { titulo: string; eyebrow?: string; children: React.ReactNode }) {
   return (
@@ -1086,14 +1429,7 @@ function Card({ titulo, eyebrow, children }: { titulo: string; eyebrow?: string;
         boxShadow: 'var(--shadow-sm)',
       }}
     >
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'baseline',
-          marginBottom: 10,
-        }}
-      >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
         <span style={{ fontFamily: 'var(--font-display)', fontWeight: 500, fontSize: 16, color: 'var(--ink)' }}>
           {titulo}
         </span>
@@ -1104,7 +1440,16 @@ function Card({ titulo, eyebrow, children }: { titulo: string; eyebrow?: string;
   );
 }
 
-function Linha({ rotulo, valor }: { rotulo: string; valor: string }) {
+function Linha({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr', gap: 16, alignItems: 'baseline' }}>
+      <Eyebrow>{rotulo}</Eyebrow>
+      {children}
+    </div>
+  );
+}
+
+function Total({ rotulo, valor }: { rotulo: string; valor: string }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}>
       <Mono style={{ color: 'var(--ink-3)', fontSize: 12 }}>{rotulo}</Mono>
@@ -1113,13 +1458,13 @@ function Linha({ rotulo, valor }: { rotulo: string; valor: string }) {
   );
 }
 
-function diaSemanaBRLong(iso: string): string {
-  const d = fromISO(iso);
-  return ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'][d.getDay()]!;
-}
-
-function capitalize(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1);
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <Eyebrow>{label}</Eyebrow>
+      {children}
+    </label>
+  );
 }
 
 const inputBase: React.CSSProperties = {
@@ -1130,5 +1475,50 @@ const inputBase: React.CSSProperties = {
   font: '500 13px/1.3 var(--font-body)',
   color: 'var(--ink)',
   outline: 'none',
+};
+
+const btnPrimario: React.CSSProperties = {
+  font: '600 14px/1 var(--font-body)',
+  padding: '12px 20px',
+  borderRadius: 999,
+  border: 'none',
+  background: 'var(--lavender-ink)',
+  color: 'var(--bg)',
+  cursor: 'pointer',
+};
+
+const btnSecundario: React.CSSProperties = {
+  font: '500 13px/1 var(--font-body)',
+  padding: '11px 18px',
+  borderRadius: 999,
+  border: '1px solid var(--line)',
+  background: 'transparent',
+  color: 'var(--ink-2)',
+  cursor: 'pointer',
+};
+
+function btnExport(success: boolean): React.CSSProperties {
+  return {
+    font: '600 13px/1 var(--font-body)',
+    padding: '11px 18px',
+    borderRadius: 999,
+    border: 'none',
+    background: success ? 'var(--sage-ink)' : 'var(--ink)',
+    color: 'var(--bg)',
+    cursor: 'pointer',
+  };
+}
+
+const btnX: React.CSSProperties = {
+  width: 28,
+  height: 28,
+  borderRadius: 999,
+  border: '1px solid var(--coral-ink)',
+  background: 'transparent',
+  color: 'var(--coral-ink)',
+  cursor: 'pointer',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
 };
 

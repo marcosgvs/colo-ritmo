@@ -383,7 +383,15 @@ function montarPrompt(opts: {
       regraLinhas.push(`feriado paga ${r.feriadoMultiplicador}×`);
     if (r.bonusFimDeSemana != null && r.bonusFimDeSemana !== 1)
       regraLinhas.push(`FDS paga ${r.bonusFimDeSemana}×`);
-    if (regraLinhas.length === 0) regraLinhas.push('nenhuma regra rígida cadastrada');
+    if (regraLinhas.length === 0) {
+      regraLinhas.push('nenhuma regra rígida cadastrada');
+      const temEscalas = opts.escalasImportadas.some((e) => e.hospitalId === h.id);
+      if (temEscalas) {
+        regraLinhas.push(
+          '→ ATENÇÃO: como não tem regras explícitas, use o "Padrão do chefe" e o "Histórico real" abaixo como guia principal. Imite os volumes e turnos típicos das escalas anteriores.',
+        );
+      }
+    }
     partes.push('Regras contratuais:', ...regraLinhas.map((l) => `  - ${l}`));
 
     if (r.regrasLivres && r.regrasLivres.length > 0) {
