@@ -155,7 +155,7 @@ export async function baixarPDFMontar(dados: DadosPDF): Promise<void> {
   const W = 297;
   const H = 210;
   const margemX = 16;
-  const margemY = 14;
+  const margemY = 12;
 
   // --- Pinta o fundo creme ---
   pdf.setFillColor(COR_BG);
@@ -163,59 +163,59 @@ export async function baixarPDFMontar(dados: DadosPDF): Promise<void> {
 
   let y = margemY;
 
-  // --- HEADER ---
+  // --- HEADER · compacto, ocupa ~50mm ---
   // Logo
-  pdf.addImage(logoPng, 'PNG', margemX, y, 40, 9.2);
-  y += 14;
+  pdf.addImage(logoPng, 'PNG', margemX, y, 36, 8.3);
+  y += 11;
 
   // Eyebrow: SUGESTÃO DE ESCALA · HOSPITAL · MM/YYYY
   pdf.setFont('Nunito', 'bold');
-  pdf.setFontSize(8);
+  pdf.setFontSize(7.5);
   pdf.setTextColor(COR_INK_3);
   const mesNome = MESES[dados.mes - 1] ?? '?';
   const eyebrow = `SUGESTÃO DE ESCALA · ${(dados.hospital.abrev ?? dados.hospital.nome).toUpperCase()} · ${capitalize(mesNome)} ${dados.ano}`;
-  pdf.text(eyebrow, margemX, y, { charSpace: 1.2 });
+  pdf.text(eyebrow, margemX, y, { charSpace: 1.1 });
 
-  y += 6;
+  y += 5;
 
   // Título principal: Escala Dra. Mariana Pinheiro
   pdf.setFont('Fraunces', 'bold');
-  pdf.setFontSize(32);
+  pdf.setFontSize(26);
   pdf.setTextColor(COR_LAVENDER);
   const nomeLimpo = (dados.preferencias.nome ?? 'Médica').trim();
   const tituloPrincipal = nomeLimpo.toLowerCase().startsWith('dra')
     ? `Escala ${nomeLimpo}`
     : `Escala Dra. ${nomeLimpo}`;
-  pdf.text(tituloPrincipal, margemX, y + 10);
+  pdf.text(tituloPrincipal, margemX, y + 8.5);
 
-  y += 16;
+  y += 13;
 
   // Subtítulo: Hospital · N plantões
   pdf.setFont('Nunito', 'normal');
-  pdf.setFontSize(11);
+  pdf.setFontSize(10);
   pdf.setTextColor(COR_INK_2);
   const subtitle = `${dados.hospital.nome} · ${dados.plantoes.length} ${dados.plantoes.length === 1 ? 'plantão' : 'plantões'}`;
   pdf.text(subtitle, margemX, y);
 
-  y += 4;
+  y += 3.5;
   pdf.setDrawColor(COR_LINHA);
   pdf.setLineWidth(0.4);
   pdf.line(margemX, y, W - margemX, y);
 
-  // --- SAUDAÇÃO ---
-  y += 6;
+  // --- SAUDAÇÃO · compacta ---
+  y += 5;
   pdf.setFont('Nunito', 'normal');
-  pdf.setFontSize(10);
+  pdf.setFontSize(9);
   pdf.setTextColor(COR_INK);
   const trat = dados.chefe ? trataChefe(dados.chefe) : 'Dr(a).';
   pdf.text(`Prezado(a) ${trat},`, margemX, y);
 
-  y += 5;
+  y += 4.2;
   const saudacao = `Apresento abaixo a proposta de plantões para ${capitalize(mesNome)} de ${dados.ano} no ${dados.hospital.nome}, conforme minha disponibilidade. Fico à disposição para os ajustes que forem necessários.`;
   const saudacaoLinhas = pdf.splitTextToSize(saudacao, W - 2 * margemX);
   pdf.setTextColor(COR_INK_2);
   pdf.text(saudacaoLinhas, margemX, y);
-  y += saudacaoLinhas.length * 4.5 + 4;
+  y += saudacaoLinhas.length * 3.8 + 3;
 
   // --- LAYOUT 2 COLS · CALENDÁRIO E DETALHAMENTO ---
   const corpoY = y;
@@ -284,8 +284,11 @@ function desenharCalendario(
 
   const colW = largura / 7;
   const semanas = dias.length / 7;
-  const linhaH = 21;
   const headH = 7;
+  // Calendário precisa caber até y=170 (acima do total/assinatura)
+  // Espaço disponível: 170 - y - headH = altura útil pras semanas
+  const espacoDisponivel = 170 - y - headH;
+  const linhaH = Math.max(13, Math.min(21, espacoDisponivel / semanas));
 
   // Header dias da semana
   pdf.setFont('Nunito', 'bold');
@@ -320,6 +323,11 @@ function desenharCalendario(
 
   const corHosp = CORES_HOSPITAL[dados.hospital.cor] ?? CORES_HOSPITAL.lavender!;
 
+  // Quantos bloquinhos cabem por célula (depende da linhaH)
+  const espacoBloquinho = linhaH - 5; // 5 mm reservados pro número do dia
+  const blocosMax = espacoBloquinho >= 13 ? 2 : 1;
+  const blocoH = blocosMax === 2 ? 6 : Math.min(7.5, espacoBloquinho - 1);
+
   // Conteúdo de cada célula
   for (let i = 0; i < dias.length; i++) {
     const iso = dias[i]!;
@@ -331,15 +339,16 @@ function desenharCalendario(
 
     // Número do dia · Fraunces, cor do site
     pdf.setFont('Fraunces', 'bold');
-    pdf.setFontSize(11);
+    pdf.setFontSize(linhaH < 16 ? 9 : 11);
     pdf.setTextColor(dataMes ? COR_INK : COR_INK_3);
     const dia = fromISO(iso).getDate();
-    pdf.text(String(dia), cx + 1.8, cy + 4.6);
+    pdf.text(String(dia), cx + 1.8, cy + 4.4);
 
-    // Bloquinhos do plantão (até 2 por célula)
+    // Bloquinhos do plantão
     const lista = porDia.get(iso) ?? [];
-    let by = cy + 7;
-    for (const p of lista.slice(0, 2)) {
+    let by = cy + 5;
+    const visiveis = lista.slice(0, blocosMax);
+    for (const p of visiveis) {
       const fim = (p.horaInicio + p.duracao) % 24;
       const horaIni = formatarHora(p.horaInicio);
       const horaFim = formatarHora(fim);
@@ -348,21 +357,34 @@ function desenharCalendario(
       pdf.setFillColor(corHosp.surface);
       pdf.setDrawColor(corHosp.ink);
       pdf.setLineWidth(0.25);
-      pdf.roundedRect(cx + 1.2, by, colW - 2.4, 6.6, 1.2, 1.2, 'FD');
+      pdf.roundedRect(cx + 1.2, by, colW - 2.4, blocoH, 1.2, 1.2, 'FD');
       // Tira lateral colorida
       pdf.setFillColor(corHosp.ink);
-      pdf.rect(cx + 1.2, by, 0.9, 6.6, 'F');
+      pdf.rect(cx + 1.2, by, 0.9, blocoH, 'F');
 
-      // Texto
+      // Texto · pode ser 1 ou 2 linhas dependendo da altura
       pdf.setFont('Nunito', 'bold');
-      pdf.setFontSize(6.5);
+      pdf.setFontSize(6.3);
       pdf.setTextColor(corHosp.ink);
-      pdf.text(`${dados.hospital.abrev ?? '?'} · ${p.duracao}h`, cx + 3, by + 2.6);
-      pdf.setFont('Nunito', 'normal');
-      pdf.setFontSize(5.8);
-      pdf.text(`${horaIni}–${horaFim}`, cx + 3, by + 5.2);
+      if (blocoH >= 6.5) {
+        pdf.text(`${dados.hospital.abrev ?? '?'} · ${p.duracao}h`, cx + 3, by + 2.4);
+        pdf.setFont('Nunito', 'normal');
+        pdf.setFontSize(5.6);
+        pdf.text(`${horaIni}–${horaFim}`, cx + 3, by + 4.8);
+      } else {
+        // Linha única compacta
+        pdf.text(`${dados.hospital.abrev ?? '?'} · ${horaIni}`, cx + 3, by + 3.4);
+      }
 
-      by += 7.5;
+      by += blocoH + 0.5;
+    }
+
+    // Indicador "+N" se sobrou
+    if (lista.length > visiveis.length) {
+      pdf.setFont('Nunito', 'bold');
+      pdf.setFontSize(6);
+      pdf.setTextColor(COR_INK_3);
+      pdf.text(`+${lista.length - visiveis.length}`, cx + colW - 5, cy + linhaH - 1.5);
     }
   }
 }

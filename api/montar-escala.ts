@@ -500,14 +500,23 @@ function montarPrompt(opts: {
 
   partes.push(
     '',
+    '## VALIDAÇÃO ANTES DE DEVOLVER',
+    'Antes de chamar a ferramenta, faça essa checagem MENTAL pra cada hospital:',
+    '1. Conte os plantões que você propôs nesse hospital · está dentro do `maxPorMes`?',
+    '2. Conte FDS (sábados+domingos) com plantão NESSE hospital · está atingindo `minFimDeSemana`?',
+    '3. Some as horas dos plantões nesse hospital · está dentro de `minHorasPorMes`/`maxHorasPorMes` e `minHorasPorSemana`/`maxHorasPorSemana`?',
+    '4. Para cada `regrasLivres` em texto, leia e confira se a sua proposta atende.',
+    '5. Para cada bloqueio listado · seu plantão proposto NÃO sobrepõe o horário do bloqueio?',
+    'Se algum item NÃO bater, AJUSTE a proposta antes de chamar o tool. Regras contratuais (CLT) são OBRIGATÓRIAS, mesmo na lente "ganhar". Se a meta financeira só for batida violando uma regra, fica abaixo da meta E menciona no `avisos`.',
+    '',
     '## INSTRUÇÕES DE SAÍDA',
     '1. Chame a ferramenta `propor_escala` com a lista completa de plantões propostos.',
     '2. Cada plantão deve ter `hospitalId` válido (um dos IDs cadastrados).',
     '3. Cada `horaInicio` e `duracao` deve bater EXATAMENTE com uma janela cadastrada do hospital.',
     '4. Adicione razão curta (1 frase) em cada plantão.',
-    '5. Justificativa em Português padrão (não minúsculo) · 2-4 frases.',
+    '5. Justificativa em Português padrão (não minúsculo) · 2-4 frases. Se uma regra contratual obrigou a ficar abaixo da meta, fala disso na justificativa.',
     '6. Estimativa de líquido considerando os valores cadastrados de cada hospital.',
-    '7. Se for inevitável violar uma regra ou ficar muito abaixo da meta, mencione no `avisos`.',
+    '7. Use `avisos` pra qualquer trade-off (ficou abaixo da meta, semana pesada, etc).',
   );
 
   return partes.join('\n');
@@ -534,7 +543,7 @@ function descricaoLente(lente: 'descansar' | 'equilibrar' | 'ganhar'): string {
       ].join('\n');
     case 'ganhar':
       return [
-        'Maximiza a receita até a meta (e um pouco além se houver oportunidade clara).',
+        'Maximiza a receita até a meta (e um pouco além se houver oportunidade clara) · MAS RESPEITA as regras contratuais de cada hospital, que são obrigatórias mesmo aqui (incluindo `minFimDeSemana`, `minHorasPorMes`, `regrasLivres`).',
         '- Pode espaçar só 1 dia entre plantões.',
         '- Prefere plantões noturnos / FDS quando o adicional vale a pena.',
         '- Pode passar da meta se for natural.',
