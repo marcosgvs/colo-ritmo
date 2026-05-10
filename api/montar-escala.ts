@@ -262,17 +262,46 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     }
 
     const inp = tool.input as ToolInput;
+    const todosPlantoes = (inp.plantoes ?? []).map((p) => ({
+      data: String(p.data),
+      hospitalId: String(p.hospitalId),
+      horaInicio: Number(p.horaInicio),
+      duracao: Number(p.duracao),
+      razao: p.razao ? String(p.razao) : undefined,
+    }));
+
+    // Validação server-side: remove plantões que sobrepõem bloqueios (modelo
+    // às vezes "racionaliza" certo na razão mas mantém o plantão mesmo assim).
+    const bloqueiosCheck = (blocos ?? []).filter(
+      (b) => b.tipo !== 'plantao' && b.tipo !== 'cedido',
+    );
+    const removidos: string[] = [];
+    const plantoesValidos = todosPlantoes.filter((p) => {
+      const conflito = bloqueiosCheck.find((b) =>
+        intervalosSobrepoem(b.data, b.horaInicio, b.duracao, p.data, p.horaInicio, p.duracao),
+      );
+      if (conflito) {
+        const tipoBlock = conflito.tipo;
+        const motivo =
+          (conflito as { motivo?: string }).motivo ??
+          (conflito as { detalhe?: string }).detalhe ??
+          (conflito as { titulo?: string }).titulo ??
+          tipoBlock;
+        removidos.push(
+          `plantão de ${p.data} ${p.horaInicio}h-${(p.horaInicio + p.duracao) % 24}h removido · sobrepõe bloqueio "${motivo}"`,
+        );
+        return false;
+      }
+      return true;
+    });
+
+    const avisosFinais = [...(inp.avisos ?? []), ...removidos];
+
     res.status(200).json({
-      plantoes: (inp.plantoes ?? []).map((p) => ({
-        data: String(p.data),
-        hospitalId: String(p.hospitalId),
-        horaInicio: Number(p.horaInicio),
-        duracao: Number(p.duracao),
-        razao: p.razao ? String(p.razao) : undefined,
-      })),
+      plantoes: plantoesValidos,
       justificativa: String(inp.justificativa ?? ''),
       totalEstimadoLiquido: Number(inp.totalEstimadoLiquido ?? 0),
-      avisos: inp.avisos ?? [],
+      avisos: avisosFinais,
     });
   } catch (err) {
     console.error('montar-escala: exceção', err);
@@ -575,4 +604,27 @@ function adicionaMesesISO(iso: string, n: number): string {
   if (a == null || m == null || d == null) return iso;
   const dt = new Date(Date.UTC(a, m - 1 + n, d));
   return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, '0')}-${String(dt.getUTCDate()).padStart(2, '0')}`;
+}
+
+/**
+ * Converte (data, horaInicio, duracao) em intervalo absoluto de timestamps
+ * decimais (em horas desde epoch / 3600). Lida com duração que vira o dia
+ * (ex: noite 19h+12h = 7h do dia seguinte).
+ */
+function intervaloAbs(data: string, horaInicio: number, duracao: number): { ini: number; fim: number } {
+  const t = new Date(`${data}T00:00:00Z`).getTime() / 3_600_000;
+  return { ini: t + horaInicio, fim: t + horaInicio + duracao };
+}
+
+function intervalosSobrepoem(
+  dA: string,
+  hA: number,
+  durA: number,
+  dB: string,
+  hB: number,
+  durB: number,
+): boolean {
+  const a = intervaloAbs(dA, hA, durA);
+  const b = intervaloAbs(dB, hB, durB);
+  return a.ini < b.fim && b.ini < a.fim;
 }

@@ -69,30 +69,38 @@ interface DadosPDF {
   chefe?: string;
 }
 
-let fontesCarregadas = false;
+// Cache do BASE64 das fontes (não do estado do jsPDF). Cada nova instância
+// de jsPDF precisa registrar as fontes em si · o estado não é compartilhado.
+// Bug anterior: cache global de "fontesCarregadas: bool" pulava o registro
+// no segundo PDF da sessão, que caía no Helvetica fallback · daí
+// inconsistência de fonte entre exports do mesmo wizard.
+type FonteRecord = { arquivo: string; nome: string; estilo: string; b64: string };
+let fontesCache: FonteRecord[] | null = null;
 let logoCache: string | null = null;
 
 async function carregarFontes(pdf: jsPDF): Promise<void> {
-  if (fontesCarregadas) return;
-
-  async function addFonte(arquivo: string, nome: string, estilo: string): Promise<void> {
-    const resp = await fetch(`/fonts/${arquivo}`);
-    if (!resp.ok) throw new Error(`fonte ${arquivo}: ${resp.status}`);
-    const buf = await resp.arrayBuffer();
-    const b64 = arrayBufferToBase64(buf);
-    pdf.addFileToVFS(arquivo, b64);
-    pdf.addFont(arquivo, nome, estilo);
+  if (!fontesCache) {
+    const lista = [
+      { arquivo: 'Fraunces-Regular.ttf', nome: 'Fraunces', estilo: 'normal' },
+      { arquivo: 'Fraunces-Medium.ttf', nome: 'Fraunces', estilo: 'bold' },
+      { arquivo: 'Nunito-Regular.ttf', nome: 'Nunito', estilo: 'normal' },
+      { arquivo: 'Nunito-Bold.ttf', nome: 'Nunito', estilo: 'bold' },
+      { arquivo: 'Caveat-Medium.ttf', nome: 'Caveat', estilo: 'italic' },
+    ];
+    fontesCache = await Promise.all(
+      lista.map(async (f) => {
+        const resp = await fetch(`/fonts/${f.arquivo}`);
+        if (!resp.ok) throw new Error(`fonte ${f.arquivo}: ${resp.status}`);
+        const buf = await resp.arrayBuffer();
+        return { ...f, b64: arrayBufferToBase64(buf) };
+      }),
+    );
   }
-
-  await Promise.all([
-    addFonte('Fraunces-Regular.ttf', 'Fraunces', 'normal'),
-    addFonte('Fraunces-Medium.ttf', 'Fraunces', 'bold'),
-    addFonte('Nunito-Regular.ttf', 'Nunito', 'normal'),
-    addFonte('Nunito-Bold.ttf', 'Nunito', 'bold'),
-    addFonte('Caveat-Medium.ttf', 'Caveat', 'italic'),
-  ]);
-
-  fontesCarregadas = true;
+  // Registra TODAS as fontes nesta instância · sempre, mesmo no segundo PDF.
+  for (const f of fontesCache) {
+    pdf.addFileToVFS(f.arquivo, f.b64);
+    pdf.addFont(f.arquivo, f.nome, f.estilo);
+  }
 }
 
 function arrayBufferToBase64(buf: ArrayBuffer): string {
