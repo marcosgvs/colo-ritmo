@@ -33,24 +33,38 @@ export interface Janela {
   duracao: number;
 }
 
+/**
+ * Regras de um hospital específico · todas opcionais. Cada hospital tem
+ * suas regras próprias · não dá pra herdar/reusar de outros. Esses dados
+ * vão alimentar o Montar AI como contexto · não disparam comportamento
+ * em runtime.
+ */
 export interface RegrasHospital {
-  maxPorSemana: number;
-  minFimDeSemana: number;
-  duracaoPlantao: number;
-  /** @deprecated mantido pra retrocompat — janelas agora ficam em Hospital.janelas. */
-  janelas: string[];
-  maxPorMes: number;
-  /** CLT · mínimo de horas/semana exigido pelo contrato. */
-  minHorasPorSemana?: number;
-  /** Limite de horas/semana antes de cair em irregularidade ou recusar plantão. */
-  maxHorasPorSemana?: number;
-  /** Quantidade máxima de fins-de-semana de plantão por mês. */
+  /** Quantidade máxima de plantões na semana. */
+  maxPorSemana?: number;
+  /** Quantidade máxima de plantões no mês. */
+  maxPorMes?: number;
+  /** Mínimo de fins-de-semana com plantão por mês (obrigação). */
+  minFimDeSemana?: number;
+  /** Máximo de fins-de-semana com plantão por mês. */
   maxFimDeSemana?: number;
-  /** Multiplicador de pagamento em feriados (ex: 2 = paga dobrado). */
+  /** Mínimo de horas/semana exigidas pelo contrato (CLT). */
+  minHorasPorSemana?: number;
+  /** Máximo de horas/semana permitidas. */
+  maxHorasPorSemana?: number;
+  /** Mínimo de horas/mês exigidas pelo contrato. */
+  minHorasPorMes?: number;
+  /** Máximo de horas/mês permitidas. */
+  maxHorasPorMes?: number;
+  /** Duração padrão de um plantão. */
+  duracaoPlantao?: number;
+  /** Total máximo de horas combinadas num único dia (ex: tarde+noite). */
+  duracaoMaximaDia?: number;
+  /** Multiplicador de pagamento em feriado (1.0 = sem bônus, 2.0 = dobro). */
   feriadoMultiplicador?: number;
-  /** Multiplicador adicional pra plantão de FDS (ex: 1.3 = +30%). */
+  /** Multiplicador adicional pra plantão de FDS (1.0 = sem bônus, 1.3 = +30%). */
   bonusFimDeSemana?: number;
-  /** Regras que a IA não conseguiu mapear pra campos estruturados. */
+  /** Regras que não casam com nenhum campo estruturado · texto livre. */
   regrasLivres?: string[];
 }
 

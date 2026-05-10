@@ -42,7 +42,6 @@ export function Onboarding({ onConcluir, onPular }: OnboardingProps) {
                 maxPorSemana: 2,
                 minFimDeSemana: 0,
                 duracaoPlantao: 12,
-                janelas: ['07:00–19:00', '19:00–07:00'],
                 maxPorMes: 8,
               },
             },

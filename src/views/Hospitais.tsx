@@ -184,7 +184,6 @@ function HospitalForm({ inicial, coresUsadas, onSalvar, onCancelar, onRemover }:
         maxPorSemana: 2,
         minFimDeSemana: 0,
         duracaoPlantao: 12,
-        janelas: [],
         maxPorMes: 8,
       },
       janelas: JANELAS_DEFAULT,
@@ -466,24 +465,27 @@ function HospitalForm({ inicial, coresUsadas, onSalvar, onCancelar, onRemover }:
         <Field label={ehPublico ? 'máx plantões por semana' : 'máx por semana'}>
           <input
             inputMode="numeric"
-            value={String(draft.regras.maxPorSemana)}
+            value={draft.regras.maxPorSemana ? String(draft.regras.maxPorSemana) : ''}
             onChange={(e) => setRegra('maxPorSemana', parseInteiro(e.target.value))}
+            placeholder="ex: 2"
             style={input}
           />
         </Field>
         <Field label="máx por mês">
           <input
             inputMode="numeric"
-            value={String(draft.regras.maxPorMes)}
+            value={draft.regras.maxPorMes ? String(draft.regras.maxPorMes) : ''}
             onChange={(e) => setRegra('maxPorMes', parseInteiro(e.target.value))}
+            placeholder="ex: 8"
             style={input}
           />
         </Field>
         <Field label={ehPublico ? 'fins-de-semana obrigatórios / mês' : 'finais de semana mínimos'}>
           <input
             inputMode="numeric"
-            value={String(draft.regras.minFimDeSemana)}
+            value={draft.regras.minFimDeSemana ? String(draft.regras.minFimDeSemana) : ''}
             onChange={(e) => setRegra('minFimDeSemana', parseInteiro(e.target.value))}
+            placeholder="ex: 1"
             style={input}
           />
         </Field>
@@ -870,9 +872,12 @@ function PreviewRegras({
   if (r.maxPorMes) linhas.push(`máx ${r.maxPorMes} plantões/mês`);
   if (r.minHorasPorSemana) linhas.push(`mín ${r.minHorasPorSemana}h/sem`);
   if (r.maxHorasPorSemana) linhas.push(`máx ${r.maxHorasPorSemana}h/sem`);
+  if (r.minHorasPorMes) linhas.push(`mín ${r.minHorasPorMes}h/mês`);
+  if (r.maxHorasPorMes) linhas.push(`máx ${r.maxHorasPorMes}h/mês`);
   if (r.minFimDeSemana) linhas.push(`mín ${r.minFimDeSemana} FDS/mês`);
   if (r.maxFimDeSemana) linhas.push(`máx ${r.maxFimDeSemana} FDS/mês`);
   if (r.duracaoPlantao) linhas.push(`plantão padrão ${r.duracaoPlantao}h`);
+  if (r.duracaoMaximaDia) linhas.push(`máx ${r.duracaoMaximaDia}h por dia`);
   if (r.feriadoMultiplicador && r.feriadoMultiplicador !== 1)
     linhas.push(`feriado paga ${r.feriadoMultiplicador}×`);
   if (r.bonusFimDeSemana && r.bonusFimDeSemana !== 1)

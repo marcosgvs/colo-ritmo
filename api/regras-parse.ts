@@ -2,7 +2,17 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { envObrigatorio } from './_shared/env.js';
 
 /**
- * /api/regras-parse · conversa iterativa pra estruturar regras de hospital.
+ * /api/regras-parse · conversa iterativa pra estruturar regras de plantão
+ * de UM hospital específico.
+ *
+ * Princípios:
+ *   - Cada hospital começa zerado · não usa padrões "comuns" / "típicos"
+ *     herdados do treinamento do modelo nem de outros hospitais cadastrados.
+ *   - Modelo só preenche campo quando o usuário declarou diretamente.
+ *     Se o usuário não falou, o campo fica undefined · regra livre é o
+ *     fallback pra o que não cabe no schema.
+ *   - Modelo NUNCA converte horas em plantões nem vice-versa. "30h/sem"
+ *     não vira "2 plantões/sem".
  *
  * Body:
  *   {
@@ -14,18 +24,10 @@ import { envObrigatorio } from './_shared/env.js';
  *
  * Resposta:
  *   {
- *     resposta: string,           // texto pra mostrar no chat
- *     regrasPropostas?: RegrasHospital,  // se atingiu coerência, sugere aplicar
- *     concluido: boolean,         // true quando IA acha que coletou o suficiente
+ *     resposta: string,
+ *     regrasPropostas?: RegrasHospital,  // só presente quando IA chamou o tool
+ *     concluido: boolean,
  *   }
- *
- * Modelo: claude-sonnet-4-6 com tool_use pra garantir formato.
- *
- * Estratégia:
- * - Se regrasAtuais vazio (cadastro novo): IA tira dúvidas iterativas pra extrair
- *   o máximo de regras (min/max horas, FDS, feriado, etc).
- * - Se regrasAtuais preenchido (edição): IA mostra as regras atuais e ajusta com
- *   base no diálogo.
  */
 
 interface ChatMsg {
@@ -35,12 +37,15 @@ interface ChatMsg {
 
 interface RegrasHospital {
   maxPorSemana?: number;
-  minFimDeSemana?: number;
-  duracaoPlantao?: number;
   maxPorMes?: number;
+  minFimDeSemana?: number;
+  maxFimDeSemana?: number;
   minHorasPorSemana?: number;
   maxHorasPorSemana?: number;
-  maxFimDeSemana?: number;
+  minHorasPorMes?: number;
+  maxHorasPorMes?: number;
+  duracaoPlantao?: number;
+  duracaoMaximaDia?: number;
   feriadoMultiplicador?: number;
   bonusFimDeSemana?: number;
   regrasLivres?: string[];
@@ -59,23 +64,72 @@ const MAX_TOKENS = 2048;
 const TOOL_DEFINIR_REGRAS = {
   name: 'definir_regras',
   description:
-    'Quando você tiver coletado informação suficiente pra estruturar as regras (ou se o usuário disse que terminou), chame esta ferramenta com os campos que conseguiu mapear. Campos não mapeáveis vão em regrasLivres como texto.',
+    'Chame esta ferramenta APENAS quando tiver coletado regras concretas que o usuário declarou. Preencha SOMENTE os campos que o usuário falou explicitamente. Campos não mencionados ficam undefined. Não invente, não sugira valores "comuns".',
   input_schema: {
     type: 'object',
     properties: {
-      maxPorSemana: { type: 'number', description: 'plantões/semana máximo' },
-      maxPorMes: { type: 'number', description: 'plantões/mês máximo' },
-      minFimDeSemana: { type: 'number', description: 'FDS obrigatórios/mês' },
-      maxFimDeSemana: { type: 'number', description: 'FDS máximo/mês' },
-      duracaoPlantao: { type: 'number', description: 'duração padrão do plantão (h)' },
-      minHorasPorSemana: { type: 'number', description: 'CLT · horas mín/sem' },
-      maxHorasPorSemana: { type: 'number', description: 'horas máx/sem' },
-      feriadoMultiplicador: { type: 'number', description: 'feriado paga × multiplicador' },
-      bonusFimDeSemana: { type: 'number', description: 'FDS multiplicador (1.3 = +30%)' },
+      maxPorSemana: {
+        type: 'number',
+        description:
+          'Quantidade máxima de PLANTÕES (não horas) na semana. Só preencha se o usuário disser explicitamente em número de plantões. Se ele falou em horas, NÃO preencha.',
+      },
+      maxPorMes: {
+        type: 'number',
+        description:
+          'Quantidade máxima de PLANTÕES no mês. Só preencha se o usuário disser explicitamente em número de plantões.',
+      },
+      minFimDeSemana: {
+        type: 'number',
+        description:
+          'Quantos fins-de-semana com plantão são OBRIGATÓRIOS por mês. Espere algo entre 0 e 4. NÃO confundir com horas em FDS.',
+      },
+      maxFimDeSemana: {
+        type: 'number',
+        description:
+          'Quantos fins-de-semana com plantão são PERMITIDOS por mês (limite). Espere algo entre 0 e 4.',
+      },
+      minHorasPorSemana: {
+        type: 'number',
+        description:
+          'Mínimo de horas de plantão por semana exigidas pelo contrato.',
+      },
+      maxHorasPorSemana: {
+        type: 'number',
+        description: 'Máximo de horas de plantão permitidas por semana.',
+      },
+      minHorasPorMes: {
+        type: 'number',
+        description: 'Mínimo de horas de plantão por mês exigidas pelo contrato.',
+      },
+      maxHorasPorMes: {
+        type: 'number',
+        description: 'Máximo de horas de plantão permitidas por mês.',
+      },
+      duracaoPlantao: {
+        type: 'number',
+        description:
+          'Duração padrão de UM plantão em horas. Só preencha se o usuário declarar diretamente como regra desse hospital. Não preencha com valor "típico".',
+      },
+      duracaoMaximaDia: {
+        type: 'number',
+        description:
+          'Total máximo de horas de plantão permitidas em UM dia (somando turnos combinados). Aplicável quando o hospital permite combinar manhã+tarde, tarde+noite, etc.',
+      },
+      feriadoMultiplicador: {
+        type: 'number',
+        description:
+          'Multiplicador de pagamento em feriado (1.0 = sem bônus, 2.0 = paga em dobro). Só preencha se o usuário disser explicitamente.',
+      },
+      bonusFimDeSemana: {
+        type: 'number',
+        description:
+          'Multiplicador adicional pra plantão de FDS (1.0 = sem bônus, 1.3 = +30%). Só preencha se o usuário disser explicitamente.',
+      },
       regrasLivres: {
         type: 'array',
         items: { type: 'string' },
-        description: 'regras que não couberam nos campos · texto livre',
+        description:
+          'Regras descritas pelo usuário que não casam com nenhum dos campos acima. Mantenha em texto curto e direto.',
       },
     },
   },
@@ -94,39 +148,50 @@ function montarSystem(opts: {
   const linhas = [
     `Você está ajudando uma médica a estruturar as regras de plantão de "${opts.hospitalNome}" (tipo: ${tipoLabel}).`,
     '',
-    'Tom: direto, conversacional, em português brasileiro coloquial. Use linguagem do dia-a-dia médico (plantão, FDS, noitinha, virar madrugada). Sentence-case minúsculo. Sem markdown, sem listas formais — frases curtas.',
+    'REGRA DURA · NÃO INVENTE',
+    '- Se o usuário NÃO falou de um campo, deixe ele undefined. Não preencha com valores "comuns" ou "típicos".',
+    '- Cada hospital tem suas próprias regras. Você NÃO usa padrões de outros hospitais.',
+    '- Se o usuário diz "geralmente", "normalmente", "uma média", PERGUNTE se é regra rígida antes de mapear como número fixo.',
+    '- NÃO converta horas em plantões nem o contrário. "30h/sem" não vira "2 plantões/sem".',
     '',
-    'Sua tarefa: coletar regras objetivas que vão alimentar o Montar (proposta de escala). Os campos que importam:',
-    '- maxPorSemana, maxPorMes (limite de plantões)',
-    '- minHorasPorSemana, maxHorasPorSemana (CLT principalmente)',
-    '- minFimDeSemana, maxFimDeSemana (FDS obrigatório/máximo no mês)',
-    '- duracaoPlantao (duração padrão · 12h é comum)',
-    '- feriadoMultiplicador (ex: 2 se paga dobrado em feriado)',
-    '- bonusFimDeSemana (ex: 1.3 se FDS paga +30%)',
-    '- regrasLivres: texto pra regras que não cabem nos campos acima',
+    'MAPEAMENTO · usuário fala em → você usa',
+    '- "X plantões por semana" → maxPorSemana=X',
+    '- "X plantões por mês" → maxPorMes=X',
+    '- "X horas por semana" → pergunte se é mín ou máx → minHorasPorSemana ou maxHorasPorSemana',
+    '- "X horas por mês" → pergunte se é mín ou máx → minHorasPorMes ou maxHorasPorMes',
+    '- "X horas em FDS por mês" → regrasLivres (não tem campo específico)',
+    '- "Y fins-de-semana obrigatórios" → minFimDeSemana=Y',
+    '- "Y fins-de-semana máximo" → maxFimDeSemana=Y',
+    '- "duração de cada plantão é X" → duracaoPlantao=X',
+    '- "máximo de Z horas combinadas no dia" / "não pode pegar dois plantões seguidos" → duracaoMaximaDia=Z',
+    '- "feriado paga em dobro" → feriadoMultiplicador=2',
+    '- "FDS paga +X%" → bonusFimDeSemana=(1 + X/100)',
+    '- Qualquer regra que não casa com campo → regrasLivres como texto curto',
+    '',
+    'TOM · português brasileiro coloquial, sentence-case minúsculo, sem markdown, frases curtas. Use linguagem do dia-a-dia médico (plantão, FDS, noitinha, virar madrugada).',
   ];
 
   if (opts.primeiraMensagem && !temRegras) {
     linhas.push(
       '',
-      'CONTEXTO: é a primeira vez que essa médica cadastra esse hospital. Nenhuma regra estruturada ainda.',
+      'CONTEXTO · primeira vez que essa médica cadastra esse hospital. Nenhuma regra estruturada ainda.',
       '',
-      'COMPORTAMENTO:',
+      'COMPORTAMENTO',
       '- Comece se apresentando rapidamente e fazendo UMA pergunta direta de cada vez (não bombardeie).',
-      '- Pergunte primeiro o essencial: quantos plantões por semana/mês, FDS obrigatórios.',
-      '- Depois pergunte sobre feriado, bônus de FDS, e se tem alguma regra "esquisita" do hospital.',
-      '- Quando achar que coletou o suficiente OU o usuário sinalizar que terminou, CHAME a ferramenta `definir_regras` com os valores mapeados.',
-      '- Se o usuário responder com algo vago ou incerto, pergunte de novo de outro jeito.',
+      '- Pergunte primeiro o essencial pra ela: o que de mais rígido o contrato/equipe define (limites de plantão ou horas, FDS obrigatórios).',
+      '- Quando ela declarar algo numérico, espelhe pra confirmar antes de salvar (ex: "30h/sem · isso é mínimo do contrato ou máximo que você não quer passar?").',
+      '- Quando achar que coletou o suficiente OU o usuário sinalizar que terminou, CHAME a ferramenta `definir_regras` com APENAS os campos que ela declarou.',
+      '- Se ela responder com algo vago ou incerto, pergunte de novo de outro jeito · nunca preencha por adivinhação.',
     );
   } else {
     linhas.push(
       '',
-      `CONTEXTO: regras já cadastradas: ${JSON.stringify(opts.regrasAtuais ?? {}, null, 2)}`,
+      `CONTEXTO · regras já cadastradas pra esse hospital: ${JSON.stringify(opts.regrasAtuais ?? {}, null, 2)}`,
       '',
-      'COMPORTAMENTO:',
-      '- A médica está editando ou ajustando regras existentes.',
+      'COMPORTAMENTO',
+      '- A médica está editando ou ajustando regras existentes desse hospital.',
       '- Trate cada mensagem como solicitação de mudança específica.',
-      '- Quando tiver uma proposta clara de novas regras, CHAME `definir_regras` com o resultado final (mantendo os campos atuais não mencionados).',
+      '- Quando tiver uma proposta clara de novas regras, CHAME `definir_regras` com o resultado final · mantém os campos atuais não mencionados, atualiza os mencionados.',
     );
   }
 
