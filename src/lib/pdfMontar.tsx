@@ -323,10 +323,12 @@ function desenharCalendario(
 
   const corHosp = CORES_HOSPITAL[dados.hospital.cor] ?? CORES_HOSPITAL.lavender!;
 
-  // Quantos bloquinhos cabem por célula (depende da linhaH)
-  const espacoBloquinho = linhaH - 5; // 5 mm reservados pro número do dia
-  const blocosMax = espacoBloquinho >= 13 ? 2 : 1;
-  const blocoH = blocosMax === 2 ? 6 : Math.min(7.5, espacoBloquinho - 1);
+  // Sempre tenta mostrar 2 bloquinhos por célula · em mês apertado eles
+  // ficam menores mas todos os plantões ficam visíveis. Detalhamento
+  // ao lado é a fonte canônica de verdade.
+  const espacoBloquinho = linhaH - 4.5; // 4.5 mm reservados pro número do dia
+  const blocosMax = 2;
+  const blocoH = (espacoBloquinho - 0.5) / 2;
 
   // Conteúdo de cada célula
   for (let i = 0; i < dias.length; i++) {
@@ -342,44 +344,38 @@ function desenharCalendario(
     pdf.setFontSize(linhaH < 16 ? 9 : 11);
     pdf.setTextColor(dataMes ? COR_INK : COR_INK_3);
     const dia = fromISO(iso).getDate();
-    pdf.text(String(dia), cx + 1.8, cy + 4.4);
+    pdf.text(String(dia), cx + 1.8, cy + 4);
 
     // Bloquinhos do plantão
     const lista = porDia.get(iso) ?? [];
-    let by = cy + 5;
+    let by = cy + 4.5;
     const visiveis = lista.slice(0, blocosMax);
     for (const p of visiveis) {
-      const fim = (p.horaInicio + p.duracao) % 24;
       const horaIni = formatarHora(p.horaInicio);
-      const horaFim = formatarHora(fim);
 
       // Background pill
       pdf.setFillColor(corHosp.surface);
       pdf.setDrawColor(corHosp.ink);
-      pdf.setLineWidth(0.25);
-      pdf.roundedRect(cx + 1.2, by, colW - 2.4, blocoH, 1.2, 1.2, 'FD');
+      pdf.setLineWidth(0.2);
+      pdf.roundedRect(cx + 1.2, by, colW - 2.4, blocoH, 1, 1, 'FD');
       // Tira lateral colorida
       pdf.setFillColor(corHosp.ink);
-      pdf.rect(cx + 1.2, by, 0.9, blocoH, 'F');
+      pdf.rect(cx + 1.2, by, 0.7, blocoH, 'F');
 
-      // Texto · pode ser 1 ou 2 linhas dependendo da altura
+      // Texto · 1 linha compacta sempre · detalhamento é a fonte canônica
       pdf.setFont('Nunito', 'bold');
-      pdf.setFontSize(6.3);
+      pdf.setFontSize(blocoH >= 5 ? 6 : 5.4);
       pdf.setTextColor(corHosp.ink);
-      if (blocoH >= 6.5) {
-        pdf.text(`${dados.hospital.abrev ?? '?'} · ${p.duracao}h`, cx + 3, by + 2.4);
-        pdf.setFont('Nunito', 'normal');
-        pdf.setFontSize(5.6);
-        pdf.text(`${horaIni}–${horaFim}`, cx + 3, by + 4.8);
-      } else {
-        // Linha única compacta
-        pdf.text(`${dados.hospital.abrev ?? '?'} · ${horaIni}`, cx + 3, by + 3.4);
-      }
+      pdf.text(
+        `${dados.hospital.abrev ?? '?'} · ${horaIni} · ${p.duracao}h`,
+        cx + 2.6,
+        by + (blocoH >= 5 ? blocoH / 2 + 1 : blocoH / 2 + 0.8),
+      );
 
-      by += blocoH + 0.5;
+      by += blocoH + 0.4;
     }
 
-    // Indicador "+N" se sobrou
+    // Indicador "+N" se sobrou (mais de 2 num dia · raríssimo)
     if (lista.length > visiveis.length) {
       pdf.setFont('Nunito', 'bold');
       pdf.setFontSize(6);
@@ -407,24 +403,39 @@ function desenharDetalhamento(
   pdf.setLineWidth(0.4);
   pdf.line(x, y + 6, x + largura, y + 6);
 
-  let cur = y + 11;
   const ordenados = [...dados.plantoes].sort(
     (a, b) => a.data.localeCompare(b.data) || a.horaInicio - b.horaInicio,
   );
-
-  // Espaço disponível: do corpoY até y=183 (acima do total/assinatura)
-  const limiteY = 175;
   const horas = ordenados.reduce((s, p) => s + p.duracao, 0);
 
-  for (const p of ordenados) {
-    if (cur > limiteY - 4) {
-      // Indica que tem mais
+  // Layout em 2 colunas pra caber até ~22 plantões sem cortar
+  const limiteY = 175;
+  const startY = y + 11;
+  const colGap = 4;
+  const colW = (largura - colGap) / 2;
+  const colX1 = x;
+  const colX2 = x + colW + colGap;
+  const itemH = 8.5; // altura de cada plantão (título + horário + gap)
+  const linhasPorCol = Math.floor((limiteY - startY) / itemH);
+
+  for (let i = 0; i < ordenados.length; i++) {
+    const p = ordenados[i]!;
+    const col = Math.floor(i / linhasPorCol);
+    const row = i % linhasPorCol;
+    if (col >= 2) {
+      // Não cabe nem em 2 colunas · indica
       pdf.setFont('Nunito', 'normal');
       pdf.setFontSize(7);
       pdf.setTextColor(COR_INK_3);
-      pdf.text(`+ ${ordenados.length - ordenados.indexOf(p)} no calendário ao lado`, x, cur);
+      pdf.text(
+        `+ ${ordenados.length - i} plantões no calendário`,
+        colX2,
+        startY + linhasPorCol * itemH + 2,
+      );
       break;
     }
+    const cx = col === 0 ? colX1 : colX2;
+    const cur = startY + row * itemH;
 
     const d = fromISO(p.data);
     const dia = String(d.getDate()).padStart(2, '0');
@@ -436,17 +447,14 @@ function desenharDetalhamento(
     const horaFim = formatarHora(fim);
 
     pdf.setFont('Fraunces', 'bold');
-    pdf.setFontSize(9);
-    pdf.setTextColor(COR_INK);
-    pdf.text(`${dia}/${mesPad} · ${dow}`, x, cur);
-
-    cur += 4;
-    pdf.setFont('Nunito', 'normal');
     pdf.setFontSize(8);
-    pdf.setTextColor(COR_INK_2);
-    pdf.text(`${horaIni} às ${horaFim} (${p.duracao}h)`, x, cur);
+    pdf.setTextColor(COR_INK);
+    pdf.text(`${dia}/${mesPad} · ${dow}`, cx, cur);
 
-    cur += 6;
+    pdf.setFont('Nunito', 'normal');
+    pdf.setFontSize(7.5);
+    pdf.setTextColor(COR_INK_2);
+    pdf.text(`${horaIni} às ${horaFim} (${p.duracao}h)`, cx, cur + 3.5);
   }
 
   // Total · linha + label + valor
