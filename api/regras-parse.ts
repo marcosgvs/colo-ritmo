@@ -36,17 +36,12 @@ interface ChatMsg {
 }
 
 interface RegrasHospital {
-  maxPorSemana?: number;
-  maxPorMes?: number;
-  minFimDeSemana?: number;
-  maxFimDeSemana?: number;
-  minHorasPorFimDeSemana?: number;
-  maxHorasPorFimDeSemana?: number;
   minHorasPorSemana?: number;
   maxHorasPorSemana?: number;
   minHorasPorMes?: number;
   maxHorasPorMes?: number;
-  duracaoPlantao?: number;
+  minHorasPorFimDeSemana?: number;
+  maxHorasPorFimDeSemana?: number;
   duracaoMaximaDia?: number;
   feriadoMultiplicador?: number;
   bonusFimDeSemana?: number;
@@ -70,30 +65,10 @@ const TOOL_DEFINIR_REGRAS = {
   input_schema: {
     type: 'object',
     properties: {
-      maxPorSemana: {
-        type: 'number',
-        description:
-          'Quantidade máxima de PLANTÕES (não horas) na semana. Só preencha se o usuário disser explicitamente em número de plantões. Se ele falou em horas, NÃO preencha.',
-      },
-      maxPorMes: {
-        type: 'number',
-        description:
-          'Quantidade máxima de PLANTÕES no mês. Só preencha se o usuário disser explicitamente em número de plantões.',
-      },
-      minFimDeSemana: {
-        type: 'number',
-        description:
-          'Quantos fins-de-semana com plantão são OBRIGATÓRIOS por mês (em DIAS de FDS, não horas). Espere algo entre 0 e 4. Se o usuário fala em HORAS de FDS, use minHorasPorFimDeSemana.',
-      },
-      maxFimDeSemana: {
-        type: 'number',
-        description:
-          'Quantos fins-de-semana com plantão são PERMITIDOS por mês (em DIAS, não horas). Espere algo entre 0 e 4.',
-      },
       minHorasPorFimDeSemana: {
         type: 'number',
         description:
-          'Mínimo de HORAS de plantão em fins-de-semana por mês. Use isso quando o usuário fala "X horas em FDS por mês". NÃO confundir com minFimDeSemana que conta dias.',
+          'Mínimo de HORAS de plantão em fins-de-semana por mês. Use quando o usuário fala "X horas em FDS por mês".',
       },
       maxHorasPorFimDeSemana: {
         type: 'number',
@@ -115,11 +90,6 @@ const TOOL_DEFINIR_REGRAS = {
       maxHorasPorMes: {
         type: 'number',
         description: 'Máximo de horas de plantão permitidas por mês.',
-      },
-      duracaoPlantao: {
-        type: 'number',
-        description:
-          'Duração padrão de UM plantão em horas. Só preencha se o usuário declarar diretamente como regra desse hospital. Não preencha com valor "típico".',
       },
       duracaoMaximaDia: {
         type: 'number',
@@ -166,19 +136,13 @@ function montarSystem(opts: {
     '- NÃO converta horas em plantões nem o contrário. "30h/sem" não vira "2 plantões/sem".',
     '',
     'MAPEAMENTO · usuário fala em → você usa',
-    '- "X plantões por semana" → maxPorSemana=X',
-    '- "X plantões por mês" → maxPorMes=X',
     '- "X horas por semana" → pergunte se é mín ou máx → minHorasPorSemana ou maxHorasPorSemana',
     '- "X horas por mês" → pergunte se é mín ou máx → minHorasPorMes ou maxHorasPorMes',
     '- "X horas em FDS por mês" (mín ou máx) → minHorasPorFimDeSemana=X ou maxHorasPorFimDeSemana=X (pergunte qual)',
-    '- "Y fins-de-semana obrigatórios" / "Y FDS por mês" → minFimDeSemana=Y (em DIAS de FDS)',
-    '- "Y fins-de-semana máximo" → maxFimDeSemana=Y',
-    '- ATENÇÃO: "30h no FDS" é HORAS, vai pra minHorasPorFimDeSemana (não pra minFimDeSemana=3).',
-    '- "duração de cada plantão é X" → duracaoPlantao=X',
     '- "máximo de Z horas combinadas no dia" / "não pode pegar dois plantões seguidos" → duracaoMaximaDia=Z',
     '- "feriado paga em dobro" → feriadoMultiplicador=2',
     '- "FDS paga +X%" → bonusFimDeSemana=(1 + X/100)',
-    '- Qualquer regra que não casa com campo → regrasLivres como texto curto',
+    '- Qualquer regra que não casa com campo (ex: "X plantões por semana", "Y FDS obrigatórios em dias", "duração X de plantão") → regrasLivres como texto curto',
     '',
     'TOM · português brasileiro coloquial, sentence-case minúsculo, sem markdown, frases curtas. Use linguagem do dia-a-dia médico (plantão, FDS, noitinha, virar madrugada).',
   ];

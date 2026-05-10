@@ -152,7 +152,7 @@ export function Hospitais({ hospitais, onSalvar, onRemover }: HospitaisProps) {
               </p>
               <Mono style={{ color: 'var(--ink-3)' }}>
                 R$ {(h.valorPlantao ?? 0).toLocaleString('pt-BR')}
-                {h.regras.maxPorSemana ? ` · até ${h.regras.maxPorSemana}/sem` : ''}
+                {h.regras.minHorasPorMes ? ` · mín ${h.regras.minHorasPorMes}h/mês` : ''}
               </Mono>
             </button>
           ))}
@@ -853,34 +853,24 @@ function RegrasChat({
 type CampoRegra = Exclude<keyof import('@/types').RegrasHospital, 'janelas' | 'regrasLivres'>;
 
 const ROTULOS: Record<CampoRegra, (v: number) => string> = {
-  maxPorSemana: (v) => `máx ${v} plantões/sem`,
-  maxPorMes: (v) => `máx ${v} plantões/mês`,
   minHorasPorSemana: (v) => `mín ${v}h/sem`,
   maxHorasPorSemana: (v) => `máx ${v}h/sem`,
   minHorasPorMes: (v) => `mín ${v}h/mês`,
   maxHorasPorMes: (v) => `máx ${v}h/mês`,
-  minFimDeSemana: (v) => `mín ${v} FDS/mês (em dias)`,
-  maxFimDeSemana: (v) => `máx ${v} FDS/mês (em dias)`,
   minHorasPorFimDeSemana: (v) => `mín ${v}h em FDS/mês`,
   maxHorasPorFimDeSemana: (v) => `máx ${v}h em FDS/mês`,
-  duracaoPlantao: (v) => `plantão padrão ${v}h`,
   duracaoMaximaDia: (v) => `máx ${v}h por dia`,
   feriadoMultiplicador: (v) => `feriado paga ${v}×`,
   bonusFimDeSemana: (v) => `FDS paga ${v}×`,
 };
 
 const ORDEM: CampoRegra[] = [
-  'maxPorSemana',
-  'maxPorMes',
   'minHorasPorSemana',
   'maxHorasPorSemana',
   'minHorasPorMes',
   'maxHorasPorMes',
-  'minFimDeSemana',
-  'maxFimDeSemana',
   'minHorasPorFimDeSemana',
   'maxHorasPorFimDeSemana',
-  'duracaoPlantao',
   'duracaoMaximaDia',
   'feriadoMultiplicador',
   'bonusFimDeSemana',
@@ -1032,17 +1022,12 @@ function PreviewRegras({
   r: Partial<import('@/types').RegrasHospital>;
 }) {
   const linhas: string[] = [];
-  if (r.maxPorSemana) linhas.push(`máx ${r.maxPorSemana} plantões/sem`);
-  if (r.maxPorMes) linhas.push(`máx ${r.maxPorMes} plantões/mês`);
   if (r.minHorasPorSemana) linhas.push(`mín ${r.minHorasPorSemana}h/sem`);
   if (r.maxHorasPorSemana) linhas.push(`máx ${r.maxHorasPorSemana}h/sem`);
   if (r.minHorasPorMes) linhas.push(`mín ${r.minHorasPorMes}h/mês`);
   if (r.maxHorasPorMes) linhas.push(`máx ${r.maxHorasPorMes}h/mês`);
-  if (r.minFimDeSemana) linhas.push(`mín ${r.minFimDeSemana} FDS/mês`);
-  if (r.maxFimDeSemana) linhas.push(`máx ${r.maxFimDeSemana} FDS/mês`);
   if (r.minHorasPorFimDeSemana) linhas.push(`mín ${r.minHorasPorFimDeSemana}h em FDS/mês`);
   if (r.maxHorasPorFimDeSemana) linhas.push(`máx ${r.maxHorasPorFimDeSemana}h em FDS/mês`);
-  if (r.duracaoPlantao) linhas.push(`plantão padrão ${r.duracaoPlantao}h`);
   if (r.duracaoMaximaDia) linhas.push(`máx ${r.duracaoMaximaDia}h por dia`);
   if (r.feriadoMultiplicador && r.feriadoMultiplicador !== 1)
     linhas.push(`feriado paga ${r.feriadoMultiplicador}×`);

@@ -40,18 +40,6 @@ export interface Janela {
  * em runtime.
  */
 export interface RegrasHospital {
-  /** Quantidade máxima de plantões na semana. */
-  maxPorSemana?: number;
-  /** Quantidade máxima de plantões no mês. */
-  maxPorMes?: number;
-  /** Mínimo de fins-de-semana COM PLANTÃO por mês (em quantidade de FDS, não horas). */
-  minFimDeSemana?: number;
-  /** Máximo de fins-de-semana com plantão por mês. */
-  maxFimDeSemana?: number;
-  /** Mínimo de horas de plantão em FDS por mês. Diferente de `minFimDeSemana` que conta dias. */
-  minHorasPorFimDeSemana?: number;
-  /** Máximo de horas de plantão em FDS por mês. */
-  maxHorasPorFimDeSemana?: number;
   /** Mínimo de horas/semana exigidas pelo contrato (CLT). */
   minHorasPorSemana?: number;
   /** Máximo de horas/semana permitidas. */
@@ -60,9 +48,11 @@ export interface RegrasHospital {
   minHorasPorMes?: number;
   /** Máximo de horas/mês permitidas. */
   maxHorasPorMes?: number;
-  /** Duração padrão de um plantão. */
-  duracaoPlantao?: number;
-  /** Total máximo de horas combinadas num único dia (ex: tarde+noite). */
+  /** Mínimo de horas de plantão em FDS por mês. */
+  minHorasPorFimDeSemana?: number;
+  /** Máximo de horas de plantão em FDS por mês. */
+  maxHorasPorFimDeSemana?: number;
+  /** Total máximo de horas combinadas num único dia (ex: tarde+noite = 18h). */
   duracaoMaximaDia?: number;
   /** Multiplicador de pagamento em feriado (1.0 = sem bônus, 2.0 = dobro). */
   feriadoMultiplicador?: number;

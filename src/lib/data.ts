@@ -91,10 +91,6 @@ export const HOSPITAIS: HospitaisMap = {
     valorHora: 150,
     adicionalNoite: 200,
     regras: {
-      maxPorSemana: 2,
-      minFimDeSemana: 1,
-      duracaoPlantao: 12,
-      maxPorMes: 8,
     },
   },
   HBDF: {
@@ -107,10 +103,6 @@ export const HOSPITAIS: HospitaisMap = {
     valorFixo: 1800,
     adicionalNoite: 250,
     regras: {
-      maxPorSemana: 2,
-      minFimDeSemana: 2,
-      duracaoPlantao: 12,
-      maxPorMes: 10,
     },
   },
   HDS: {
@@ -123,10 +115,6 @@ export const HOSPITAIS: HospitaisMap = {
     valorHora: 200,
     adicionalNoite: 250,
     regras: {
-      maxPorSemana: 1,
-      minFimDeSemana: 0,
-      duracaoPlantao: 12,
-      maxPorMes: 6,
     },
   },
   HCB: {
@@ -139,10 +127,6 @@ export const HOSPITAIS: HospitaisMap = {
     valorFixo: 1600,
     adicionalNoite: 200,
     regras: {
-      maxPorSemana: 2,
-      minFimDeSemana: 1,
-      duracaoPlantao: 12,
-      maxPorMes: 8,
     },
   },
 };

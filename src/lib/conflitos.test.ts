@@ -14,10 +14,6 @@ const HOSPITAIS: HospitaisMap = {
     adicionalNoite: 250,
     setores: [],
     regras: {
-      maxPorSemana: 2,
-      minFimDeSemana: 0,
-      duracaoPlantao: 12,
-      maxPorMes: 10,
     },
   },
   HSL: {
@@ -31,10 +27,6 @@ const HOSPITAIS: HospitaisMap = {
     adicionalNoite: 200,
     setores: [],
     regras: {
-      maxPorSemana: 1,
-      minFimDeSemana: 0,
-      duracaoPlantao: 12,
-      maxPorMes: 8,
     },
   },
 };

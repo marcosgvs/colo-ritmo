@@ -13,10 +13,6 @@ const HBDF: Hospital = {
   adicionalNoite: 250,
   setores: [],
   regras: {
-    maxPorSemana: 2,
-    minFimDeSemana: 0,
-    duracaoPlantao: 12,
-    maxPorMes: 10,
   },
 };
 

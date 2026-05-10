@@ -149,8 +149,7 @@ export function Detalhe({ bloco, hospitais: _h, voltar, onTrocar, onCeder }: Det
                 {hosp.nome}
               </p>
               <Mono style={{ display: 'block', marginTop: 6, color: 'var(--ink-3)' }}>
-                {hosp.tipo === 'publico' ? 'público' : 'privado'} · até{' '}
-                {hosp.regras.maxPorSemana}/sem · {hosp.regras.maxPorMes}/mês
+                {hosp.tipo === 'publico' ? 'público' : 'privado'}
               </Mono>
             </Card>
           )}
