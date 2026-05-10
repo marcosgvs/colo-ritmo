@@ -74,32 +74,6 @@ export function Usuario({ email, userId, preferencias, onSalvarPreferencias }: U
                 style={input}
               />
             </Field>
-            <Field label="máx plantões / semana">
-              <input
-                type="number"
-                value={draft.maxPlantoesPorSemana}
-                onChange={(e) =>
-                  setDraft({ ...draft, maxPlantoesPorSemana: Number(e.target.value) })
-                }
-                style={input}
-              />
-            </Field>
-            <Field label="janela preferida">
-              <select
-                value={draft.janelaPreferida}
-                onChange={(e) =>
-                  setDraft({
-                    ...draft,
-                    janelaPreferida: e.target.value as 'dia' | 'noite' | 'ambos',
-                  })
-                }
-                style={input}
-              >
-                <option value="dia">dia</option>
-                <option value="noite">noite</option>
-                <option value="ambos">ambos</option>
-              </select>
-            </Field>
             <label
               style={{
                 display: 'flex',

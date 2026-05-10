@@ -209,9 +209,6 @@ function HospitalForm({ inicial, coresUsadas, onSalvar, onCancelar, onRemover }:
   function setCampo<K extends keyof Hospital>(k: K, v: Hospital[K]) {
     setDraft((d) => ({ ...d, [k]: v }));
   }
-  function setRegra<K extends keyof Hospital['regras']>(k: K, v: Hospital['regras'][K]) {
-    setDraft((d) => ({ ...d, regras: { ...d.regras, [k]: v } }));
-  }
 
   function selecionarSugestao(s: SugestaoHospital) {
     setDraft((d) => ({
@@ -462,34 +459,6 @@ function HospitalForm({ inicial, coresUsadas, onSalvar, onCancelar, onRemover }:
             style={input}
           />
         </Field>
-        <Field label={ehPublico ? 'máx plantões por semana' : 'máx por semana'}>
-          <input
-            inputMode="numeric"
-            value={draft.regras.maxPorSemana ? String(draft.regras.maxPorSemana) : ''}
-            onChange={(e) => setRegra('maxPorSemana', parseInteiro(e.target.value))}
-            placeholder="ex: 2"
-            style={input}
-          />
-        </Field>
-        <Field label="máx por mês">
-          <input
-            inputMode="numeric"
-            value={draft.regras.maxPorMes ? String(draft.regras.maxPorMes) : ''}
-            onChange={(e) => setRegra('maxPorMes', parseInteiro(e.target.value))}
-            placeholder="ex: 8"
-            style={input}
-          />
-        </Field>
-        <Field label={ehPublico ? 'fins-de-semana obrigatórios / mês' : 'finais de semana mínimos'}>
-          <input
-            inputMode="numeric"
-            value={draft.regras.minFimDeSemana ? String(draft.regras.minFimDeSemana) : ''}
-            onChange={(e) => setRegra('minFimDeSemana', parseInteiro(e.target.value))}
-            placeholder="ex: 1"
-            style={input}
-          />
-        </Field>
-
         <div style={{ gridColumn: '1 / -1' }}>
           <BlocoJanelas
             janelas={draft.janelas ?? JANELAS_DEFAULT}
