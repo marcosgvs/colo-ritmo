@@ -53,18 +53,26 @@ function levenshtein(a: string, b: string): number {
 }
 
 /**
- * Tolerância proporcional:
- *   < 4 caracteres: match exato (qualquer typo é falso positivo)
- *   4-6 caracteres: 1 erro
- *   7+ caracteres: 2 erros
+ * Tolerância conservadora — 1 erro é suficiente pra cobrir typos típicos
+ * (letra faltando, letra a mais, troca pontual) em qualquer tamanho de
+ * nome 4+ chars.
  *
- * "Mpinheiro" tem 9 chars → tolera 2 erros. Pega Mpinhero, MPnheiro, Mpinheiro.
- * "Mariana" tem 7 chars → tolera 2. Pega Mariama, Mariama, Marianna.
+ *   < 4 caracteres: match exato (qualquer typo é falso positivo)
+ *   4+ caracteres: 1 erro
+ *
+ * Tolerar 2 erros era fonte de confusão real: "Mariana" vs "Marilia" tem
+ * distância 2 (`n→i`, `a→l`) e ambos têm 7 chars. Com tolerância 2 os
+ * dois batiam · com tolerância 1 não.
+ *
+ * Casos ainda cobertos:
+ *   - Mpinheiro vs Mpinhero (1 letra a menos) ✓
+ *   - Mpinheiro vs MPnheiro (1 letra a menos) ✓
+ *   - Mariana vs Marianna (1 letra a mais) ✓
+ *   - Mariana vs Mariane (1 substituição) ✓
  */
 function tolerancia(tamanho: number): number {
   if (tamanho < 4) return 0;
-  if (tamanho < 7) return 1;
-  return 2;
+  return 1;
 }
 
 export function fuzzyMatch(nomeNoPdf: string, alvo: string): boolean {
