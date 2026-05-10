@@ -512,7 +512,14 @@ function ViewSwitch({
       );
 
     case 'montar':
-      return <MontarEscala />;
+      return (
+        <MontarEscala
+          hospitais={state.hospitais}
+          preferencias={state.preferencias}
+          blocos={state.blocos}
+          escalasImportadas={state.escalasImportadas}
+        />
+      );
 
     case 'usuario':
       return (
