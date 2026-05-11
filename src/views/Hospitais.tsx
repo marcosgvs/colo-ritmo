@@ -28,6 +28,26 @@ function parseInteiro(s: string): number {
   return limpo ? parseInt(limpo, 10) : 0;
 }
 
+/**
+ * Resumo do valor no card · mostra fixo mensal (público), valor por
+ * hora (privado), ou valorPlantao (legado), seguindo o que está
+ * cadastrado · sempre com o adicional noturno embutido se houver.
+ */
+function resumoValorHospital(h: Hospital): string {
+  const adic = h.adicionalNoite ?? 0;
+  const sufixoNoite = adic > 0 ? ` · noite +R$ ${adic.toLocaleString('pt-BR')}` : '';
+  if (h.valorFixo && h.valorFixo > 0) {
+    return `R$ ${h.valorFixo.toLocaleString('pt-BR')}/mês fixo${sufixoNoite}`;
+  }
+  if (h.valorHora && h.valorHora > 0) {
+    return `R$ ${h.valorHora.toLocaleString('pt-BR')}/h${sufixoNoite}`;
+  }
+  if (h.valorPlantao && h.valorPlantao > 0) {
+    return `R$ ${h.valorPlantao.toLocaleString('pt-BR')}/plantão${sufixoNoite}`;
+  }
+  return 'valor não cadastrado';
+}
+
 function parseDecimal(s: string): number {
   const limpo = s.replace(',', '.').replace(/[^\d.]/g, '');
   const n = parseFloat(limpo);
@@ -151,7 +171,7 @@ export function Hospitais({ hospitais, onSalvar, onRemover }: HospitaisProps) {
                 {h.nome}
               </p>
               <Mono style={{ color: 'var(--ink-3)' }}>
-                R$ {(h.valorPlantao ?? 0).toLocaleString('pt-BR')}
+                {resumoValorHospital(h)}
                 {h.regras.minHorasPorMes ? ` · mín ${h.regras.minHorasPorMes}h/mês` : ''}
               </Mono>
             </button>
