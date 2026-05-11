@@ -7,7 +7,7 @@ import type {
   Preferencias,
 } from '@/types';
 import { supabase } from '@/lib/supabase';
-import { BLOCOS_SEMANA, HOSPITAIS, PREFERENCIAS_ME, marcarConflitos } from '@/lib/data';
+import { marcarConflitos } from '@/lib/data';
 
 /**
  * Shape do JSON em `user_state.state`. Mantemos compatibilidade com
@@ -44,21 +44,12 @@ export interface UserStateAPI {
 
 const SAVE_DEBOUNCE_MS = 800;
 
-/** Demo data · só pro modo preview (Marcos vendo agenda como X) e pra
- * primeira renderização antes do select. Nunca persistido pra users
- * reais — quem entra sem state vai ver onboarding e cadastra do zero. */
-const FALLBACK: UserStateValor = {
-  blocos: BLOCOS_SEMANA,
-  hospitais: HOSPITAIS,
-  preferencias: PREFERENCIAS_ME,
-  escalasImportadas: [],
-};
-
-/** State inicial pra users novos · vazio · força o onboarding. */
+/** State vazio · usado pro render inicial (antes do select retornar) e
+ * pra users novos (força onboarding · hospitais={} dispara o fluxo). */
 const STATE_VAZIO: UserStateValor = {
   blocos: [],
   hospitais: {},
-  preferencias: { nome: '' },
+  preferencias: { nome: '', hospitaisPreferidos: [] },
   escalasImportadas: [],
 };
 
@@ -73,7 +64,7 @@ const STATE_VAZIO: UserStateValor = {
 export function useUserState(userId: string | null): UserStateAPI {
   const [status, setStatus] = useState<LoadStatus>(userId ? 'carregando' : 'inativo');
   const [erro, setErro] = useState<string | null>(null);
-  const [state, setStateInternal] = useState<UserStateValor>(FALLBACK);
+  const [state, setStateInternal] = useState<UserStateValor>(STATE_VAZIO);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingRef = useRef<UserStateValor | null>(null);
   const channelRef = useRef<RealtimeChannel | null>(null);
@@ -133,7 +124,7 @@ export function useUserState(userId: string | null): UserStateAPI {
   useEffect(() => {
     if (!userId) {
       setStatus('inativo');
-      setStateInternal(FALLBACK);
+      setStateInternal(STATE_VAZIO);
       return;
     }
 
@@ -156,9 +147,9 @@ export function useUserState(userId: string | null): UserStateAPI {
         const blob = (data?.state ?? null) as UserStateBlob | null;
         if (blob) {
           setStateInternal({
-            blocos: blob.blocos ?? FALLBACK.blocos,
-            hospitais: blob.hospitais ?? FALLBACK.hospitais,
-            preferencias: blob.preferencias ?? FALLBACK.preferencias,
+            blocos: blob.blocos ?? STATE_VAZIO.blocos,
+            hospitais: blob.hospitais ?? STATE_VAZIO.hospitais,
+            preferencias: blob.preferencias ?? STATE_VAZIO.preferencias,
             escalasImportadas: blob.escalasImportadas ?? [],
           });
         } else {
@@ -214,42 +205,16 @@ export function useUserState(userId: string | null): UserStateAPI {
     };
   }, [userId, persistir]);
 
-  // State enriquecido:
-  //   1. Garante que hospitais referenciados por plantões antigos existam
-  //      no map ativo (preenche com defaults pra evitar plantões "fantasmas"
-  //      sem nome/regras/valor).
-  //   2. Marca `conflito: true` nos plantões em sobreposição/sem-descanso
-  //      pra UI pintar vermelho.
+  // Marca `conflito: true` nos plantões em sobreposição/sem-descanso pra
+  // UI pintar vermelho. Plantão cujo hospitalId não está no map atual
+  // (user removeu o hospital) aparece sem nome/cor · UI lida com getHospital
+  // devolvendo undefined.
   const stateEnriquecido = useMemo<UserStateValor>(() => {
-    const hospitaisFinal = preencherFantasmas(state.blocos, state.hospitais);
     return {
       ...state,
-      hospitais: hospitaisFinal,
-      blocos: marcarConflitos(state.blocos, hospitaisFinal),
+      blocos: marcarConflitos(state.blocos, state.hospitais),
     };
   }, [state]);
 
   return { status, erro, state: stateEnriquecido, setState, flushSave };
-}
-
-/**
- * Quando um plantão antigo aponta pra hospitalId que não está no map
- * (porque o usuário removeu o hospital mas o plantão sobreviveu), busca
- * no `HOSPITAIS` default. Sem isso, calcRemuneracaoBloco devolve 0 e o
- * solver nem considera o hospital.
- */
-function preencherFantasmas(
-  blocos: Bloco[],
-  atuais: Record<string, Hospital>,
-): Record<string, Hospital> {
-  const idsUsados = new Set<string>();
-  for (const b of blocos) {
-    if (b.tipo === 'plantao' || b.tipo === 'cedido') idsUsados.add(b.hospitalId);
-  }
-  const extras: Record<string, Hospital> = {};
-  for (const id of idsUsados) {
-    if (!atuais[id] && HOSPITAIS[id]) extras[id] = HOSPITAIS[id]!;
-  }
-  if (Object.keys(extras).length === 0) return atuais;
-  return { ...extras, ...atuais };
 }

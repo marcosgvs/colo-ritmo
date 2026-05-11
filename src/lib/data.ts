@@ -1,4 +1,4 @@
-import type { Bloco, CargaSemana, Hospital, HospitaisMap, Nivel, Preferencias } from '@/types';
+import type { Bloco, CargaSemana, Hospital, Nivel } from '@/types';
 
 /**
  * data.ts · ponto único de import pra dados de domínio. Em vez de uma
@@ -80,62 +80,6 @@ export type {
   Faixa,
 } from './descanso.js';
 
-export const HOSPITAIS: HospitaisMap = {
-  HSL: {
-    id: 'HSL',
-    nome: 'Hospital Santa Lúcia',
-    abrev: 'HSL',
-    cor: 'sand',
-    tipo: 'privado',
-    valorPlantao: 1800,
-    valorHora: 150,
-    adicionalNoite: 200,
-    regras: {
-    },
-  },
-  HBDF: {
-    id: 'HBDF',
-    nome: 'Hospital de Base do DF',
-    abrev: 'HBDF',
-    cor: 'blue',
-    tipo: 'publico',
-    valorPlantao: 1800,
-    valorFixo: 1800,
-    adicionalNoite: 250,
-    regras: {
-    },
-  },
-  HDS: {
-    id: 'HDS',
-    nome: 'Hospital DF Star',
-    abrev: 'HDS',
-    cor: 'coral',
-    tipo: 'privado',
-    valorPlantao: 2400,
-    valorHora: 200,
-    adicionalNoite: 250,
-    regras: {
-    },
-  },
-  HCB: {
-    id: 'HCB',
-    nome: 'Hospital da Criança',
-    abrev: 'HCB',
-    cor: 'aqua',
-    tipo: 'publico',
-    valorPlantao: 1600,
-    valorFixo: 1600,
-    adicionalNoite: 200,
-    regras: {
-    },
-  },
-};
-
-export const PREFERENCIAS_ME: Preferencias = {
-  nome: 'Dra. Mariana',
-  hospitaisPreferidos: ['HBDF', 'HCB'],
-};
-
 /** Semana de referência mockada — segunda 4 mai a domingo 10 mai 2026. */
 export const SEMANA: readonly string[] = [
   '2026-05-04',
@@ -156,8 +100,9 @@ export const HOJE: string = toISO(new Date());
 
 /**
  * Map de hospitais do usuário em runtime · setado pelo App.tsx quando o
- * user_state carrega. `getHospital` consulta primeiro esse map (cobre
- * hospitais customizados com id "H-...") e cai pra constante default.
+ * user_state carrega. `getHospital` consulta esse map. Se um plantão
+ * legado aponta pra um id que o user removeu, retorna undefined · a UI
+ * já lida com isso (renderiza "—" ou esconde detalhes).
  */
 let hospitaisRuntime: Record<string, Hospital> | null = null;
 
@@ -167,7 +112,7 @@ export function setHospitaisRuntime(map: Record<string, Hospital> | null): void 
 
 export function getHospital(id: string | undefined): Hospital | undefined {
   if (!id) return undefined;
-  return hospitaisRuntime?.[id] ?? HOSPITAIS[id];
+  return hospitaisRuntime?.[id];
 }
 
 export function nivelCarga(h: number): Nivel {
@@ -175,23 +120,6 @@ export function nivelCarga(h: number): Nivel {
   if (h < 60) return 'warn';
   return 'err';
 }
-
-/**
- * Estado "cheia" da semana 4–10 mai · 48h de plantão, troca, cedido,
- * deslocamento, bloqueio. Espelha BLOCOS_CHEIA de design-bundle/data.jsx.
- * Usado como fallback até o user_state real carregar do Supabase.
- */
-export const BLOCOS_SEMANA: Bloco[] = [
-  { id: 1, tipo: 'plantao', hospitalId: 'HSL',  data: '2026-05-04', horaInicio: 7,  duracao: 6 },
-  { id: 2, tipo: 'deslocamento', data: '2026-05-04', horaInicio: 13, duracao: 0.5, de: 'HSL', para: 'HCB', auto: true },
-  { id: 3, tipo: 'plantao', hospitalId: 'HCB',  data: '2026-05-04', horaInicio: 19, duracao: 12 },
-  { id: 4, tipo: 'sono',                          data: '2026-05-05', horaInicio: 8,  duracao: 8 },
-  { id: 5, tipo: 'plantao', hospitalId: 'HBDF', data: '2026-05-06', horaInicio: 13, duracao: 6 },
-  { id: 6, tipo: 'cedido',  hospitalId: 'HSL',  data: '2026-05-07', horaInicio: 7,  duracao: 6,  cedidoPara: 'Dra. Ana', motivo: 'aniversário do filho' },
-  { id: 7, tipo: 'plantao', hospitalId: 'HSL',  data: '2026-05-08', horaInicio: 19, duracao: 12, viaTroca: true, trocaInfo: 'Dr. João · HBDF sex' },
-  { id: 8, tipo: 'bloqueio',                       data: '2026-05-09', horaInicio: 0,  duracao: 24, motivo: 'aniversário Mariana' },
-  { id: 9, tipo: 'plantao', hospitalId: 'HCB',  data: '2026-05-10', horaInicio: 7,  duracao: 12 },
-];
 
 /**
  * Calcula a carga (h de plantão) das semanas SEG–DOM que tocam o mês de
