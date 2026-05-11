@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { Bloco, BlocoPlantao, HospitaisMap } from '@/types';
 import type { AddTipo } from '@/components/shell';
-import { Eyebrow, Hand, Mono, Pill } from '@/components/atoms';
+import { DatePicker, Eyebrow, Hand, Mono, Pill } from '@/components/atoms';
 import { JanelaPreview } from '@/components/preview';
 import { detectarConflitos, fmtDate, fmtRange, toISO } from '@/lib/data';
 
@@ -275,12 +275,7 @@ export function AdicionarBloco({
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 12 }}>
           <Field label="data">
-            <input
-              type="date"
-              value={data}
-              onChange={(e) => setData(e.target.value)}
-              style={input}
-            />
+            <DatePicker value={data} onChange={setData} />
           </Field>
           {tipoAtual === 'bloqueio' ? (
             <Field label="duração (h)">

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { Bloco, BlocoPlantao, HospitaisMap } from '@/types';
 import { fmtDate, fmtRange, getHospital } from '@/lib/data';
-import { Eyebrow, Hand, Mono, Pill } from '@/components/atoms';
+import { DatePicker, Eyebrow, Hand, Mono, Pill } from '@/components/atoms';
 import { JanelaPreview } from '@/components/preview';
 
 export type ModoTrocaCeder = 'trocar' | 'ceder';
@@ -199,12 +199,7 @@ export function TrocaCederModal({
             <Eyebrow>plantão que você recebe em troca</Eyebrow>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               <Field label="data">
-                <input
-                  type="date"
-                  value={recebidoData}
-                  onChange={(e) => setRecebidoData(e.target.value)}
-                  style={input}
-                />
+                <DatePicker value={recebidoData} onChange={setRecebidoData} />
               </Field>
               <Field label="hospital">
                 <select

@@ -1,5 +1,6 @@
 export { Bloco } from './Bloco';
 export { ColoMark } from './ColoMark';
+export { DatePicker } from './DatePicker';
 export { Eyebrow } from './Eyebrow';
 export { Hand } from './Hand';
 export { HandVariantContext } from './HandVariantContext';

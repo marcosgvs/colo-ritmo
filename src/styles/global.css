@@ -32,6 +32,18 @@ h1, h2, .t-display, .t-h1, .t-h2,
   text-rendering: optimizeLegibility;
 }
 
+/* Apaga os spinners nativos de input[type=number] · não fazem sentido
+ * em mobile e poluem o input. inputMode="numeric" continua dando o
+ * teclado numérico onde precisamos. */
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type='number'] {
+  -moz-appearance: textfield;
+}
+
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 999px; border: 2px solid var(--bg); }
 ::-webkit-scrollbar-track { background: transparent; }
