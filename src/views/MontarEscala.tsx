@@ -31,7 +31,7 @@ const FRASES_MONTAR = [
   'ajustando a proposta final',
 ] as const;
 
-type Lente = 'descansar' | 'equilibrar' | 'ganhar';
+type Lente = 'descansar' | 'equilibrar' | 'acelerar';
 type Etapa = 'setup' | 'bloqueios' | 'gerando' | 'preview' | 'exportar';
 type TipoAtividade = 'bloqueio' | 'sono' | 'consulta' | 'estudo' | 'pessoal' | 'outros';
 
@@ -70,8 +70,8 @@ interface MontarEscalaProps {
 
 const LENTES: Array<{ id: Lente; titulo: string; recado: string }> = [
   { id: 'descansar', titulo: 'descansar', recado: 'menos plantões · espaçamento maior · prioriza descanso' },
-  { id: 'equilibrar', titulo: 'equilibrar', recado: 'meta + descanso · mistura turnos · padrão sustentável' },
-  { id: 'ganhar', titulo: 'ganhar', recado: 'maximiza receita · prefere noturno se paga mais' },
+  { id: 'equilibrar', titulo: 'equilibrar', recado: 'saudável dentro das regras · sem pressão extra' },
+  { id: 'acelerar', titulo: 'acelerar', recado: 'mais perto do teto contratual · precisa de motivo' },
 ];
 
 export function MontarEscala({
@@ -93,7 +93,8 @@ export function MontarEscala({
     () => new Set(Object.keys(hospitais)),
   );
   const [lente, setLente] = useState<Lente>('equilibrar');
-  const [metaOverride, setMetaOverride] = useState<string>('');
+  const [acelerarPercentual, setAcelerarPercentual] = useState<string>('');
+  const [acelerarValor, setAcelerarValor] = useState<string>('');
   const [chefes, setChefes] = useState<Record<string, string>>({});
 
   const [resultado, setResultado] = useState<PropostaResultado | null>(null);
@@ -109,9 +110,10 @@ export function MontarEscala({
   }, [mes]);
 
   const metaEfetiva = useMemo<number | null>(() => {
-    const o = metaOverride.trim() ? parseInt(metaOverride, 10) : NaN;
-    return isFinite(o) ? o : null;
-  }, [metaOverride]);
+    if (lente !== 'acelerar') return null;
+    const o = acelerarValor.trim() ? parseInt(acelerarValor, 10) : NaN;
+    return isFinite(o) && o > 0 ? o : null;
+  }, [lente, acelerarValor]);
 
   function toggleHospital(id: string) {
     setHospitaisSel((prev) => {
@@ -127,13 +129,24 @@ export function MontarEscala({
       setErro('escolha pelo menos um hospital');
       return;
     }
+    if (lente === 'acelerar' && !acelerarPercentual.trim() && !acelerarValor.trim()) {
+      setErro('acelerar precisa de motivo · preencha % ou R$');
+      return;
+    }
     setEtapa('gerando');
     setErro(null);
     try {
       const [anoStr, mesStr] = mes.split('-');
       const ano = parseInt(anoStr ?? '0', 10);
       const mesNum = parseInt(mesStr ?? '0', 10);
-      const meta = metaOverride.trim() ? parseInt(metaOverride, 10) : undefined;
+      const acelPct =
+        lente === 'acelerar' && acelerarPercentual.trim()
+          ? parseInt(acelerarPercentual, 10)
+          : undefined;
+      const acelVal =
+        lente === 'acelerar' && acelerarValor.trim()
+          ? parseInt(acelerarValor, 10)
+          : undefined;
 
       const resp = await fetch('/api/montar-escala', {
         method: 'POST',
@@ -142,7 +155,8 @@ export function MontarEscala({
           ano,
           mes: mesNum,
           lente,
-          metaOverride: meta,
+          acelerarPercentual: acelPct,
+          acelerarValor: acelVal,
           hospitais: hospitaisHabilitados,
           preferencias,
           escalasImportadas: escalasImportadas.filter((e) => hospitaisSel.has(e.hospitalId)),
@@ -223,12 +237,18 @@ export function MontarEscala({
           toggleHospital={toggleHospital}
           lente={lente}
           setLente={setLente}
-          metaOverride={metaOverride}
-          setMetaOverride={setMetaOverride}
+          acelerarPercentual={acelerarPercentual}
+          setAcelerarPercentual={setAcelerarPercentual}
+          acelerarValor={acelerarValor}
+          setAcelerarValor={setAcelerarValor}
           erro={erro}
           onAvancar={() => {
             if (hospitaisSel.size === 0) {
               setErro('escolha pelo menos um hospital');
+              return;
+            }
+            if (lente === 'acelerar' && !acelerarPercentual.trim() && !acelerarValor.trim()) {
+              setErro('acelerar precisa de motivo · preencha % ou R$');
               return;
             }
             setErro(null);
@@ -368,8 +388,10 @@ interface SetupCardProps {
   toggleHospital: (id: string) => void;
   lente: Lente;
   setLente: (l: Lente) => void;
-  metaOverride: string;
-  setMetaOverride: (s: string) => void;
+  acelerarPercentual: string;
+  setAcelerarPercentual: (s: string) => void;
+  acelerarValor: string;
+  setAcelerarValor: (s: string) => void;
   erro: string | null;
   onAvancar: () => void;
 }
@@ -382,8 +404,10 @@ function SetupCard({
   toggleHospital,
   lente,
   setLente,
-  metaOverride,
-  setMetaOverride,
+  acelerarPercentual,
+  setAcelerarPercentual,
+  acelerarValor,
+  setAcelerarValor,
   erro,
   onAvancar,
 }: SetupCardProps) {
@@ -462,20 +486,47 @@ function SetupCard({
         </div>
       </Linha>
 
-      <Linha rotulo="meta líquida">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <input
-            inputMode="numeric"
-            value={metaOverride}
-            onChange={(e) => setMetaOverride(e.target.value.replace(/\D/g, ''))}
-            placeholder="opcional · ex: 25000"
-            style={{ ...inputBase, width: 220 }}
-          />
-          <Mono style={{ color: 'var(--ink-3)', fontSize: 11 }}>
-            preencha só quando esse mês tem que render mais que o normal
-          </Mono>
-        </div>
-      </Linha>
+      {lente === 'acelerar' && (
+        <Linha rotulo="motivo">
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 10,
+              padding: '14px 16px',
+              borderRadius: 'var(--r-md)',
+              border: '1px solid var(--lavender-ink)',
+              background: 'var(--lavender-surface)',
+            }}
+          >
+            <Mono style={{ color: 'var(--ink-3)', fontSize: 11 }}>
+              preencha pelo menos um · pode preencher os dois e a gente honra o mais demandante
+            </Mono>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, font: '500 13px/1.3 var(--font-body)' }}>
+              <span>+</span>
+              <input
+                inputMode="numeric"
+                value={acelerarPercentual}
+                onChange={(e) => setAcelerarPercentual(e.target.value.replace(/\D/g, ''))}
+                placeholder="15"
+                style={{ ...inputBase, width: 70, textAlign: 'right' }}
+              />
+              <span>% de plantões a mais que seu normal histórico</span>
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, font: '500 13px/1.3 var(--font-body)' }}>
+              <span>chegar até R$</span>
+              <input
+                inputMode="numeric"
+                value={acelerarValor}
+                onChange={(e) => setAcelerarValor(e.target.value.replace(/\D/g, ''))}
+                placeholder="25000"
+                style={{ ...inputBase, width: 110, textAlign: 'right' }}
+              />
+              <span>líquido no mês</span>
+            </label>
+          </div>
+        </Linha>
+      )}
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 6 }}>
         <button

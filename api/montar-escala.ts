@@ -97,11 +97,14 @@ interface Bloco {
   viaTroca?: boolean;
 }
 
+type Lente = 'descansar' | 'equilibrar' | 'acelerar';
+
 interface MontarBody {
   ano?: number;
   mes?: number;
-  lente?: 'descansar' | 'equilibrar' | 'ganhar';
-  metaOverride?: number;
+  lente?: Lente;
+  acelerarPercentual?: number;
+  acelerarValor?: number;
   hospitais?: Hospital[];
   preferencias?: Preferencias;
   escalasImportadas?: EscalaImportada[];
@@ -191,10 +194,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   }
 
   const body = (req.body ?? {}) as MontarBody;
-  const { ano, mes, lente, metaOverride, hospitais, preferencias, escalasImportadas, blocos } = body;
+  const { ano, mes, lente, acelerarPercentual, acelerarValor, hospitais, preferencias, escalasImportadas, blocos } = body;
 
   if (!ano || !mes || !lente || !hospitais || hospitais.length === 0 || !preferencias) {
     res.status(400).json({ erro: 'payload incompleto · ano, mes, lente, hospitais, preferencias obrigatórios' });
+    return;
+  }
+
+  if (lente === 'acelerar' && !acelerarPercentual && !acelerarValor) {
+    res.status(400).json({ erro: 'acelerar precisa de motivo · acelerarPercentual ou acelerarValor' });
     return;
   }
 
@@ -203,7 +211,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     ano,
     mes,
     lente,
-    metaEfetiva: metaOverride,
+    acelerarPercentual,
+    acelerarValor,
     hospitais,
     preferencias,
     escalasImportadas: escalasImportadas ?? [],
@@ -308,8 +317,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 function montarPrompt(opts: {
   ano: number;
   mes: number;
-  lente: 'descansar' | 'equilibrar' | 'ganhar';
-  metaEfetiva?: number;
+  lente: Lente;
+  acelerarPercentual?: number;
+  acelerarValor?: number;
   hospitais: Hospital[];
   preferencias: Preferencias;
   escalasImportadas: EscalaImportada[];
@@ -342,29 +352,84 @@ function montarPrompt(opts: {
     historicoPorHospital.set(b.hospitalId, arr);
   }
 
+  // Baseline + diagnóstico de disfunção servem de contexto pro modelo entender
+  // de onde a médica vem · não são bloqueios, são sinais que pesam na decisão.
+  const baseline = computeBaseline(opts.blocos, mesISO);
+  const disfuncao = computeDisfuncaoSignals(opts.blocos, mesISO);
+
   const partes: string[] = [];
 
   partes.push(
     `Você está propondo uma escala de plantões para a médica ${opts.preferencias.nome} no mês de ${mesPad}/${opts.ano}.`,
     '',
     `O dia 1/${mesPad} é ${diaUm}-feira.`,
-    opts.metaEfetiva != null
-      ? `Meta financeira líquida do mês: R$ ${opts.metaEfetiva.toLocaleString('pt-BR')}. (a médica marcou esse mês como um mês de meta — vale forçar a régua até o limite das regras contratuais pra atingir.)`
-      : 'Sem meta financeira específica esse mês · proponha o que faz sentido respeitando regras contratuais e qualidade de vida.',
     '',
+    '## CONTEXTO DA MÉDICA',
+  );
+
+  if (baseline.suficiente) {
+    partes.push(`- Volume base (média dos últimos ${baseline.mesesAmostra} meses): ~${baseline.avgPlantoesMes.toFixed(0)} plantões/mês.`);
+  } else {
+    partes.push(`- Histórico curto (${baseline.mesesAmostra} mês/meses com plantão) · sem baseline confiável de volume.`);
+  }
+
+  const sinais: string[] = [];
+  if (disfuncao.sequenciasMaiores3 > 0) {
+    sinais.push(`${disfuncao.sequenciasMaiores3} sequência(s) de 3+ plantões consecutivos nos últimos 90 dias (mais longa: ${disfuncao.diasMaiorSequencia} dias)`);
+  }
+  if (disfuncao.fdsCheios > 0) {
+    const cons = disfuncao.fdsCheiosConsecutivos >= 2 ? ` (até ${disfuncao.fdsCheiosConsecutivos} consecutivos)` : '';
+    sinais.push(`${disfuncao.fdsCheios} fim(ns) de semana totalmente trabalhado(s) nos últimos 90 dias${cons}`);
+  }
+  if (disfuncao.mesAnteriorPlantoes > 0) {
+    sinais.push(`${disfuncao.mesAnteriorPlantoes} plantão(ões) no mês anterior`);
+  }
+  if (sinais.length > 0) {
+    partes.push('- Carga recente: ' + sinais.join(' · '));
+    partes.push('  → considere isso ao decidir o volume desse mês · médica vinda de mês pesado precisa de mais espaçamento');
+  } else {
+    partes.push('- Carga recente: sem sinais fortes de acúmulo.');
+  }
+  partes.push('');
+
+  if (opts.lente === 'acelerar') {
+    partes.push('## MÊS DE META · MÉDICA ESCOLHEU ACELERAR');
+    const motivos: string[] = [];
+    if (opts.acelerarPercentual && baseline.suficiente) {
+      const alvo = Math.round(baseline.avgPlantoesMes * (1 + opts.acelerarPercentual / 100));
+      motivos.push(`+${opts.acelerarPercentual}% sobre baseline · mire em ~${alvo} plantões esse mês`);
+    } else if (opts.acelerarPercentual) {
+      motivos.push(`+${opts.acelerarPercentual}% sobre baseline · MAS baseline insuficiente · use o valor R$ como alvo principal`);
+    }
+    if (opts.acelerarValor) {
+      motivos.push(`chegar até R$ ${opts.acelerarValor.toLocaleString('pt-BR')} líquido`);
+    }
+    partes.push('Motivo: ' + motivos.join(' OU '));
+    partes.push('Se as duas metas estão presentes, honre a MAIS DEMANDANTE. Use como justificativa pra forçar a régua até o LIMITE das regras contratuais — nunca além.');
+    partes.push('');
+  }
+
+  partes.push(
     '## ESTRATÉGIA · ' + opts.lente.toUpperCase(),
     descricaoLente(opts.lente),
     '',
-    '## REGRAS RÍGIDAS',
-    '- Cada plantão pertence a UM hospital. Use SOMENTE as regras desse hospital pra esse plantão.',
-    '- NUNCA aplique regras de um hospital nos plantões de outro.',
+    '## METAS DE QUALIDADE DE VIDA · SOFT, MAS PESAM',
+    '- Evite sequências de 3+ plantões consecutivos · acumulam fadiga real.',
+    '- Pelo menos 1-2 fins de semana com folga no mês (descansar/equilibrar mira 2+, acelerar mira 1+).',
+    '- Recuperação após plantão noturno (mínimo 12h sem plantão depois).',
+    '- Distribua espaçamento entre plantões · não concentre tudo numa semana.',
+    'Essas metas NÃO são bloqueios. Violações são aceitáveis quando justificadas pelo contexto, mas trate como tendência preferida e mencione em avisos quando violar.',
+    '',
+    '## REGRAS DURAS · NÃO VIOLE',
+    '- Cada plantão pertence a UM hospital. Use SOMENTE as regras desse hospital pra esse plantão. NUNCA herde de outro.',
     '- Use APENAS as janelas (turnos) cadastradas pra cada hospital · não invente horários.',
-    '- DURAÇÃO · plantão de 12h é a jornada típica · plantões partidos de 5-6h (manhã, tarde, noitinha) existem e são válidos, mas use-os com moderação. Uma escala que vira metade plantões curtos vira irreal · prefira completar uma jornada com 12h e usar partidos quando faz sentido (fechar gap de horas, FDS específico).',
-    '- BLOQUEIOS · não proponha plantão se o horário do plantão sobrepõe um bloqueio listado abaixo. Bloqueios podem ser parciais (ex: 14h-17h) · não invalidam o dia inteiro mas invalidam o turno que conflita. Se duracao do bloqueio é 24h, o dia inteiro está fora.',
+    '- Regras contratuais (mín/máx horas, duracaoMaximaDia, regrasLivres) são GROUND TRUTH. Mesmo se o histórico da médica passa por cima delas, RESPEITE no que propor.',
+    '- Bloqueios listados abaixo são absolutos · não proponha plantão sobrepondo. Bloqueios parciais (ex: 14h-17h) invalidam o turno conflitante mas não o dia inteiro.',
     '- Não duplique plantão (mesmo dia + mesmo hospital + mesmo turno).',
-    '- minHorasPorFimDeSemana é a soma de HORAS dos plantões que caem em sábado/domingo desse hospital. Cumpra somando duracao dos plantões em FDS.',
-    '- minHorasPorMes · OBRIGATÓRIO em hospitais públicos (CLT). Se você está abaixo, ADICIONE plantões até bater. Prefira plantão noturno (12h) · partidos de 6h são válidos pra ajustar a soma final, mas não em massa.',
-    '- Se um campo de regra está em branco, não invente um valor "comum" — apenas ignore esse limite.',
+    '- minHorasPorFimDeSemana é a soma de HORAS dos plantões em sábado/domingo desse hospital. Cumpra somando duracao.',
+    '- minHorasPorMes (típico em hospitais públicos CLT) é obrigatório · se está abaixo, ADICIONE plantões até bater.',
+    '- DURAÇÃO · plantão de 12h é a jornada típica · partidos de 5-6h existem mas use com moderação · prefira completar 12h e usar partidos pra fechar gap de horas.',
+    '- Se um campo de regra está em branco, IGNORE esse limite · não invente.',
     '',
   );
 
@@ -492,11 +557,10 @@ function montarPrompt(opts: {
   }
 
   // Preferências
-  partes.push('', '## PREFERÊNCIAS DA MÉDICA');
-  if (opts.metaEfetiva != null)
-    partes.push(`- Meta líquida: R$ ${opts.metaEfetiva.toLocaleString('pt-BR')}`);
-  if (opts.preferencias.hospitaisPreferidos && opts.preferencias.hospitaisPreferidos.length > 0)
+  if (opts.preferencias.hospitaisPreferidos && opts.preferencias.hospitaisPreferidos.length > 0) {
+    partes.push('', '## PREFERÊNCIAS DA MÉDICA');
     partes.push(`- Hospitais favoritos: ${opts.preferencias.hospitaisPreferidos.join(', ')}`);
+  }
 
   // Bloqueios
   partes.push('', '## BLOQUEIOS NO MÊS ALVO');
@@ -540,34 +604,159 @@ function montarPrompt(opts: {
   return partes.join('\n');
 }
 
-function descricaoLente(lente: 'descansar' | 'equilibrar' | 'ganhar'): string {
+function descricaoLente(lente: Lente): string {
   switch (lente) {
     case 'descansar':
       return [
-        'Priorize descanso físico acima da meta financeira. A médica vem de um período pesado e precisa respirar.',
-        '- Espace plantões com 2-3 dias entre eles.',
-        '- Evite mais de 2 plantões na mesma semana.',
-        '- Evite combinar tarde+noite no mesmo dia.',
-        '- Evite plantões noturnos seguidos por plantões na mesma manhã/tarde do dia seguinte.',
-        '- Aceite ficar abaixo da meta financeira se necessário · prefira descanso.',
+        'A médica precisa respirar · prioriza descanso real acima de receita.',
+        '- Mire em volume ABAIXO da média histórica (~70-80% do baseline).',
+        '- Espace plantões 2-3 dias entre si.',
+        '- Evite sequências de 3+ dias.',
+        '- Pelo menos 2 fins de semana totalmente livres no mês.',
+        '- Não pegue plantão na manhã/tarde do dia seguinte a um noturno.',
+        '- Se cair abaixo do mínimo contratual, informe nos avisos.',
       ].join('\n');
     case 'equilibrar':
       return [
-        'Equilibre carga e remuneração. Sustentável a longo prazo.',
-        '- Espace plantões com 1-2 dias entre eles na maioria das vezes.',
-        '- Tente bater a meta sem ultrapassar muito.',
-        '- Mistura turnos diurnos e noturnos.',
-        '- Respeita recuperação após noite (12h sem plantão depois).',
+        'Mês saudável e sustentável · sem pressão extra.',
+        '- Volume na média histórica · não force além.',
+        '- Espace plantões 1-2 dias na maioria das vezes.',
+        '- Pelo menos 1-2 fins de semana com folga.',
+        '- Misture turnos diurnos e noturnos respeitando recuperação pós-noite (12h).',
+        '- Respeite todas as regras contratuais sem violar.',
       ].join('\n');
-    case 'ganhar':
+    case 'acelerar':
       return [
-        'Maximiza a receita até a meta (e um pouco além se houver oportunidade clara) · MAS RESPEITA as regras contratuais de cada hospital, que são obrigatórias mesmo aqui (incluindo `minFimDeSemana`, `minHorasPorMes`, `regrasLivres`).',
-        '- Pode espaçar só 1 dia entre plantões.',
-        '- Prefere plantões noturnos / FDS quando o adicional vale a pena.',
-        '- Pode passar da meta se for natural.',
-        '- Respeita as regras rígidas dos hospitais mas vai no limite delas.',
+        'Mês de meta · a médica marcou um motivo concreto pra forçar a régua. Empurre até o LIMITE DAS REGRAS CONTRATUAIS.',
+        '- Pode espaçar plantões só 1 dia entre si.',
+        '- Pode aceitar 2-3 plantões na mesma semana se for o caminho pra atingir.',
+        '- Prefira plantões mais rentáveis (noturnos, FDS quando o adicional vale).',
+        '- Pelo menos 1 fim de semana livre no mês · qualidade de vida não some mesmo aqui.',
+        '- NUNCA viole regras contratuais (CLT, máximos do hospital) pra atingir. Se a meta exigir violação, fica abaixo dela E declara isso na justificativa e avisos.',
+        '- Recuperação pós-noite (12h) não é negociável · vale mesmo na lente acelerar.',
       ].join('\n');
   }
+}
+
+// --- Análise de contexto da médica -----------------------------------------
+
+interface BaselineInfo {
+  avgPlantoesMes: number;
+  mesesAmostra: number;
+  suficiente: boolean;
+}
+
+function computeBaseline(blocos: Bloco[], mesISO: string): BaselineInfo {
+  const inicio = `${mesISO}-01`;
+  const inicioJanela = adicionaMesesISO(inicio, -6);
+  const plantoes = blocos.filter(
+    (b) => b.tipo === 'plantao' && b.data >= inicioJanela && b.data < inicio,
+  );
+  const mesesUnicos = new Set(plantoes.map((b) => b.data.slice(0, 7)));
+  const mesesAmostra = mesesUnicos.size;
+  const avgPlantoesMes = mesesAmostra > 0 ? plantoes.length / mesesAmostra : 0;
+  return {
+    avgPlantoesMes,
+    mesesAmostra,
+    suficiente: mesesAmostra >= 3,
+  };
+}
+
+interface DisfuncaoSignals {
+  sequenciasMaiores3: number;
+  diasMaiorSequencia: number;
+  fdsCheios: number;
+  fdsCheiosConsecutivos: number;
+  mesAnteriorPlantoes: number;
+}
+
+function computeDisfuncaoSignals(blocos: Bloco[], mesISO: string): DisfuncaoSignals {
+  const inicio = `${mesISO}-01`;
+  const inicioJanela = adicionaMesesISO(inicio, -3); // últimos ~90 dias
+  const datasPlantao = Array.from(
+    new Set(
+      blocos
+        .filter((b) => b.tipo === 'plantao' && b.data >= inicioJanela && b.data < inicio)
+        .map((b) => b.data),
+    ),
+  ).sort();
+
+  let sequenciasMaiores3 = 0;
+  let diasMaiorSequencia = 0;
+  let atual = datasPlantao.length > 0 ? 1 : 0;
+  for (let i = 1; i < datasPlantao.length; i++) {
+    const prev = new Date(`${datasPlantao[i - 1]}T00:00:00Z`);
+    const cur = new Date(`${datasPlantao[i]}T00:00:00Z`);
+    const diffDays = Math.round((cur.getTime() - prev.getTime()) / 86400000);
+    if (diffDays === 1) {
+      atual++;
+    } else {
+      if (atual >= 3) sequenciasMaiores3++;
+      if (atual > diasMaiorSequencia) diasMaiorSequencia = atual;
+      atual = 1;
+    }
+  }
+  if (atual >= 3) sequenciasMaiores3++;
+  if (atual > diasMaiorSequencia) diasMaiorSequencia = atual;
+
+  const fdsPorSemana = new Map<string, Set<number>>();
+  for (const d of datasPlantao) {
+    const dt = new Date(`${d}T12:00:00Z`);
+    const dow = dt.getUTCDay();
+    if (dow !== 0 && dow !== 6) continue;
+    const iso = isoWeek(dt);
+    const set = fdsPorSemana.get(iso) ?? new Set<number>();
+    set.add(dow);
+    fdsPorSemana.set(iso, set);
+  }
+  const semanasFdsCheio: string[] = [];
+  for (const [iso, set] of fdsPorSemana) {
+    if (set.has(0) && set.has(6)) semanasFdsCheio.push(iso);
+  }
+  semanasFdsCheio.sort();
+  const fdsCheios = semanasFdsCheio.length;
+
+  let fdsCheiosConsecutivos = 0;
+  let run = fdsCheios > 0 ? 1 : 0;
+  for (let i = 1; i < semanasFdsCheio.length; i++) {
+    if (isoWeekNext(semanasFdsCheio[i - 1]!) === semanasFdsCheio[i]) {
+      run++;
+    } else {
+      if (run > fdsCheiosConsecutivos) fdsCheiosConsecutivos = run;
+      run = 1;
+    }
+  }
+  if (run > fdsCheiosConsecutivos) fdsCheiosConsecutivos = run;
+
+  const inicioMesAnt = adicionaMesesISO(inicio, -1);
+  const plantoesMesAnt = blocos.filter(
+    (b) => b.tipo === 'plantao' && b.data >= inicioMesAnt && b.data < inicio,
+  );
+
+  return {
+    sequenciasMaiores3,
+    diasMaiorSequencia,
+    fdsCheios,
+    fdsCheiosConsecutivos,
+    mesAnteriorPlantoes: plantoesMesAnt.length,
+  };
+}
+
+function isoWeek(d: Date): string {
+  const tmp = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  const day = tmp.getUTCDay() || 7;
+  tmp.setUTCDate(tmp.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(tmp.getUTCFullYear(), 0, 1));
+  const weekNum = Math.ceil(((tmp.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+  return `${tmp.getUTCFullYear()}-W${String(weekNum).padStart(2, '0')}`;
+}
+
+function isoWeekNext(iso: string): string {
+  const [yearStr, wkStr] = iso.split('-W');
+  const year = parseInt(yearStr!, 10);
+  const wk = parseInt(wkStr!, 10);
+  if (wk < 52) return `${year}-W${String(wk + 1).padStart(2, '0')}`;
+  return `${year + 1}-W01`;
 }
 
 function diaDaSemana(ano: number, mes: number, dia: number): string {
