@@ -453,6 +453,7 @@ function montarPrompt(opts: {
     '- Hospital com `valorFixo` (CLT mensal · típico em hospital `publico`): o salário do mês é FIXO e não muda com hora a mais. Mire EXATAMENTE no `minHorasPorMes` · ficar acima é trabalho de graça (sem retorno financeiro) e ficar abaixo perde o salário garantido.',
     '- Hospital com `valorHora` (típico em hospital `privado`): cada plantão extra vira receita proporcional. É AQUI que volume extra paga · qualquer horas além das mínimas contratuais deve ir pra este hospital.',
     '- Quando há mais de um hospital com tipos diferentes, primeiro fecha o público no mínimo contratual · só depois distribui o resto no privado. Isso vale em qualquer lente, mas é especialmente crítico em `acelerar`.',
+    '- ESCOLHA DA JANELA NO PRIVADO (valorHora): janela de 12h (noite ou manhã+tarde combinadas) é SEMPRE mais rentável que dois turnos curtos somando as mesmas horas, e MUITO mais rentável que uma noitinha de 5h. Exemplo: com valorHora=150 e adicNoite=200, noite 12h paga R$ 2.000 contra R$ 950 da noitinha 5h. Use turnos curtos (noitinha 5h, manhã 6h, tarde 6h isoladas) SÓ pra fechar gap final de horas · NUNCA como padrão.',
     '',
   );
 
@@ -652,9 +653,10 @@ function descricaoLente(lente: Lente): string {
       return [
         'Mês de meta · a médica marcou um motivo concreto pra forçar a régua. Empurre até o LIMITE DAS REGRAS CONTRATUAIS.',
         '- ALOCAÇÃO POR HOSPITAL: hospital `publico`/`valorFixo` cumpre EXATAMENTE o mínimo contratual (mais que isso é trabalho de graça · não escala receita). Os plantões EXTRAS vão pro hospital `privado`/`valorHora`, onde cada plantão a mais vira dinheiro.',
+        '- NO PRIVADO, ESCOLHA SEMPRE A JANELA DE 12h (noite ou manhã+tarde) como default. Noitinha de 5h é a janela MENOS rentável · só use pra encaixar o fechamento de horas no final. Encher o mês de noitinha no privado é o pior cenário pra acelerar.',
         '- Pode espaçar plantões só 1 dia entre si.',
         '- Pode aceitar 2-3 plantões na mesma semana se for o caminho pra atingir.',
-        '- Prefira plantões mais rentáveis (noturnos, FDS quando o adicional vale) · NO PRIVADO.',
+        '- Prefira plantões noturnos quando o adicional vale (sempre paga mais que diurno) e FDS quando há bônus · MAS no privado, prioridade é janela LONGA (12h) acima de tudo.',
         '- Pelo menos 1 fim de semana livre no mês · qualidade de vida não some mesmo aqui.',
         '- NUNCA viole regras contratuais (CLT, máximos do hospital) pra atingir. Se a meta exigir violação, fica abaixo dela E declara isso na justificativa e avisos.',
         '- Recuperação pós-noite (12h) não é negociável · vale mesmo na lente acelerar.',
