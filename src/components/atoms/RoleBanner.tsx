@@ -35,7 +35,7 @@ export function RoleBanner({ mode }: RoleBannerProps) {
             color: 'var(--lavender-ink)',
           }}
         >
-          modo parceiro · você está vendo a agenda da Mariana
+          modo parceiro · você está vendo uma agenda compartilhada
         </span>
         <span style={{ flex: 1 }} />
         <Mono style={{ color: 'var(--lavender-ink)', opacity: 0.8 }}>somente leitura</Mono>
@@ -62,7 +62,7 @@ export function RoleBanner({ mode }: RoleBannerProps) {
         admin · editando agenda alheia · ações registradas em audit log
       </span>
       <span style={{ flex: 1 }} />
-      <Mono style={{ color: 'var(--coral-ink)' }}>Marcos · sessão admin</Mono>
+      <Mono style={{ color: 'var(--coral-ink)' }}>sessão admin</Mono>
     </div>
   );
 }

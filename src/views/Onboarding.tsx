@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { Hospital, Preferencias } from '@/types';
+import type { Hospital, Preferencias, TipoHospital } from '@/types';
 import { ColoMark, Eyebrow, Hand, Mono } from '@/components/atoms';
 
 interface OnboardingProps {
@@ -16,7 +16,9 @@ export function Onboarding({ onConcluir, onPular }: OnboardingProps) {
   const [erro, setErro] = useState<string | null>(null);
   const [hospitalNome, setHospitalNome] = useState('');
   const [hospitalAbrev, setHospitalAbrev] = useState('');
-  const [valorPlantao, setValorPlantao] = useState(1800);
+  const [hospitalTipo, setHospitalTipo] = useState<TipoHospital>('publico');
+  const [valorFixo, setValorFixo] = useState(0);
+  const [valorHora, setValorHora] = useState(0);
 
   const idx = PASSOS.indexOf(passo);
 
@@ -24,7 +26,7 @@ export function Onboarding({ onConcluir, onPular }: OnboardingProps) {
     if (passo === 'boas-vindas') {
       const partes = nome.trim().split(/\s+/).filter(Boolean);
       if (partes.length < 2) {
-        setErro('precisa ser nome completo · pelo menos nome + sobrenome (ex: Mariana Pinheiro Araújo)');
+        setErro('precisa ser nome completo · pelo menos nome + sobrenome (ex: Ana Costa Silva)');
         return;
       }
     }
@@ -43,8 +45,13 @@ export function Onboarding({ onConcluir, onPular }: OnboardingProps) {
               nome: hospitalNome,
               abrev: hospitalAbrev.toUpperCase(),
               cor: 'lavender',
-              tipo: 'publico',
-              valorPlantao,
+              tipo: hospitalTipo,
+              // valorPlantao zerado · o valor real vive em valorFixo (público)
+              // ou valorHora (privado). Mantemos o campo legado pra compat
+              // de tipo, mas a UI não usa mais.
+              valorPlantao: 0,
+              valorFixo: hospitalTipo === 'publico' ? valorFixo : 0,
+              valorHora: hospitalTipo === 'privado' ? valorHora : 0,
               adicionalNoite: 200,
               regras: {},
             },
@@ -122,7 +129,7 @@ export function Onboarding({ onConcluir, onPular }: OnboardingProps) {
               <input
                 value={nome}
                 onChange={(e) => setNome(e.target.value)}
-                placeholder="Mariana Pinheiro Araújo"
+                placeholder="Ana Costa Silva"
                 style={input}
                 autoFocus
               />
@@ -196,15 +203,38 @@ export function Onboarding({ onConcluir, onPular }: OnboardingProps) {
                   style={input}
                 />
               </Field>
-              <Field label="valor / plantão">
+              <Field label="tipo">
+                <select
+                  value={hospitalTipo}
+                  onChange={(e) => setHospitalTipo(e.target.value as TipoHospital)}
+                  style={input}
+                >
+                  <option value="publico">público</option>
+                  <option value="privado">privado</option>
+                </select>
+              </Field>
+            </div>
+            {hospitalTipo === 'publico' ? (
+              <Field label="valor fixo mensal (R$)">
                 <input
-                  type="number"
-                  value={valorPlantao}
-                  onChange={(e) => setValorPlantao(Number(e.target.value))}
+                  inputMode="numeric"
+                  value={valorFixo ? String(valorFixo) : ''}
+                  onChange={(e) => setValorFixo(Number(e.target.value.replace(/\D/g, '')) || 0)}
+                  placeholder="contrato CLT · independente das horas"
                   style={input}
                 />
               </Field>
-            </div>
+            ) : (
+              <Field label="valor por hora (R$)">
+                <input
+                  inputMode="numeric"
+                  value={valorHora ? String(valorHora) : ''}
+                  onChange={(e) => setValorHora(Number(e.target.value.replace(/\D/g, '')) || 0)}
+                  placeholder="ex: 150"
+                  style={input}
+                />
+              </Field>
+            )}
           </>
         )}
 

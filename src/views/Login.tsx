@@ -88,7 +88,7 @@ export function Login() {
               autoFocus
               required
               autoComplete="email"
-              placeholder="mariana@exemplo.com"
+              placeholder="voce@exemplo.com"
               value={email}
               onChange={(e) => {
                 setEmail(e.target.value);

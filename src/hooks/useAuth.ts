@@ -65,7 +65,9 @@ export async function enviarMagicLink(email: string): Promise<{ ok: true } | { o
   const { error } = await sb.auth.signInWithOtp({
     email,
     options: {
-      emailRedirectTo: typeof window !== 'undefined' ? window.location.origin : undefined,
+      // App vive em /ritmo · magic link precisa voltar pra dentro do scope.
+      emailRedirectTo:
+        typeof window !== 'undefined' ? `${window.location.origin}/ritmo/` : undefined,
     },
   });
   if (error) return { ok: false, erro: traduzirErroAuth(error.message) };
@@ -81,6 +83,6 @@ function traduzirErroAuth(msg: string): string {
   if (lower.includes('rate limit')) return 'muita tentativa em pouco tempo · espera 1 min';
   if (lower.includes('invalid email')) return 'esse email parece inválido';
   if (lower.includes('not allowed') || lower.includes('user not allowed'))
-    return 'esse email não tem acesso · fala com o Marcos';
+    return 'esse email não tem acesso ainda · acesso por convite';
   return 'algo travou aqui · tenta de novo em instantes';
 }
