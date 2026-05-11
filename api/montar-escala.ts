@@ -449,6 +449,11 @@ function montarPrompt(opts: {
     '- DURAÇÃO · plantão de 12h é a jornada típica · partidos de 5-6h existem mas use com moderação · prefira completar 12h e usar partidos pra fechar gap de horas.',
     '- Se um campo de regra está em branco, IGNORE esse limite · não invente.',
     '',
+    '## ECONOMIA POR TIPO DE HOSPITAL · INSTRUÇÃO DE ALOCAÇÃO',
+    '- Hospital com `valorFixo` (CLT mensal · típico em hospital `publico`): o salário do mês é FIXO e não muda com hora a mais. Mire EXATAMENTE no `minHorasPorMes` · ficar acima é trabalho de graça (sem retorno financeiro) e ficar abaixo perde o salário garantido.',
+    '- Hospital com `valorHora` (típico em hospital `privado`): cada plantão extra vira receita proporcional. É AQUI que volume extra paga · qualquer horas além das mínimas contratuais deve ir pra este hospital.',
+    '- Quando há mais de um hospital com tipos diferentes, primeiro fecha o público no mínimo contratual · só depois distribui o resto no privado. Isso vale em qualquer lente, mas é especialmente crítico em `acelerar`.',
+    '',
   );
 
   // Hospitais — bloco por hospital, isolado
@@ -646,9 +651,10 @@ function descricaoLente(lente: Lente): string {
     case 'acelerar':
       return [
         'Mês de meta · a médica marcou um motivo concreto pra forçar a régua. Empurre até o LIMITE DAS REGRAS CONTRATUAIS.',
+        '- ALOCAÇÃO POR HOSPITAL: hospital `publico`/`valorFixo` cumpre EXATAMENTE o mínimo contratual (mais que isso é trabalho de graça · não escala receita). Os plantões EXTRAS vão pro hospital `privado`/`valorHora`, onde cada plantão a mais vira dinheiro.',
         '- Pode espaçar plantões só 1 dia entre si.',
         '- Pode aceitar 2-3 plantões na mesma semana se for o caminho pra atingir.',
-        '- Prefira plantões mais rentáveis (noturnos, FDS quando o adicional vale).',
+        '- Prefira plantões mais rentáveis (noturnos, FDS quando o adicional vale) · NO PRIVADO.',
         '- Pelo menos 1 fim de semana livre no mês · qualidade de vida não some mesmo aqui.',
         '- NUNCA viole regras contratuais (CLT, máximos do hospital) pra atingir. Se a meta exigir violação, fica abaixo dela E declara isso na justificativa e avisos.',
         '- Recuperação pós-noite (12h) não é negociável · vale mesmo na lente acelerar.',
