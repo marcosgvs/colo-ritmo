@@ -262,12 +262,20 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
               marco como aviso pra você revisar antes de salvar.
             </p>
 
-            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: isMobile ? 'column' : 'row',
+                gap: 12,
+                flexWrap: 'wrap',
+                marginBottom: 14,
+              }}
+            >
               <Field label="hospital">
                 <select
                   value={hospitalId}
                   onChange={(e) => setHospitalId(e.target.value)}
-                  style={inputStyle}
+                  style={{ ...inputStyle, width: isMobile ? '100%' : undefined }}
                 >
                   {Object.values(hospitais).map((h) => (
                     <option key={h.id} value={h.id}>
@@ -282,7 +290,7 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
                   value={apelidoNaEscala}
                   onChange={(e) => setApelidoNaEscala(e.target.value)}
                   placeholder="ex: Mpinheiro"
-                  style={{ ...inputStyle, minWidth: 200 }}
+                  style={{ ...inputStyle, minWidth: isMobile ? 0 : 200, width: isMobile ? '100%' : undefined }}
                 />
               </Field>
               <Field label="mês">
@@ -686,6 +694,9 @@ const inputStyle: React.CSSProperties = {
   font: '500 13px/1.3 var(--font-body)',
   color: 'var(--ink)',
   outline: 'none',
+  // mobile · garante que select com nome longo de hospital não estoura
+  maxWidth: '100%',
+  textOverflow: 'ellipsis',
 };
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -706,21 +717,24 @@ function Card({
   eyebrow?: string;
   children: React.ReactNode;
 }) {
+  const isMobile = useIsMobile();
   return (
     <div
       style={{
         background: 'var(--bg)',
         border: '1px solid var(--line)',
         borderRadius: 18,
-        padding: '20px 22px',
+        padding: isMobile ? '16px 16px' : '20px 22px',
         boxShadow: 'var(--shadow-sm)',
       }}
     >
       <div
         style={{
           display: 'flex',
+          flexDirection: isMobile ? 'column' : 'row',
           justifyContent: 'space-between',
-          alignItems: 'baseline',
+          alignItems: isMobile ? 'flex-start' : 'baseline',
+          gap: isMobile ? 4 : 12,
           marginBottom: 12,
         }}
       >

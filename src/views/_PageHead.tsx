@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Eyebrow, Hand } from '@/components/atoms';
+import { useIsMobile } from '@/hooks/useIsMobile';
 
 interface PageHeadProps {
   eyebrow?: string;
@@ -10,33 +11,41 @@ interface PageHeadProps {
 }
 
 export function PageHead({ eyebrow, titulo, hand, direita }: PageHeadProps) {
+  const isMobile = useIsMobile();
   return (
     <div
       style={{
         display: 'flex',
         alignItems: 'flex-end',
         justifyContent: 'space-between',
-        gap: 24,
+        gap: isMobile ? 14 : 24,
         flexWrap: 'wrap',
-        marginBottom: 28,
+        marginBottom: isMobile ? 18 : 28,
       }}
     >
-      <div>
+      <div style={{ minWidth: 0, flex: '1 1 auto', maxWidth: '100%' }}>
         {eyebrow && <Eyebrow>{eyebrow}</Eyebrow>}
         <h1
           style={{
             fontFamily: 'var(--font-display)',
             fontWeight: 500,
-            fontSize: 'clamp(34px, 4vw, 44px)',
+            // mobile · escala suave de 26px (iphone) até 44px (desktop)
+            fontSize: 'clamp(26px, 7vw, 44px)',
             letterSpacing: '-0.02em',
             margin: '8px 0 0',
             color: 'var(--ink)',
+            overflowWrap: 'break-word',
+            wordBreak: 'break-word',
           }}
         >
           {titulo}
         </h1>
         {hand && (
-          <Hand color="var(--lavender-ink)" size={22} style={{ display: 'block', marginTop: 10 }}>
+          <Hand
+            color="var(--lavender-ink)"
+            size={isMobile ? 16 : 22}
+            style={{ display: 'block', marginTop: isMobile ? 8 : 10 }}
+          >
             {hand}
           </Hand>
         )}
