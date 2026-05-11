@@ -83,6 +83,7 @@ export function Hospitais({ hospitais, onSalvar, onRemover }: HospitaisProps) {
           setEditando(null);
           setCriando(false);
         }}
+        onPersistir={(h) => onSalvar(h.id, h)}
         onCancelar={() => {
           setEditando(null);
           setCriando(false);
@@ -186,11 +187,13 @@ interface FormProps {
   inicial: Hospital | null;
   coresUsadas: CorFamilia[];
   onSalvar: (h: Hospital) => void;
+  /** Persiste sem fechar o form · usado quando aplicar regras do chat. */
+  onPersistir?: (h: Hospital) => void;
   onCancelar: () => void;
   onRemover?: () => void;
 }
 
-function HospitalForm({ inicial, coresUsadas, onSalvar, onCancelar, onRemover }: FormProps) {
+function HospitalForm({ inicial, coresUsadas, onSalvar, onPersistir, onCancelar, onRemover }: FormProps) {
   const [draft, setDraft] = useState<Hospital>(
     inicial ?? {
       id: `H-${Date.now()}`.slice(0, 12),
@@ -331,7 +334,12 @@ function HospitalForm({ inicial, coresUsadas, onSalvar, onCancelar, onRemover }:
             tipoHospital={draft.tipo}
             regrasAtuais={draft.regras}
             onAplicarRegras={(novas) =>
-              setDraft((d) => ({ ...d, regras: { ...d.regras, ...novas } }))
+              setDraft((d) => {
+                const novoDraft = { ...d, regras: { ...d.regras, ...novas } };
+                // Aplicar = salvar imediato · não exige clicar "salvar" depois.
+                onPersistir?.(novoDraft);
+                return novoDraft;
+              })
             }
           />
         </div>
