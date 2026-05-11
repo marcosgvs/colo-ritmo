@@ -8,7 +8,7 @@ import type {
   Mode,
   Preferencias,
 } from '@/types';
-import { cargaSemanal, setHospitaisRuntime } from '@/lib/data';
+import { cargaSemanal, HOJE, semanaDe, setHospitaisRuntime } from '@/lib/data';
 import { HandVariantContext } from '@/components/atoms';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserState } from '@/hooks/useUserState';
@@ -91,7 +91,13 @@ export function App() {
     setHospitaisRuntime(userState.state.hospitais);
   }, [userState.state.hospitais]);
 
-  const carga = useMemo(() => cargaSemanal(userState.state.blocos), [userState.state.blocos]);
+  // CargaBadge do header mostra a semana de HOJE · cargaSemanal só
+  // soma o array que recebe (não filtra), então filtramos antes pra
+  // não somar a vida toda.
+  const carga = useMemo(() => {
+    const dias = new Set(semanaDe(HOJE));
+    return cargaSemanal(userState.state.blocos.filter((b) => dias.has(b.data)));
+  }, [userState.state.blocos]);
 
   const precisaOnboarding =
     auth.status === 'logado' &&
