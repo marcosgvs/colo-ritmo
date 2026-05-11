@@ -132,7 +132,7 @@ export function Mes({ blocos, hospitais, onSelectBloco }: MesProps) {
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(7, 1fr) 56px',
+              gridTemplateColumns: isMobile ? 'repeat(7, 1fr)' : 'repeat(7, 1fr) 56px',
               background: 'var(--bg-alt)',
               borderBottom: '1px solid var(--line)',
             }}
@@ -151,18 +151,20 @@ export function Mes({ blocos, hospitais, onSelectBloco }: MesProps) {
                 {dow}
               </div>
             ))}
-            <div
-              style={{
-                padding: '12px 10px',
-                font: '700 10px/1 var(--font-body)',
-                letterSpacing: '0.06em',
-                textTransform: 'uppercase',
-                color: 'var(--ink-3)',
-                textAlign: 'right',
-              }}
-            >
-              soma
-            </div>
+            {!isMobile && (
+              <div
+                style={{
+                  padding: '12px 10px',
+                  font: '700 10px/1 var(--font-body)',
+                  letterSpacing: '0.06em',
+                  textTransform: 'uppercase',
+                  color: 'var(--ink-3)',
+                  textAlign: 'right',
+                }}
+              >
+                soma
+              </div>
+            )}
           </div>
 
           {semanas.map((semana, i) => {
@@ -175,7 +177,7 @@ export function Mes({ blocos, hospitais, onSelectBloco }: MesProps) {
                 key={`${semana[0]}-${i}`}
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(7, 1fr) 56px',
+                  gridTemplateColumns: isMobile ? 'repeat(7, 1fr)' : 'repeat(7, 1fr) 56px',
                   borderBottom: i === semanas.length - 1 ? 'none' : '1px solid var(--line)',
                 }}
               >
@@ -256,25 +258,27 @@ export function Mes({ blocos, hospitais, onSelectBloco }: MesProps) {
                     </div>
                   );
                 })}
-                <div
-                  style={{
-                    padding: '8px 10px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'flex-end',
-                    fontFamily: 'var(--font-display)',
-                    fontSize: 14,
-                    fontWeight: 500,
-                    color:
-                      niv === 'ok'
-                        ? 'var(--sage-ink)'
-                        : niv === 'warn'
-                          ? '#B8884A'
-                          : 'var(--coral-ink)',
-                  }}
-                >
-                  {cargaSem}h
-                </div>
+                {!isMobile && (
+                  <div
+                    style={{
+                      padding: '8px 10px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'flex-end',
+                      fontFamily: 'var(--font-display)',
+                      fontSize: 14,
+                      fontWeight: 500,
+                      color:
+                        niv === 'ok'
+                          ? 'var(--sage-ink)'
+                          : niv === 'warn'
+                            ? '#B8884A'
+                            : 'var(--coral-ink)',
+                    }}
+                  >
+                    {cargaSem}h
+                  </div>
+                )}
               </div>
             );
           })}
