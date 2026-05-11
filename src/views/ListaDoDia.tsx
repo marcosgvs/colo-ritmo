@@ -133,6 +133,8 @@ export function ListaDoDia({ blocos, hospitais: _h, onSelectBloco }: ListaDaSema
                   </Mono>
                 </div>
 
+                <TimelineDia dia={dia} blocos={blocos} />
+
                 {items.length === 0 ? (
                   <Mono style={{ color: 'var(--ink-3)', display: 'block', padding: '4px 4px 8px' }}>
                     aberto
@@ -151,6 +153,134 @@ export function ListaDoDia({ blocos, hospitais: _h, onSelectBloco }: ListaDaSema
       )}
     </>
   );
+}
+
+/**
+ * Mini-timeline horizontal de 24h pra cada dia · plantão que cruza
+ * meia-noite aparece também no dia seguinte (em 0-Xh), com cantos retos
+ * do lado em que continua. Ajuda a ver "o sábado tá tomado até as 7h"
+ * sem precisar repetir o item na lista.
+ */
+function TimelineDia({ dia, blocos }: { dia: string; blocos: Bloco[] }) {
+  const segmentos = segmentosDoDia(blocos, dia);
+  if (segmentos.length === 0) return null;
+
+  return (
+    <div
+      style={{
+        position: 'relative',
+        height: 14,
+        background: 'var(--bg-alt)',
+        borderRadius: 4,
+        marginBottom: 10,
+        overflow: 'hidden',
+      }}
+    >
+      {/* marcadores 6h / 12h / 18h */}
+      {[6, 12, 18].map((h) => (
+        <span
+          key={h}
+          style={{
+            position: 'absolute',
+            top: 0,
+            bottom: 0,
+            left: `${(h / 24) * 100}%`,
+            width: 1,
+            background: 'var(--line-2)',
+            opacity: 0.6,
+          }}
+        />
+      ))}
+      {segmentos.map((s, i) => {
+        const hosp =
+          s.bloco.tipo === 'plantao' || s.bloco.tipo === 'cedido'
+            ? getHospital(s.bloco.hospitalId)
+            : undefined;
+        const cor = hosp ? `var(--${hosp.cor})` : 'var(--ink-3)';
+        const ehCedido = s.bloco.tipo === 'cedido';
+        return (
+          <span
+            key={`${s.bloco.id}-${i}`}
+            title={tooltipSegmento(s)}
+            style={{
+              position: 'absolute',
+              top: 2,
+              bottom: 2,
+              left: `${(s.startHora / 24) * 100}%`,
+              width: `${(s.durHora / 24) * 100}%`,
+              background: cor,
+              opacity: ehCedido ? 0.4 : 0.85,
+              borderTopLeftRadius: s.continuaAntes ? 0 : 3,
+              borderBottomLeftRadius: s.continuaAntes ? 0 : 3,
+              borderTopRightRadius: s.continuaDepois ? 0 : 3,
+              borderBottomRightRadius: s.continuaDepois ? 0 : 3,
+              ...(ehCedido
+                ? {
+                    backgroundImage:
+                      'repeating-linear-gradient(45deg, transparent 0 3px, rgba(255,255,255,0.5) 3px 5px)',
+                  }
+                : null),
+            }}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+interface SegmentoDia {
+  bloco: Bloco;
+  /** 0-24 · hora local de início do segmento naquele dia. */
+  startHora: number;
+  /** Em horas · sempre dentro de [0, 24-startHora]. */
+  durHora: number;
+  continuaAntes: boolean;
+  continuaDepois: boolean;
+}
+
+/**
+ * Retorna segmentos visíveis na timeline do `dia`. Considera apenas
+ * tipos com horário (plantão/cedido/sono/bloqueio). Plantão noturno do
+ * dia anterior vira segmento `continuaAntes=true` em 0-Xh deste dia.
+ */
+function segmentosDoDia(blocos: Bloco[], dia: string): SegmentoDia[] {
+  const out: SegmentoDia[] = [];
+  for (const b of blocos) {
+    if (b.tipo === 'deslocamento') continue;
+    const inicioH = b.horaInicio + 24 * diffDias(b.data, dia) * -1;
+    // simplificado: trabalha em "horas relativas ao dia"
+    const ini = b.horaInicio - 24 * diffDias(dia, b.data);
+    const fim = ini + b.duracao;
+    if (fim <= 0 || ini >= 24) continue;
+    void inicioH;
+    const startHora = Math.max(0, ini);
+    const endHora = Math.min(24, fim);
+    out.push({
+      bloco: b,
+      startHora,
+      durHora: endHora - startHora,
+      continuaAntes: ini < 0,
+      continuaDepois: fim > 24,
+    });
+  }
+  return out.sort((a, b) => a.startHora - b.startHora);
+}
+
+/** Diferença em dias entre dois ISOs (a-b). */
+function diffDias(a: string, b: string): number {
+  const da = fromISO(a).getTime();
+  const db = fromISO(b).getTime();
+  return Math.round((da - db) / (24 * 3600 * 1000));
+}
+
+function tooltipSegmento(s: SegmentoDia): string {
+  const b = s.bloco;
+  if (b.tipo === 'plantao' || b.tipo === 'cedido') {
+    const hosp = getHospital(b.hospitalId);
+    const prefixo = b.tipo === 'cedido' ? 'cedido · ' : '';
+    return `${prefixo}${hosp?.abrev ?? '?'} · ${fmtRange(b.horaInicio, b.duracao)}`;
+  }
+  return `${b.tipo} · ${fmtRange(b.horaInicio, b.duracao)}`;
 }
 
 function ItemLinha({ b, onClick }: { b: Bloco; onClick: () => void }) {
