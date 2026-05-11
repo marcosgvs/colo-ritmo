@@ -11,6 +11,7 @@
 
 import type { BlocoPlantao, Hospital, Preferencias } from '@/types';
 import { DOWS_LONG, MESES, fromISO } from './dates.js';
+import { rotuloTurno } from './turno.js';
 
 interface DadosExport {
   hospital: Hospital;
@@ -42,7 +43,9 @@ export function montarMensagem(dados: DadosExport): string {
     const fim = (p.horaInicio + p.duracao) % 24;
     const ini = formatarHora(p.horaInicio);
     const fimStr = formatarHora(fim);
-    return `- ${dow} ${dia}/${mesPad} · das ${ini} às ${fimStr} (${p.duracao}h)`;
+    const rotulo = rotuloTurno(p.horaInicio, p.duracao, dados.hospital);
+    const rotuloPart = rotulo ? `${rotulo} · ` : '';
+    return `- ${dow} ${dia}/${mesPad} · ${rotuloPart}das ${ini} às ${fimStr} (${p.duracao}h)`;
   });
 
   const horas = ordenados.reduce((s, p) => s + p.duracao, 0);
@@ -67,9 +70,11 @@ export async function baixarExcelMontar(dados: DadosExport): Promise<void> {
     const mesPad = String(d.getMonth() + 1).padStart(2, '0');
     const dowIdx = d.getDay() === 0 ? 6 : d.getDay() - 1;
     const fim = (p.horaInicio + p.duracao) % 24;
+    const rotulo = rotuloTurno(p.horaInicio, p.duracao, dados.hospital);
     return {
       Data: `${dia}/${mesPad}/${dados.ano}`,
       'Dia da semana': capitalize(DOWS_LONG[dowIdx] ?? ''),
+      Turno: rotulo ? capitalize(rotulo) : '',
       Início: formatarHora(p.horaInicio),
       Fim: formatarHora(fim),
       'Duração (h)': p.duracao,
@@ -82,6 +87,7 @@ export async function baixarExcelMontar(dados: DadosExport): Promise<void> {
   linhas.push({
     Data: '',
     'Dia da semana': '',
+    Turno: '',
     Início: '',
     Fim: 'Total',
     'Duração (h)': horas,
@@ -92,6 +98,7 @@ export async function baixarExcelMontar(dados: DadosExport): Promise<void> {
   ws['!cols'] = [
     { wch: 12 },
     { wch: 14 },
+    { wch: 12 },
     { wch: 8 },
     { wch: 8 },
     { wch: 12 },

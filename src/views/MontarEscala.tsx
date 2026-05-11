@@ -19,6 +19,7 @@ import {
   inicioDoMes,
 } from '@/lib/data';
 import { Eyebrow, LoadingFrases, MonthPicker, Mono } from '@/components/atoms';
+import { rotuloTurno } from '@/lib/turno';
 import { PageHead } from './_PageHead';
 
 const FRASES_MONTAR = [
@@ -55,7 +56,7 @@ interface PlantaoSugerido {
 interface PropostaResultado {
   plantoes: PlantaoSugerido[];
   justificativa: string;
-  totalEstimadoLiquido: number;
+  valorEstimado: number;
   avisos: string[];
   respostaCrua?: string;
 }
@@ -522,7 +523,7 @@ function SetupCard({
                 placeholder="25000"
                 style={{ ...inputBase, width: 110, textAlign: 'right' }}
               />
-              <span>líquido no mês</span>
+              <span>estimado no mês</span>
             </label>
           </div>
         </Linha>
@@ -726,7 +727,7 @@ function CalendarioBloqueios({ dias, mes, bloqueios, plantoes, hospitais, onClic
                       color: `var(--${cor}-ink)`,
                     }}
                   >
-                    {h?.abrev} · {fmtHora(p.horaInicio)}
+                    {h?.abrev} · {rotuloTurno(p.horaInicio, p.duracao, h) ?? fmtHora(p.horaInicio)}
                   </Mono>
                 );
               })}
@@ -915,7 +916,7 @@ function PreviewBlock({
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <Total rotulo="plantões" valor={String(resultado.plantoes.length)} />
             <Total rotulo="horas" valor={`${totalDuracao}h`} />
-            <Total rotulo="líquido aprox." valor={`R$ ${resultado.totalEstimadoLiquido.toLocaleString('pt-BR')}`} />
+            <Total rotulo="valor estimado" valor={`R$ ${resultado.valorEstimado.toLocaleString('pt-BR')}`} />
             {metaEfetiva !== null && (
               <Total rotulo="meta" valor={`R$ ${metaEfetiva.toLocaleString('pt-BR')}`} />
             )}
@@ -1275,7 +1276,7 @@ function CalendarioProposta({
                       color: `var(--${cor}-ink)`,
                     }}
                   >
-                    {h?.abrev ?? '?'} · {fmtHora(p.horaInicio)}
+                    {h?.abrev ?? '?'} · {rotuloTurno(p.horaInicio, p.duracao, h) ?? fmtHora(p.horaInicio)}
                   </div>
                 );
               })}
@@ -1354,10 +1355,10 @@ function DetalheDia({
               >
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                   <span style={{ font: '500 13px/1.2 var(--font-body)', color: 'var(--ink)' }}>
-                    {h?.abrev ?? '?'}
+                    {h?.abrev ?? '?'} · {rotuloTurno(p.horaInicio, p.duracao, h) ?? `${fmtHora(p.horaInicio)} → ${fmtHora((p.horaInicio + p.duracao) % 24)}`}
                   </span>
                   <Mono style={{ color: 'var(--ink-2)', fontSize: 11 }}>
-                    {fmtHora(p.horaInicio)} → {fmtHora((p.horaInicio + p.duracao) % 24)} · {p.duracao}h
+                    {p.duracao}h
                   </Mono>
                   {p.razao && (
                     <Mono style={{ color: 'var(--ink-3)', fontSize: 11, marginTop: 2 }}>{p.razao}</Mono>

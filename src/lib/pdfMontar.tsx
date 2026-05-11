@@ -34,6 +34,7 @@ import {
   inicioDoMes,
   toISO,
 } from './dates.js';
+import { rotuloTurno } from './turno.js';
 
 // Cores do site (de tokens/colors_and_type.css)
 const COR_BG = '#FFFAF3';
@@ -359,7 +360,8 @@ function desenharCalendario(
     let by = cy + 4.5;
     const visiveis = lista.slice(0, blocosMax);
     for (const p of visiveis) {
-      const horaIni = formatarHora(p.horaInicio);
+      const rotulo = rotuloTurno(p.horaInicio, p.duracao, dados.hospital);
+      const labelTurno = rotulo ?? `${formatarHora(p.horaInicio)} · ${p.duracao}h`;
 
       // Background pill
       pdf.setFillColor(corHosp.surface);
@@ -370,12 +372,13 @@ function desenharCalendario(
       pdf.setFillColor(corHosp.ink);
       pdf.rect(cx + 1.2, by, 0.7, blocoH, 'F');
 
-      // Texto · 1 linha compacta sempre · detalhamento é a fonte canônica
+      // Texto · 1 linha compacta sempre · só rotulo no calendário,
+      // o detalhamento (à direita) tem o horário completo.
       pdf.setFont('Nunito', 'bold');
       pdf.setFontSize(blocoH >= 5 ? 6 : 5.4);
       pdf.setTextColor(corHosp.ink);
       pdf.text(
-        `${dados.hospital.abrev ?? '?'} · ${horaIni} · ${p.duracao}h`,
+        `${dados.hospital.abrev ?? '?'} · ${labelTurno}`,
         cx + 2.6,
         by + (blocoH >= 5 ? blocoH / 2 + 1 : blocoH / 2 + 0.8),
       );
@@ -453,6 +456,8 @@ function desenharDetalhamento(
     const fim = (p.horaInicio + p.duracao) % 24;
     const horaIni = formatarHora(p.horaInicio);
     const horaFim = formatarHora(fim);
+    const rotulo = rotuloTurno(p.horaInicio, p.duracao, dados.hospital);
+    const prefixoTurno = rotulo ? `${rotulo} · ` : '';
 
     pdf.setFont('Fraunces', 'bold');
     pdf.setFontSize(8);
@@ -462,7 +467,7 @@ function desenharDetalhamento(
     pdf.setFont('Nunito', 'normal');
     pdf.setFontSize(7.5);
     pdf.setTextColor(COR_INK_2);
-    pdf.text(`${horaIni} às ${horaFim} (${p.duracao}h)`, cx, cur + 3.5);
+    pdf.text(`${prefixoTurno}${horaIni} às ${horaFim} (${p.duracao}h)`, cx, cur + 3.5);
   }
 
   // Total · linha + label + valor

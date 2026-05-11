@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { envObrigatorio } from './_shared/env.js';
 import { fuzzyMatch } from '../src/lib/fuzzyMatch.js';
+import { calcRemuneracaoMes } from '../src/lib/remuneracao.js';
 
 /**
  * /api/montar-escala · gera proposta de escala via Claude com tool_use.
@@ -28,7 +29,7 @@ import { fuzzyMatch } from '../src/lib/fuzzyMatch.js';
  *   {
  *     plantoes: Array<{ data, hospitalId, horaInicio, duracao, razao? }>,
  *     justificativa: string,
- *     totalEstimadoLiquido: number,
+ *     valorEstimado: number,
  *     avisos: string[],
  *     respostaCrua?: string,
  *   }
@@ -122,7 +123,7 @@ interface PlantaoOutput {
 interface ToolInput {
   plantoes?: PlantaoOutput[];
   justificativa?: string;
-  totalEstimadoLiquido?: number;
+  valorEstimado?: number;
   avisos?: string[];
 }
 
@@ -172,9 +173,9 @@ const FERRAMENTA = {
         description:
           'Português padrão (capitalização correta · NÃO minúsculo). 2-4 frases. Explica a estratégia escolhida e como respeita as regras de cada hospital.',
       },
-      totalEstimadoLiquido: {
+      valorEstimado: {
         type: 'number',
-        description: 'Estimativa do líquido em R$ do mês todo.',
+        description: 'Estimativa em R$ do mês todo (referência · o servidor recalcula).',
       },
       avisos: {
         type: 'array',
@@ -183,7 +184,7 @@ const FERRAMENTA = {
           'Trade-offs ou alertas relevantes pra médica (ex: "ficou abaixo da meta", "duas semanas com 3 plantões").',
       },
     },
-    required: ['plantoes', 'justificativa', 'totalEstimadoLiquido'],
+    required: ['plantoes', 'justificativa', 'valorEstimado'],
   },
 } as const;
 
@@ -252,7 +253,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       res.status(200).json({
         plantoes: [],
         justificativa: '',
-        totalEstimadoLiquido: 0,
+        valorEstimado: 0,
         avisos: ['o modelo não retornou no formato esperado · veja o que recebi e tenta de novo'],
         respostaCrua: texto || '(resposta vazia)',
       });
@@ -298,12 +299,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     // com soma real, ex: "138h" quando a soma é 150h).
     const validacaoLinhas = validarPorHospital(plantoesValidos, hospitais);
 
+    // Cálculo do valor estimado · servidor é a fonte de verdade. O modelo
+    // erra historicamente quando mistura valorFixo CLT + valorHora.
+    const hospitaisMap: Record<string, Hospital> = {};
+    for (const h of hospitais) hospitaisMap[h.id] = h;
+    const blocosPlantao = plantoesValidos.map((p, i) => ({
+      id: `prop-${i}`,
+      tipo: 'plantao' as const,
+      hospitalId: p.hospitalId,
+      data: p.data,
+      horaInicio: p.horaInicio,
+      duracao: p.duracao,
+    }));
+    const mesAlvoISO = `${ano}-${String(mes).padStart(2, '0')}`;
+    const resumo = calcRemuneracaoMes(blocosPlantao, hospitaisMap as never, mesAlvoISO);
+    const valorEstimadoReal = resumo.total.liquido;
+
     const avisosFinais = [...(inp.avisos ?? []), ...removidos, ...validacaoLinhas];
 
     res.status(200).json({
       plantoes: plantoesValidos,
       justificativa: String(inp.justificativa ?? ''),
-      totalEstimadoLiquido: Number(inp.totalEstimadoLiquido ?? 0),
+      valorEstimado: valorEstimadoReal,
       avisos: avisosFinais,
     });
   } catch (err) {
@@ -402,7 +419,7 @@ function montarPrompt(opts: {
       motivos.push(`+${opts.acelerarPercentual}% sobre baseline · MAS baseline insuficiente · use o valor R$ como alvo principal`);
     }
     if (opts.acelerarValor) {
-      motivos.push(`chegar até R$ ${opts.acelerarValor.toLocaleString('pt-BR')} líquido`);
+      motivos.push(`chegar até R$ ${opts.acelerarValor.toLocaleString('pt-BR')} estimado no mês`);
     }
     partes.push('Motivo: ' + motivos.join(' OU '));
     partes.push('Se as duas metas estão presentes, honre a MAIS DEMANDANTE. Use como justificativa pra forçar a régua até o LIMITE das regras contratuais — nunca além.');
@@ -414,11 +431,12 @@ function montarPrompt(opts: {
     descricaoLente(opts.lente),
     '',
     '## METAS DE QUALIDADE DE VIDA · SOFT, MAS PESAM',
-    '- Evite sequências de 3+ plantões consecutivos · acumulam fadiga real.',
+    '- Sequências de 3+ plantões consecutivos são um sinal RUIM · evite ao máximo. Se for absolutamente necessário pra cumprir um mínimo contratual (FDS, minHorasPorMes), aceite MAS declare EXPLICITAMENTE em "avisos" qual mínimo forçou isso (ex: "seq 22-23-24 aceita pra cumprir minHorasPorFimDeSemana de 30h"). Sem justificativa concreta, NÃO empilhe 3 dias.',
     '- Pelo menos 1-2 fins de semana com folga no mês (descansar/equilibrar mira 2+, acelerar mira 1+).',
     '- Recuperação após plantão noturno (mínimo 12h sem plantão depois).',
     '- Distribua espaçamento entre plantões · não concentre tudo numa semana.',
-    'Essas metas NÃO são bloqueios. Violações são aceitáveis quando justificadas pelo contexto, mas trate como tendência preferida e mencione em avisos quando violar.',
+    '- 2 turnos no mesmo dia (manhã+tarde = 12h, ou tarde+noite = 18h) são pesados · use com moderação (3-4 vezes no mês no máximo). Cada ocorrência tem que ser justificada em avisos.',
+    'Essas metas NÃO são bloqueios. Violações são aceitáveis SE houver justificativa contratual concreta · declare em avisos.',
     '',
     '## REGRAS DURAS · NÃO VIOLE',
     '- Cada plantão pertence a UM hospital. Use SOMENTE as regras desse hospital pra esse plantão. NUNCA herde de outro.',
@@ -597,7 +615,7 @@ function montarPrompt(opts: {
     '3. Cada `horaInicio` e `duracao` deve bater EXATAMENTE com uma janela cadastrada do hospital.',
     '4. Adicione razão curta (1 frase) em cada plantão.',
     '5. Justificativa em Português padrão (não minúsculo) · 2-4 frases. Se uma regra contratual obrigou a ficar abaixo da meta, fala disso na justificativa.',
-    '6. Estimativa de líquido considerando os valores cadastrados de cada hospital.',
+    '6. Estimativa total considerando os valores cadastrados de cada hospital (informativa · o servidor recalcula).',
     '7. Use `avisos` pra qualquer trade-off (ficou abaixo da meta, semana pesada, etc).',
   );
 
