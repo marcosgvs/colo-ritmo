@@ -90,7 +90,9 @@ async function carregarFontes(pdf: jsPDF): Promise<void> {
     ];
     fontesCache = await Promise.all(
       lista.map(async (f) => {
-        const resp = await fetch(`/fonts/${f.arquivo}`);
+        // BASE_URL = '/ritmo/' em prod · prefixa as fontes que ficam em
+        // dist/ritmo/fonts/. Se voltar pra root no futuro, segue sozinho.
+        const resp = await fetch(`${import.meta.env.BASE_URL}fonts/${f.arquivo}`);
         if (!resp.ok) throw new Error(`fonte ${f.arquivo}: ${resp.status}`);
         const buf = await resp.arrayBuffer();
         return { ...f, b64: arrayBufferToBase64(buf) };
