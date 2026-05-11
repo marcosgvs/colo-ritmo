@@ -5,6 +5,13 @@ import path from 'node:path';
 
 export default defineConfig({
   plugins: [react()],
+  // App vive em colopediatria.com.br/ritmo · raiz fica livre pro site
+  // do consultório (Colo Pediatria) que vai ser montado depois.
+  base: '/ritmo/',
+  build: {
+    outDir: 'dist/ritmo',
+    emptyOutDir: true,
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),

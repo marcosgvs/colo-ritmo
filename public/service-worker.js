@@ -3,27 +3,30 @@
 /**
  * Colo Ritmo · service worker
  *
+ * Vive em `colopediatria.com.br/ritmo/service-worker.js` · scope `/ritmo/`.
+ * Só intercepta requests dentro de `/ritmo/*` · APIs no root (`/api/*`)
+ * passam direto sem tocar no SW.
+ *
  * Responsabilidades:
  *   1. Receber web push e mostrar notificação (titulo, corpo, ações).
  *   2. Reabrir/focar a aba da agenda quando o user clica.
  *   3. Cache do app shell · estratégia diferenciada por tipo:
  *      - HTML/SPA · network-first (UI sempre fresh, cache é só fallback offline)
- *      - /assets/* (build com hash imutável) · cache-first
- *      - /api/* · network-only (sempre fresh)
+ *      - /ritmo/assets/* (build com hash imutável) · cache-first
  *
  * Bump em VERSAO força limpeza de caches anteriores no activate.
  */
 
-const VERSAO = 'colo-ritmo-v2';
+const VERSAO = 'colo-ritmo-v3';
 const CACHE_SHELL = `${VERSAO}-shell`;
 const CACHE_ASSETS = `${VERSAO}-assets`;
 
-const SHELL_INICIAL = ['/', '/colo-ritmo-mark.svg'];
+const SHELL_INICIAL = ['/ritmo/', '/ritmo/colo-ritmo-mark.svg'];
 
 const NOTIF_DEFAULT = {
   titulo: 'Colo Ritmo',
   corpo: 'um lembrete chegou pra você',
-  url: '/',
+  url: '/ritmo/',
   tag: 'colo-ritmo',
 };
 
@@ -65,26 +68,28 @@ self.addEventListener('fetch', (event) => {
   // Mesmo origem só. Ignora extensões de browser e cross-origin.
   if (url.origin !== self.location.origin) return;
 
-  // /api/* nunca cacheia · sempre rede
+  // /api/* nunca cacheia · sempre rede (mesmo se o SW receber por acaso)
   if (url.pathname.startsWith('/api/')) return;
 
-  // /assets/* (build hashed) · cache-first imutável
-  if (url.pathname.startsWith('/assets/')) {
+  // /ritmo/assets/* (build hashed) · cache-first imutável
+  if (url.pathname.startsWith('/ritmo/assets/')) {
     event.respondWith(cacheFirst(request, CACHE_ASSETS));
     return;
   }
 
-  // Logos e estáticos públicos · cache-first
+  // Logos e estáticos públicos do ritmo · cache-first
   if (
-    url.pathname.startsWith('/colo-ritmo') ||
-    url.pathname === '/service-worker.js'
+    url.pathname.startsWith('/ritmo/colo-ritmo') ||
+    url.pathname === '/ritmo/service-worker.js'
   ) {
     event.respondWith(cacheFirst(request, CACHE_ASSETS));
     return;
   }
 
-  // HTML / SPA shell · network-first (sempre tenta rede; cache é só fallback offline)
-  event.respondWith(networkFirst(request, CACHE_SHELL));
+  // HTML / SPA shell dentro de /ritmo · network-first (sempre tenta rede; cache é só fallback offline)
+  if (url.pathname === '/ritmo/' || url.pathname.startsWith('/ritmo/')) {
+    event.respondWith(networkFirst(request, CACHE_SHELL));
+  }
 });
 
 async function networkFirst(request, cacheName) {
@@ -125,10 +130,10 @@ self.addEventListener('push', (event) => {
   event.waitUntil(
     self.registration.showNotification(data.titulo, {
       body: data.corpo,
-      icon: data.icon ?? '/colo-ritmo-mark.svg',
-      badge: data.badge ?? '/colo-ritmo-mark.svg',
+      icon: data.icon ?? '/ritmo/colo-ritmo-mark.svg',
+      badge: data.badge ?? '/ritmo/colo-ritmo-mark.svg',
       tag: data.tag,
-      data: { url: data.url ?? '/' },
+      data: { url: data.url ?? '/ritmo/' },
       requireInteraction: false,
     }),
   );
@@ -136,7 +141,7 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const targetUrl = event.notification.data?.url ?? '/';
+  const targetUrl = event.notification.data?.url ?? '/ritmo/';
 
   event.waitUntil(
     (async () => {

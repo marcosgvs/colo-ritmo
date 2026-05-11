@@ -2,7 +2,8 @@
  * Web Push helpers · client-side.
  *
  * Fluxo:
- *   1. registrarServiceWorker() — chamado uma vez no boot
+ *   1. registrarServiceWorker() — chamado uma vez no boot. Limpa SW antigo
+ *      do scope raiz (quando o app vivia em `/`) e registra o novo em `/ritmo/`.
  *   2. assinarPush(userId) — pede permissão, gera PushSubscription,
  *      manda pra /api/push/subscribe
  *   3. cancelarPush(userId) — desassina e tira do banco
@@ -11,17 +12,46 @@
  * iOS, etc) — retornam `false` ou `null` sem throw.
  */
 
-const SW_PATH = '/service-worker.js';
+const SW_PATH = '/ritmo/service-worker.js';
+const SW_SCOPE = '/ritmo/';
 
 export function suportaPush(): boolean {
   if (typeof window === 'undefined') return false;
   return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
 }
 
+/**
+ * Desinstala SWs antigos registrados em outro scope · cobre a transição
+ * de `/service-worker.js` (scope `/`) pra `/ritmo/service-worker.js`
+ * (scope `/ritmo/`). Sem isso, o user antigo fica com 2 SWs duplicados
+ * recebendo push.
+ */
+async function limparSWAntigos(): Promise<void> {
+  if (!('serviceWorker' in navigator)) return;
+  try {
+    const regs = await navigator.serviceWorker.getRegistrations();
+    const novoScope = new URL(SW_SCOPE, window.location.origin).href;
+    for (const reg of regs) {
+      if (reg.scope !== novoScope) {
+        // Desinstala SW antigo (scope raiz ou qualquer outro)
+        // Subscription dele é descartada junto · user vai precisar re-permitir push.
+        try {
+          await reg.unregister();
+        } catch {
+          /* ignora */
+        }
+      }
+    }
+  } catch {
+    /* ignora · não bloqueia boot se navegador não cooperar */
+  }
+}
+
 export async function registrarServiceWorker(): Promise<ServiceWorkerRegistration | null> {
   if (!suportaPush()) return null;
   try {
-    return await navigator.serviceWorker.register(SW_PATH, { scope: '/' });
+    await limparSWAntigos();
+    return await navigator.serviceWorker.register(SW_PATH, { scope: SW_SCOPE });
   } catch (err) {
     console.warn('push: falhou ao registrar SW', err);
     return null;

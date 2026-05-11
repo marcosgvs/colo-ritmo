@@ -316,7 +316,7 @@ export function Usuario({ email, userId, preferencias, onSalvarPreferencias }: U
                       <button
                         type="button"
                         onClick={() => {
-                          const url = `${window.location.origin}/share/${s.token}`;
+                          const url = `${window.location.origin}/ritmo/share/${s.token}`;
                           navigator.clipboard?.writeText(url);
                         }}
                         style={{
