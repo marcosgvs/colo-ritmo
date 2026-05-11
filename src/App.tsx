@@ -14,6 +14,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useUserState } from '@/hooks/useUserState';
 import { usePreviewMode } from '@/hooks/usePreviewMode';
 import { useNotificacoes } from '@/hooks/useNotificacoes';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import { registrarServiceWorker } from '@/lib/push';
 
 // Telas críticas (Login + Semana = first paint) ficam eager — o resto
@@ -438,9 +439,20 @@ function ViewSwitch({
   aplicarEscala,
 }: ViewSwitchProps) {
   const { state, status, erro } = userState;
+  const isMobile = useIsMobile();
 
   switch (active) {
     case 'agenda':
+      // Em mobile a grade semanal é inviável (7 dias × 24h) · cai pra Lista.
+      if (isMobile) {
+        return (
+          <ListaDoDia
+            blocos={state.blocos}
+            hospitais={state.hospitais}
+            onSelectBloco={onSelectBloco}
+          />
+        );
+      }
       return (
         <Semana
           blocos={state.blocos}

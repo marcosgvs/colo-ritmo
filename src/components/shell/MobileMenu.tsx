@@ -25,7 +25,9 @@ export function MobileMenu({ active, mode, conflitos = 0, onNav, onClose }: Mobi
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  const items = NAV_ITEMS.filter((i) => i.roles.includes(mode));
+  // 'lista' some em mobile porque 'agenda' já renderiza ListaDoDia ·
+  // mostrar os dois seria entrada redundante pro mesmo destino.
+  const items = NAV_ITEMS.filter((i) => i.roles.includes(mode) && i.key !== 'lista');
   const conflitoAtivo = active === 'conflitos';
 
   return (
