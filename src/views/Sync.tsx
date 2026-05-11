@@ -395,7 +395,8 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
                             display: 'flex',
                             alignItems: 'center',
                             gap: 10,
-                            padding: '10px 12px',
+                            padding: isMobile ? '14px 14px' : '10px 12px',
+                            minHeight: isMobile ? 48 : undefined,
                             borderRadius: 'var(--r-sm)',
                             border: ativo ? '1px solid var(--lavender-ink)' : '1px solid var(--line)',
                             background: ativo ? 'var(--bg)' : 'transparent',
@@ -408,6 +409,7 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
                             type="checkbox"
                             checked={ativo}
                             onChange={() => toggleVariante(v.nome)}
+                            style={isMobile ? { width: 20, height: 20 } : undefined}
                           />
                           <span style={{ flex: 1 }}>{v.nome}</span>
                           <Mono style={{ color: 'var(--ink-3)' }}>
@@ -521,8 +523,9 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
                               aria-label="remover deste import"
                               title="remover deste import"
                               style={{
-                                width: 28,
-                                height: 28,
+                                width: isMobile ? 44 : 28,
+                                height: isMobile ? 44 : 28,
+                                flexShrink: 0,
                                 borderRadius: 999,
                                 border: '1px solid var(--coral-ink)',
                                 background: 'transparent',

@@ -1333,6 +1333,7 @@ function DetalheDia({
   onRemover: (id: string) => void;
   onAdicionar: (hospitalId: string, janela: Janela) => void;
 }) {
+  const isMobile = useIsMobile();
   const [adicionando, setAdicionando] = useState(false);
   const lista = Object.values(hospitais);
   const [hospitalEsc, setHospitalEsc] = useState<string>(lista[0]?.id ?? '');
@@ -1381,7 +1382,7 @@ function DetalheDia({
                     <Mono style={{ color: 'var(--ink-3)', fontSize: 11, marginTop: 2 }}>{p.razao}</Mono>
                   )}
                 </div>
-                <button type="button" onClick={() => onRemover(p.id)} style={btnX}>
+                <button type="button" onClick={() => onRemover(p.id)} style={btnXStyle(isMobile)}>
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
                     <path d="M6 6l12 12M18 6L6 18" />
                   </svg>
@@ -1617,16 +1618,20 @@ function btnExport(success: boolean): React.CSSProperties {
   };
 }
 
-const btnX: React.CSSProperties = {
-  width: 28,
-  height: 28,
-  borderRadius: 999,
-  border: '1px solid var(--coral-ink)',
-  background: 'transparent',
-  color: 'var(--coral-ink)',
-  cursor: 'pointer',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-};
+function btnXStyle(isMobile: boolean): React.CSSProperties {
+  const size = isMobile ? 44 : 28;
+  return {
+    width: size,
+    height: size,
+    flexShrink: 0,
+    borderRadius: 999,
+    border: '1px solid var(--coral-ink)',
+    background: 'transparent',
+    color: 'var(--coral-ink)',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  };
+}
 
