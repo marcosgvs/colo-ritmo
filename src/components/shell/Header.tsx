@@ -1,8 +1,11 @@
+import { useState } from 'react';
 import type { Mode } from '@/types';
 import { ColoMark } from '@/components/atoms';
 import { NotifSino, type Notificacao } from '@/components/notif';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import { CargaBadge } from './CargaBadge';
 import { NavIcon, type IconName } from './NavIcon';
+import { MobileMenu } from './MobileMenu';
 
 export type NavKey =
   | 'agenda'
@@ -67,7 +70,84 @@ export function Header({
   notificacoes,
   onMarcarLida,
 }: HeaderProps) {
+  const isMobile = useIsMobile();
+  const [menuOpen, setMenuOpen] = useState(false);
   const items = NAV_ITEMS.filter((i) => i.roles.includes(mode));
+
+  if (isMobile) {
+    return (
+      <>
+        <header
+          style={{
+            position: 'sticky',
+            top: 0,
+            zIndex: 30,
+            height: 56,
+            background: 'var(--bg)',
+            display: 'flex',
+            alignItems: 'center',
+            padding: '0 14px',
+            gap: 10,
+            borderBottom: '1px solid var(--line)',
+          }}
+        >
+          <ColoMark size={22} />
+          <div style={{ flex: 1 }} />
+          <CargaBadge horas={carga} compact />
+          {notificacoes && onMarcarLida && (
+            <NotifSino notificacoes={notificacoes} onMarcarLida={onMarcarLida} />
+          )}
+          <button
+            type="button"
+            onClick={() => setMenuOpen(true)}
+            aria-label="abrir menu"
+            style={{
+              width: 44,
+              height: 44,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'var(--bg-alt)',
+              border: '1px solid var(--line)',
+              borderRadius: 999,
+              cursor: 'pointer',
+              color: 'var(--ink)',
+              position: 'relative',
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <path d="M4 7h16M4 12h16M4 17h16" />
+            </svg>
+            {conflitos > 0 && active !== 'conflitos' && (
+              <span
+                aria-hidden
+                style={{
+                  position: 'absolute',
+                  top: 2,
+                  right: 2,
+                  width: 9,
+                  height: 9,
+                  borderRadius: 999,
+                  background: 'var(--coral)',
+                  border: '1.5px solid var(--bg)',
+                }}
+              />
+            )}
+          </button>
+        </header>
+        {menuOpen && (
+          <MobileMenu
+            active={active}
+            mode={mode}
+            conflitos={conflitos}
+            onNav={(k) => onNav?.(k)}
+            onClose={() => setMenuOpen(false)}
+          />
+        )}
+      </>
+    );
+  }
+
   return (
     <header
       style={{
