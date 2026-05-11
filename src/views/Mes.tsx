@@ -285,7 +285,12 @@ export function Mes({ blocos, hospitais, onSelectBloco }: MesProps) {
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <ResumoMes blocos={blocos} hospitais={hospitais} mesAno={`${mesNome} ${ano}`} />
+          <ResumoMes
+            blocos={blocos}
+            hospitais={hospitais}
+            mesISO={refIso.slice(0, 7)}
+            mesAno={`${mesNome} ${ano}`}
+          />
         </div>
       </div>
     </>
@@ -370,11 +375,15 @@ const navBtnStyle: React.CSSProperties = {
 interface ResumoMesProps {
   blocos: Bloco[];
   hospitais: HospitaisMap;
+  /** Mês ISO no formato "YYYY-MM" · usado pra filtrar os blocos. */
+  mesISO: string;
   mesAno: string;
 }
 
-function ResumoMes({ blocos, hospitais, mesAno }: ResumoMesProps) {
-  const plantoes = blocos.filter((b): b is BlocoPlantao => b.tipo === 'plantao');
+function ResumoMes({ blocos, hospitais, mesISO, mesAno }: ResumoMesProps) {
+  const plantoes = blocos.filter(
+    (b): b is BlocoPlantao => b.tipo === 'plantao' && b.data.startsWith(mesISO),
+  );
   const plantoesFuturos = plantoes
     .filter((p) => p.data >= HOJE)
     .sort((a, b) => a.data.localeCompare(b.data) || a.horaInicio - b.horaInicio);
