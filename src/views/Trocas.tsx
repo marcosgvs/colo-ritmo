@@ -3,6 +3,7 @@ import type { Bloco, BlocoPlantao, HospitaisMap } from '@/types';
 import { fmtDate, fmtRange, getHospital } from '@/lib/data';
 import { Eyebrow, Hand, Mono, Pill } from '@/components/atoms';
 import { EmptyState } from '@/components/empty';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import { PageHead } from './_PageHead';
 
 interface TrocasProps {
@@ -21,6 +22,7 @@ const COLEGAS_MOCK = [
 ];
 
 export function Trocas({ blocos, hospitais: _h, onCriarPedido }: TrocasProps) {
+  const isMobile = useIsMobile();
   const plantoes = blocos
     .filter((b): b is BlocoPlantao => b.tipo === 'plantao')
     .sort((a, b) => a.data.localeCompare(b.data) || a.horaInicio - b.horaInicio);
@@ -75,8 +77,8 @@ export function Trocas({ blocos, hospitais: _h, onCriarPedido }: TrocasProps) {
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'minmax(0, 1fr) 320px',
-          gap: 32,
+          gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1fr) 320px',
+          gap: isMobile ? 18 : 32,
           alignItems: 'flex-start',
         }}
       >

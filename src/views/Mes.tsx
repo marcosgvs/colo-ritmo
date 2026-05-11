@@ -13,6 +13,7 @@ import {
   toISO,
 } from '@/lib/data';
 import { Eyebrow, Hand, Mono, Pill } from '@/components/atoms';
+import { useIsMobile } from '@/hooks/useIsMobile';
 
 interface MesProps {
   blocos: Bloco[];
@@ -31,6 +32,7 @@ const MESES_LONG = [
  * editor, só visualização. Pra editar, abre Drawer.
  */
 export function Mes({ blocos, hospitais, onSelectBloco }: MesProps) {
+  const isMobile = useIsMobile();
   const [refIso, setRefIso] = useState<string>(HOJE);
 
   const semanas = useMemo(() => {
@@ -113,8 +115,8 @@ export function Mes({ blocos, hospitais, onSelectBloco }: MesProps) {
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'minmax(0, 1fr) 320px',
-          gap: 32,
+          gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1fr) 320px',
+          gap: isMobile ? 18 : 32,
           alignItems: 'flex-start',
         }}
       >

@@ -13,6 +13,7 @@ import {
 import { Eyebrow, Hand, Mono } from '@/components/atoms';
 import { WeekGrid } from '@/components/week';
 import { Rail } from '@/components/rail';
+import { useIsMobile } from '@/hooks/useIsMobile';
 
 interface SemanaProps {
   blocos: Bloco[];
@@ -24,6 +25,7 @@ interface SemanaProps {
 }
 
 export function Semana({ blocos, hospitais: _h, mode, loading, erro, onSelectBloco }: SemanaProps) {
+  const isMobile = useIsMobile();
   const [refIso, setRefIso] = useState<string>(HOJE);
   const semanaIso = useMemo(() => semanaDe(refIso), [refIso]);
   const inicio = semanaIso[0]!;
@@ -95,8 +97,8 @@ export function Semana({ blocos, hospitais: _h, mode, loading, erro, onSelectBlo
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'minmax(0, 1fr) 1px 320px',
-          gap: 24,
+          gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1fr) 1px 320px',
+          gap: isMobile ? 18 : 24,
           alignItems: 'flex-start',
         }}
       >

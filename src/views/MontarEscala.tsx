@@ -20,6 +20,7 @@ import {
 } from '@/lib/data';
 import { Eyebrow, LoadingFrases, MonthPicker, Mono } from '@/components/atoms';
 import { rotuloTurno } from '@/lib/turno';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import { PageHead } from './_PageHead';
 
 const FRASES_MONTAR = [
@@ -889,6 +890,7 @@ function PreviewBlock({
   onAvancar,
   onRegerar,
 }: PreviewBlockProps) {
+  const isMobile = useIsMobile();
   const [diaAberto, setDiaAberto] = useState<string | null>(null);
   const totalDuracao = resultado.plantoes.reduce((s, p) => s + p.duracao, 0);
 
@@ -913,7 +915,7 @@ function PreviewBlock({
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 320px', gap: 24, alignItems: 'flex-start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1fr) 320px', gap: isMobile ? 18 : 24, alignItems: 'flex-start' }}>
       <CalendarioProposta
         mes={mes}
         plantoes={resultado.plantoes}

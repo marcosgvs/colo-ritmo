@@ -3,6 +3,7 @@ import type { Preferencias } from '@/types';
 import { sair } from '@/hooks/useAuth';
 import { usePush } from '@/hooks/usePush';
 import { useSnapshotsShares } from '@/hooks/useSnapshotsShares';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import { Eyebrow, Hand, MonthPicker, Mono, Pill } from '@/components/atoms';
 import { PageHead } from './_PageHead';
 
@@ -14,6 +15,7 @@ interface UsuarioProps {
 }
 
 export function Usuario({ email, userId, preferencias, onSalvarPreferencias }: UsuarioProps) {
+  const isMobile = useIsMobile();
   const push = usePush(userId);
   const snapshotsShares = useSnapshotsShares(userId);
   const [draft, setDraft] = useState(preferencias);
@@ -34,8 +36,8 @@ export function Usuario({ email, userId, preferencias, onSalvarPreferencias }: U
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'minmax(0, 1fr) 320px',
-          gap: 32,
+          gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1fr) 320px',
+          gap: isMobile ? 18 : 32,
           alignItems: 'flex-start',
         }}
       >

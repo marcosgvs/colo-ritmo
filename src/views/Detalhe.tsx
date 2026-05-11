@@ -6,6 +6,7 @@ import {
   ehNoturno,
 } from '@/lib/data';
 import { Eyebrow, Hand, Mono, Pill } from '@/components/atoms';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import { PageHead } from './_PageHead';
 
 interface DetalheProps {
@@ -22,6 +23,7 @@ interface DetalheProps {
  * relação com `time`), checklist do plantão, ações no rodapé sticky.
  */
 export function Detalhe({ bloco, hospitais: _h, voltar, onTrocar, onCeder }: DetalheProps) {
+  const isMobile = useIsMobile();
   const hosp =
     bloco.tipo === 'plantao' || bloco.tipo === 'cedido' ? getHospital(bloco.hospitalId) : undefined;
   const noturno = bloco.tipo === 'plantao' ? ehNoturno(bloco) : false;
@@ -77,8 +79,8 @@ export function Detalhe({ bloco, hospitais: _h, voltar, onTrocar, onCeder }: Det
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'minmax(0, 1fr) 320px',
-          gap: 32,
+          gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1fr) 320px',
+          gap: isMobile ? 18 : 32,
           alignItems: 'flex-start',
         }}
       >

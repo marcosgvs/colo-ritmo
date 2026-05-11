@@ -20,6 +20,7 @@ const FRASES_PDF = [
   'quase lá',
 ] as const;
 import { EmptyState } from '@/components/empty';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import { PageHead } from './_PageHead';
 
 interface SyncProps {
@@ -63,6 +64,7 @@ interface Resultado {
 }
 
 export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, icsToken, nomeUser }: SyncProps) {
+  const isMobile = useIsMobile();
   const [hospitalId, setHospitalId] = useState<string>(() => Object.keys(hospitais)[0] ?? '');
   const [apelidoNaEscala, setApelidoNaEscala] = useState('');
   const [mes, setMes] = useState<string>(() => new Date().toISOString().slice(0, 7));
@@ -248,8 +250,8 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'minmax(0, 1fr) 320px',
-          gap: 32,
+          gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1fr) 320px',
+          gap: isMobile ? 18 : 32,
           alignItems: 'flex-start',
         }}
       >

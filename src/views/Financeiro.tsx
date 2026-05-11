@@ -3,6 +3,7 @@ import type { Bloco, HospitaisMap } from '@/types';
 import { calcRemuneracaoMes, fromISO, HOJE } from '@/lib/data';
 import { Eyebrow, Hand, MonthPicker, Mono } from '@/components/atoms';
 import { EmptyState } from '@/components/empty';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import { PageHead } from './_PageHead';
 
 interface FinanceiroProps {
@@ -16,6 +17,7 @@ const MESES_LONG = [
 ];
 
 export function Financeiro({ blocos, hospitais }: FinanceiroProps) {
+  const isMobile = useIsMobile();
   const hojeMesISO = useMemo(() => {
     const d = fromISO(HOJE);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -80,8 +82,8 @@ export function Financeiro({ blocos, hospitais }: FinanceiroProps) {
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'minmax(0, 1fr) 320px',
-          gap: 32,
+          gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1fr) 320px',
+          gap: isMobile ? 18 : 32,
           alignItems: 'flex-start',
         }}
       >
