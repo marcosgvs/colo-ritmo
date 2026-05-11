@@ -17,11 +17,17 @@
  * Bump em VERSAO força limpeza de caches anteriores no activate.
  */
 
-const VERSAO = 'colo-ritmo-v3';
+const VERSAO = 'colo-ritmo-v4';
 const CACHE_SHELL = `${VERSAO}-shell`;
 const CACHE_ASSETS = `${VERSAO}-assets`;
 
-const SHELL_INICIAL = ['/ritmo/', '/ritmo/colo-ritmo-mark.svg'];
+const SHELL_INICIAL = [
+  '/ritmo/',
+  '/ritmo/manifest.webmanifest',
+  '/ritmo/pwa-icon.svg',
+  '/ritmo/pwa-icon-maskable.svg',
+  '/ritmo/colo-ritmo-mark.svg',
+];
 
 const NOTIF_DEFAULT = {
   titulo: 'Colo Ritmo',
@@ -77,9 +83,11 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Logos e estáticos públicos do ritmo · cache-first
+  // Logos, manifest, ícones do PWA · cache-first
   if (
     url.pathname.startsWith('/ritmo/colo-ritmo') ||
+    url.pathname.startsWith('/ritmo/pwa-icon') ||
+    url.pathname === '/ritmo/manifest.webmanifest' ||
     url.pathname === '/ritmo/service-worker.js'
   ) {
     event.respondWith(cacheFirst(request, CACHE_ASSETS));

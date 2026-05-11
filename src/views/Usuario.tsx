@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { Preferencias } from '@/types';
 import { sair } from '@/hooks/useAuth';
 import { usePush } from '@/hooks/usePush';
+import { useInstallPrompt } from '@/hooks/useInstallPrompt';
 import { useSnapshotsShares } from '@/hooks/useSnapshotsShares';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { Eyebrow, Hand, MonthPicker, Mono, Pill } from '@/components/atoms';
@@ -17,6 +18,7 @@ interface UsuarioProps {
 export function Usuario({ email, userId, preferencias, onSalvarPreferencias }: UsuarioProps) {
   const isMobile = useIsMobile();
   const push = usePush(userId);
+  const install = useInstallPrompt();
   const snapshotsShares = useSnapshotsShares(userId);
   const [draft, setDraft] = useState(preferencias);
   const sujo = JSON.stringify(draft) !== JSON.stringify(preferencias);
@@ -104,6 +106,53 @@ export function Usuario({ email, userId, preferencias, onSalvarPreferencias }: U
         </section>
 
         <aside style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {install.tipo !== 'indisponivel' && (
+            <Card titulo="instalar" eyebrow="vira app no celular">
+              {install.tipo === 'instalado' ? (
+                <>
+                  <Pill kind="ok" style={{ marginBottom: 12 }}>
+                    instalado
+                  </Pill>
+                  <Hand color="var(--ink-2)" size={16}>
+                    abre fullscreen, fica no app drawer · pode arquivar a aba.
+                  </Hand>
+                </>
+              ) : install.tipo === 'pode-instalar' ? (
+                <>
+                  <Hand color="var(--ink-2)" size={16}>
+                    coloca o colo na tela inicial · abre fullscreen, sem barra do
+                    navegador.
+                  </Hand>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void install.instalar();
+                    }}
+                    style={{
+                      marginTop: 14,
+                      font: '600 13px/1 var(--font-body)',
+                      padding: '11px 18px',
+                      borderRadius: 999,
+                      border: 'none',
+                      background: 'var(--ink)',
+                      color: 'var(--bg)',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    instalar
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Hand color="var(--ink-2)" size={16}>
+                    no safari do iPhone: toca em compartilhar (□↑) e escolhe
+                    "adicionar à tela de início".
+                  </Hand>
+                </>
+              )}
+            </Card>
+          )}
+
           <Card titulo="notificações" eyebrow="chega no celular">
             {push.status === 'sem-suporte' ? (
               <Hand color="var(--ink-3)" size={16}>

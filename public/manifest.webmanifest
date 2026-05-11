@@ -1,0 +1,29 @@
+{
+  "name": "Colo Ritmo",
+  "short_name": "Colo Ritmo",
+  "description": "a agenda que respira no seu ritmo, não no do plantão",
+  "lang": "pt-BR",
+  "dir": "ltr",
+  "start_url": "/ritmo/",
+  "scope": "/ritmo/",
+  "id": "/ritmo/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FFFAF3",
+  "theme_color": "#FFFAF3",
+  "categories": ["productivity", "medical", "lifestyle"],
+  "icons": [
+    {
+      "src": "/ritmo/pwa-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/ritmo/pwa-icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}
