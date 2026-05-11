@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Eyebrow, Hand, Mono, Pill } from '@/components/atoms';
+import { useIsMobile } from '@/hooks/useIsMobile';
 
 export interface Notificacao {
   id: string;
@@ -25,6 +26,7 @@ interface NotificacoesProps {
  * do popover quando count > 0.
  */
 export function NotifSino({ notificacoes, onMarcarLida, conflitos = 0, onAbrirConflitos }: NotificacoesProps) {
+  const isMobile = useIsMobile();
   const [aberto, setAberto] = useState(false);
   const naoLidas = notificacoes.filter((n) => !n.lida);
   const totalAtencao = naoLidas.length + conflitos;
@@ -85,11 +87,23 @@ export function NotifSino({ notificacoes, onMarcarLida, conflitos = 0, onAbrirCo
           <div
             role="dialog"
             style={{
-              position: 'absolute',
-              top: '110%',
-              right: 0,
-              width: 'min(360px, calc(100vw - 28px))',
-              maxHeight: 480,
+              // em mobile o drawer pinga do header e fica preso na viewport
+              // (left+right ancorados) · evita estourar pra fora da tela
+              ...(isMobile
+                ? {
+                    position: 'fixed' as const,
+                    top: 76,
+                    left: 14,
+                    right: 14,
+                    width: 'auto',
+                  }
+                : {
+                    position: 'absolute' as const,
+                    top: '110%',
+                    right: 0,
+                    width: 'min(360px, calc(100vw - 28px))',
+                  }),
+              maxHeight: '70vh',
               overflowY: 'auto',
               background: 'var(--bg)',
               border: '1px solid var(--line)',

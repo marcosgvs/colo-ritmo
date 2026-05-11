@@ -13,6 +13,7 @@ import {
   type SugestaoHospital,
 } from '@/lib/hospitaisBrasilia';
 import { validarRegras, type AvisoRegra } from '@/lib/regrasValidacao';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import { Eyebrow, Mono, Pill } from '@/components/atoms';
 import { EmptyState } from '@/components/empty';
 import { PageHead } from './_PageHead';
@@ -195,6 +196,7 @@ interface FormProps {
 }
 
 function HospitalForm({ inicial, coresUsadas, onSalvar, onPersistir, onCancelar, onRemover }: FormProps) {
+  const isMobile = useIsMobile();
   const [draft, setDraft] = useState<Hospital>(
     inicial ?? {
       id: `H-${Date.now()}`.slice(0, 12),
@@ -352,7 +354,12 @@ function HospitalForm({ inicial, coresUsadas, onSalvar, onPersistir, onCancelar,
           e.preventDefault();
           void salvar();
         }}
-        style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18, maxWidth: 720 }}
+        style={{
+          display: 'grid',
+          gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
+          gap: isMobile ? 14 : 18,
+          maxWidth: 720,
+        }}
       >
         <Field label="nome">
           <div style={{ position: 'relative' }}>
@@ -1187,7 +1194,7 @@ function BlocoJanelas({
             key={i}
             style={{
               display: 'grid',
-              gridTemplateColumns: '1fr 90px 90px 36px',
+              gridTemplateColumns: '1fr 64px 64px 28px',
               gap: 8,
               alignItems: 'center',
             }}
