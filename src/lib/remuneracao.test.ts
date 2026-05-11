@@ -71,7 +71,6 @@ describe('calcRemuneracaoBloco', () => {
     const b: Bloco = { id: 1, tipo: 'plantao', hospitalId: 'HSL', data: '2026-05-04', horaInicio: 7, duracao: 6, setor: '' };
     const r = calcRemuneracaoBloco(b, HSL);
     expect(r.bruto).toBe(150 * 6);
-    expect(r.liquido).toBe(Math.round(150 * 6 * 0.94));
   });
 });
 

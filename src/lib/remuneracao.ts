@@ -7,23 +7,29 @@ import type {
 import { fromISO } from './dates.js';
 
 /**
- * Cálculo de remuneração — primeira aproximação. Bruto vem da regra do
- * hospital (público com valorFixo, privado com valorHora). Líquido é
- * uma estimativa: PJ ~94%, CLT/cooperativa ~72.5%. A tela Financeiro
- * (Sessão 4) refina com IRPF por faixa, INSS, etc.
+ * Cálculo de remuneração · SEMPRE BRUTO.
+ *
+ * Não estimamos líquido nem aplicamos factor de imposto. Quem precisa
+ * saber líquido tem o contador. Pro app, bruto é o número de verdade.
+ *
+ * Bruto vem da regra do hospital:
+ *   - valorFixo (público CLT) entra UMA vez no mês · plantões adicionam
+ *     só adicionalNoite quando noturnos
+ *   - valorHora (privado PJ) multiplica pela duração · noturno adiciona
+ *     adicionalNoite
+ *   - valorPlantao (fallback) entra por plantão
  */
 
 export interface ResumoBloco {
   hospitalId: string;
   bruto: number;
-  liquido: number;
   noturno: boolean;
 }
 
 export interface ResumoMes {
   mes: string; // ISO YYYY-MM
-  total: { bruto: number; liquido: number };
-  porHospital: Record<string, { bruto: number; liquido: number; plantoes: number }>;
+  total: { bruto: number };
+  porHospital: Record<string, { bruto: number; plantoes: number }>;
 }
 
 /** Considera noturno qualquer bloco que cruze a faixa 22h-06h. */
@@ -47,9 +53,7 @@ export function calcRemuneracaoBloco(b: BlocoPlantao, hosp: Hospital): ResumoBlo
     bruto = hosp.valorPlantao || 0;
     if (noturno) bruto += hosp.adicionalNoite;
   }
-  const factor = hosp.tipo === 'privado' ? 0.94 : 0.725;
-  const liquido = Math.round(bruto * factor);
-  return { hospitalId: hosp.id, bruto, liquido, noturno };
+  return { hospitalId: hosp.id, bruto, noturno };
 }
 
 /**
@@ -64,7 +68,7 @@ export function calcRemuneracaoMes(
 ): ResumoMes {
   const out: ResumoMes = {
     mes,
-    total: { bruto: 0, liquido: 0 },
+    total: { bruto: 0 },
     porHospital: {},
   };
 
@@ -75,13 +79,11 @@ export function calcRemuneracaoMes(
     if (!hosp) continue;
     const res = calcRemuneracaoBloco(b, hosp);
     out.total.bruto += res.bruto;
-    out.total.liquido += res.liquido;
     if (!out.porHospital[hosp.id]) {
-      out.porHospital[hosp.id] = { bruto: 0, liquido: 0, plantoes: 0 };
+      out.porHospital[hosp.id] = { bruto: 0, plantoes: 0 };
     }
     const sub = out.porHospital[hosp.id]!;
     sub.bruto += res.bruto;
-    sub.liquido += res.liquido;
     sub.plantoes += 1;
   }
 
@@ -90,11 +92,8 @@ export function calcRemuneracaoMes(
     const hosp = hospitais[hospId];
     if (!hosp) continue;
     if (typeof hosp.valorFixo === 'number' && hosp.valorFixo > 0) {
-      const liquidoFixo = Math.round(hosp.valorFixo * 0.725);
       sub.bruto += hosp.valorFixo;
-      sub.liquido += liquidoFixo;
       out.total.bruto += hosp.valorFixo;
-      out.total.liquido += liquidoFixo;
     }
   }
   return out;

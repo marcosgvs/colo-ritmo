@@ -313,7 +313,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     }));
     const mesAlvoISO = `${ano}-${String(mes).padStart(2, '0')}`;
     const resumo = calcRemuneracaoMes(blocosPlantao, hospitaisMap as never, mesAlvoISO);
-    const valorEstimadoReal = resumo.total.liquido;
+    const valorEstimadoReal = resumo.total.bruto;
 
     const avisosFinais = [...(inp.avisos ?? []), ...removidos, ...validacaoLinhas];
 
