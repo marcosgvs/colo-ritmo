@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import type { Bloco, HospitaisMap } from '@/types';
 import { detectarConflitos, fmtDate, fmtRange, getHospital } from '@/lib/data';
 import type { TipoConflito } from '@/lib/conflitos';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import { Eyebrow, Mono, Pill } from '@/components/atoms';
 import { EmptyState } from '@/components/empty';
 import { PageHead } from './_PageHead';
@@ -28,6 +29,7 @@ const COPY_TIPO: Record<TipoConflito, { titulo: string; recado: string }> = {
 };
 
 export function Conflitos({ blocos, hospitais, onSelectBloco }: ConflitosProps) {
+  const isMobile = useIsMobile();
   const conflitos = useMemo(() => detectarConflitos(blocos, hospitais), [blocos, hospitais]);
 
   return (
@@ -64,15 +66,16 @@ export function Conflitos({ blocos, hospitais, onSelectBloco }: ConflitosProps) 
                   background: 'var(--coral-surface)',
                   borderLeft: '4px solid var(--coral-ink)',
                   borderRadius: 14,
-                  padding: '18px 20px',
+                  padding: isMobile ? '14px 16px' : '18px 20px',
                   display: 'grid',
-                  gridTemplateColumns: 'minmax(0, 1fr) auto',
-                  gap: 14,
-                  alignItems: 'center',
+                  // mobile · empilha · botões viram full-width abaixo do texto
+                  gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1fr) auto',
+                  gap: isMobile ? 12 : 14,
+                  alignItems: isMobile ? 'stretch' : 'center',
                 }}
               >
-                <div>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
                     <Pill kind="err" dot={false}>
                       {labelTipo(c.tipo)}
                     </Pill>
@@ -84,7 +87,8 @@ export function Conflitos({ blocos, hospitais, onSelectBloco }: ConflitosProps) 
                     style={{
                       fontFamily: 'var(--font-display)',
                       fontWeight: 500,
-                      fontSize: 22,
+                      fontSize: isMobile ? 18 : 22,
+                      lineHeight: 1.2,
                       letterSpacing: '-0.005em',
                       margin: 0,
                       color: 'var(--ink)',
@@ -99,7 +103,14 @@ export function Conflitos({ blocos, hospitais, onSelectBloco }: ConflitosProps) 
                     {c.detalhe}
                   </Mono>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 220 }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 8,
+                    ...(isMobile ? { width: '100%' } : { minWidth: 220 }),
+                  }}
+                >
                   <button
                     type="button"
                     onClick={() => onSelectBloco(c.a)}

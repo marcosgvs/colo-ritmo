@@ -1133,11 +1133,16 @@ const input: React.CSSProperties = {
   font: '500 14px/1.3 var(--font-body)',
   color: 'var(--ink)',
   outline: 'none',
+  // mobile · sem isto, input HTML default tem min-width baseado em
+  // `size` attribute (~280px) que faz grid item não encolher abaixo disso
+  width: '100%',
+  minWidth: 0,
+  boxSizing: 'border-box',
 };
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+    <label style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 }}>
       <Eyebrow>{label}</Eyebrow>
       {children}
     </label>
