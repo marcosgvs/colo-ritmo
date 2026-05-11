@@ -27,6 +27,13 @@ function nivelColor(n: Nivel): string {
   return 'var(--coral-ink)';
 }
 
+/** Data ISO de `hojeISO - dias` dias · usada pra recortar histórico recente no rail. */
+function janelaRecente(hojeISO: string, dias: number): string {
+  const d = new Date(`${hojeISO}T00:00:00`);
+  d.setDate(d.getDate() - dias);
+  return d.toISOString().slice(0, 10);
+}
+
 interface CargaBarProps {
   h: number;
   nivel: Nivel;
@@ -269,10 +276,21 @@ export function Rail({ blocos, mode, analise, blocosDaJanela }: RailProps) {
     .sort((a, b) => a.data.localeCompare(b.data) || a.horaInicio - b.horaInicio);
   const proximoDestaque = proximos[0];
 
-  const cedidos = blocos.filter((b): b is BlocoCedido => b.tipo === 'cedido');
-  const trocas = blocos.filter(
-    (b): b is BlocoPlantao => b.tipo === 'plantao' && Boolean(b.viaTroca),
-  );
+  // "movimentações" mostra só o que aconteceu (ou vai acontecer) numa janela
+  // próxima · sem filtro, um user com 2 anos de histórico veria 100+ linhas.
+  // Janela: últimos 30 dias até futuro indefinido (cedidos futuros importam).
+  const janelaInicio = janelaRecente(HOJE, 30);
+  const cedidos = blocos
+    .filter((b): b is BlocoCedido => b.tipo === 'cedido' && b.data >= janelaInicio)
+    .sort((a, b) => b.data.localeCompare(a.data))
+    .slice(0, 5);
+  const trocas = blocos
+    .filter(
+      (b): b is BlocoPlantao =>
+        b.tipo === 'plantao' && Boolean(b.viaTroca) && b.data >= janelaInicio,
+    )
+    .sort((a, b) => b.data.localeCompare(a.data))
+    .slice(0, 5);
 
   const cargaJanela = blocosDaJanela ? cargaSemanal(blocosDaJanela) : null;
 

@@ -12,6 +12,7 @@ import {
   buscarSugestoesHospitais,
   type SugestaoHospital,
 } from '@/lib/hospitaisBrasilia';
+import { validarRegras, type AvisoRegra } from '@/lib/regrasValidacao';
 import { Eyebrow, Mono, Pill } from '@/components/atoms';
 import { EmptyState } from '@/components/empty';
 import { PageHead } from './_PageHead';
@@ -803,6 +804,7 @@ function RegrasChat({
         >
           <Eyebrow color="var(--sage-ink)">regras propostas</Eyebrow>
           <PreviewRegras r={propostas} />
+          <AvisosRegras avisos={validarRegras(propostas)} />
           <div style={{ display: 'flex', gap: 8 }}>
             <button
               type="button"
@@ -1040,6 +1042,38 @@ function RegrasAtivas({
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+function AvisosRegras({ avisos }: { avisos: AvisoRegra[] }) {
+  if (avisos.length === 0) return null;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
+      {avisos.map((a, i) => {
+        const ehErro = a.severidade === 'erro';
+        return (
+          <div
+            key={i}
+            style={{
+              background: ehErro ? 'var(--coral-surface)' : 'var(--sand-surface)',
+              borderLeft: `3px solid ${ehErro ? 'var(--coral-ink)' : 'var(--ink-3)'}`,
+              padding: '8px 12px',
+              borderRadius: 'var(--r-sm)',
+              display: 'flex',
+              gap: 8,
+              alignItems: 'flex-start',
+            }}
+          >
+            <span style={{ font: '600 11px/1.2 var(--font-body)', color: ehErro ? 'var(--coral-ink)' : 'var(--ink-2)', flexShrink: 0 }}>
+              {ehErro ? '⚠' : '·'}
+            </span>
+            <span style={{ font: '500 12px/1.4 var(--font-body)', color: 'var(--ink-2)' }}>
+              {a.texto}
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 }
