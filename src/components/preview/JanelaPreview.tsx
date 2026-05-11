@@ -117,7 +117,7 @@ export function JanelaPreview({ blocos, hospitais: _h, novoBloco, raioDias = 1 }
       <div
         style={{
           position: 'relative',
-          height: 56,
+          height: 64,
           background: 'var(--bg)',
           borderRadius: 8,
           overflow: 'hidden',
@@ -179,22 +179,37 @@ export function JanelaPreview({ blocos, hospitais: _h, novoBloco, raioDias = 1 }
         {plantoesExistentes.map((p) => {
           const hosp = getHospital(p.hospitalId);
           const cor = hosp ? `var(--${hosp.cor})` : 'var(--ink-2)';
+          const corInk = hosp ? `var(--${hosp.cor}-ink)` : 'var(--ink)';
           const { left, width } = offsetPct(p);
+          const widthPct = parseFloat(width);
+          // só mostra label se houver largura mínima (~3%)
+          const mostraLabel = widthPct >= 3;
           return (
             <div
               key={`p-${p.id}`}
               title={`${hosp?.abrev ?? '?'} · ${fmtRange(p.horaInicio, p.duracao)}`}
               style={{
                 position: 'absolute',
-                top: 8,
-                height: 40,
+                top: 10,
+                height: 44,
                 left,
                 width,
                 background: cor,
                 borderRadius: 4,
-                opacity: 0.85,
+                opacity: 0.92,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                font: '700 10px/1 var(--font-body)',
+                color: corInk,
+                letterSpacing: '0.02em',
+                overflow: 'hidden',
+                padding: '0 2px',
+                textTransform: 'uppercase',
               }}
-            />
+            >
+              {mostraLabel && hosp?.abrev}
+            </div>
           );
         })}
 
@@ -204,23 +219,36 @@ export function JanelaPreview({ blocos, hospitais: _h, novoBloco, raioDias = 1 }
           const cor = hosp ? `var(--${hosp.cor})` : 'var(--lavender)';
           const corInk = hosp ? `var(--${hosp.cor}-ink)` : 'var(--lavender-ink)';
           const { left, width } = offsetPct(novoBloco);
+          const widthPct = parseFloat(width);
+          const mostraLabel = widthPct >= 5;
           return (
             <div
               title={`proposto · ${fmtRange(novoBloco.horaInicio, novoBloco.duracao)}`}
               style={{
                 position: 'absolute',
-                top: 8,
-                height: 40,
+                top: 10,
+                height: 44,
                 left,
                 width,
                 backgroundColor: cor,
                 backgroundImage:
-                  'repeating-linear-gradient(45deg, rgba(255,255,255,0.45) 0 4px, transparent 4px 8px)',
+                  'repeating-linear-gradient(45deg, rgba(255,255,255,0.55) 0 4px, transparent 4px 8px)',
                 border: `1.5px dashed ${corInk}`,
                 borderRadius: 4,
-                opacity: 0.95,
+                opacity: 0.98,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                font: '700 10px/1 var(--font-body)',
+                color: corInk,
+                letterSpacing: '0.02em',
+                overflow: 'hidden',
+                padding: '0 2px',
+                textTransform: 'uppercase',
               }}
-            />
+            >
+              {mostraLabel && (hosp?.abrev ?? 'NOVO')}
+            </div>
           );
         })()}
       </div>
@@ -254,6 +282,50 @@ export function JanelaPreview({ blocos, hospitais: _h, novoBloco, raioDias = 1 }
             </div>
           );
         })}
+      </div>
+
+      {/* legenda */}
+      <div
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 12,
+          marginTop: 10,
+          font: '500 10px/1.2 var(--font-body)',
+          color: 'var(--ink-3)',
+        }}
+      >
+        <LegendaItem>
+          <span style={{ width: 14, height: 10, borderRadius: 2, background: 'var(--ink-3)', opacity: 0.7 }} />
+          existente
+        </LegendaItem>
+        <LegendaItem>
+          <span
+            style={{
+              width: 14,
+              height: 10,
+              borderRadius: 2,
+              backgroundColor: 'var(--lavender)',
+              backgroundImage:
+                'repeating-linear-gradient(45deg, rgba(255,255,255,0.55) 0 3px, transparent 3px 6px)',
+              border: '1px dashed var(--lavender-ink)',
+            }}
+          />
+          novo
+        </LegendaItem>
+        <LegendaItem>
+          <span
+            style={{
+              width: 14,
+              height: 10,
+              borderRadius: 2,
+              backgroundImage:
+                'repeating-linear-gradient(135deg, rgba(58,46,42,0.16) 0 3px, transparent 3px 6px)',
+              backgroundColor: 'rgba(58,46,42,0.05)',
+            }}
+          />
+          recuperação invadida
+        </LegendaItem>
       </div>
 
       {/* resumo antes/depois */}
@@ -299,5 +371,13 @@ export function JanelaPreview({ blocos, hospitais: _h, novoBloco, raioDias = 1 }
         )}
       </div>
     </div>
+  );
+}
+
+function LegendaItem({ children }: { children: React.ReactNode }) {
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+      {children}
+    </span>
   );
 }

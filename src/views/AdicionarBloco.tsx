@@ -47,6 +47,17 @@ const ROTULO_TIPO: Record<Exclude<AddTipo, 'plantao'>, string> = {
   outros: 'outros',
 };
 
+/** Hora-fim a partir de início + duração · cruza meia-noite (mod 24). */
+function horaFimDe(inicio: number, duracao: number): number {
+  return (inicio + duracao) % 24;
+}
+
+/** Duração inferida de início + fim · se fim ≤ início, considera overnight. */
+function duracaoDeInicioFim(inicio: number, fim: number): number {
+  if (fim === inicio) return 24;
+  return (fim - inicio + 24) % 24;
+}
+
 /** Lê o "nome" descritivo de um bloco · varia por tipo (motivo/local/titulo). */
 function nomeDoBloco(b: Bloco): string {
   if (b.tipo === 'bloqueio') return b.motivo ?? '';
@@ -271,18 +282,8 @@ export function AdicionarBloco({
               style={input}
             />
           </Field>
-          <Field label={tipoAtual === 'bloqueio' ? 'duração (h)' : 'horário'}>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <input
-                type="number"
-                step="0.5"
-                min={0}
-                max={24}
-                value={horaInicio}
-                onChange={(e) => setHoraInicio(Number(e.target.value))}
-                style={{ ...input, flex: 1 }}
-                placeholder="h início"
-              />
+          {tipoAtual === 'bloqueio' ? (
+            <Field label="duração (h)">
               <input
                 type="number"
                 step="0.5"
@@ -290,11 +291,65 @@ export function AdicionarBloco({
                 max={24}
                 value={duracao}
                 onChange={(e) => setDuracao(Number(e.target.value))}
-                style={{ ...input, flex: 1 }}
+                style={input}
                 placeholder="duração"
               />
-            </div>
-          </Field>
+            </Field>
+          ) : tipoAtual === 'plantao' ? (
+            <Field label="horário · h + duração">
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  type="number"
+                  step="0.5"
+                  min={0}
+                  max={24}
+                  value={horaInicio}
+                  onChange={(e) => setHoraInicio(Number(e.target.value))}
+                  style={{ ...input, flex: 1 }}
+                  placeholder="h início"
+                />
+                <input
+                  type="number"
+                  step="0.5"
+                  min={0.5}
+                  max={24}
+                  value={duracao}
+                  onChange={(e) => setDuracao(Number(e.target.value))}
+                  style={{ ...input, flex: 1 }}
+                  placeholder="duração"
+                />
+              </div>
+            </Field>
+          ) : (
+            <Field label="horário · início → fim">
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <input
+                  type="number"
+                  step="0.5"
+                  min={0}
+                  max={24}
+                  value={horaInicio}
+                  onChange={(e) => setHoraInicio(Number(e.target.value))}
+                  style={{ ...input, flex: 1 }}
+                  placeholder="início"
+                />
+                <span style={{ color: 'var(--ink-3)', font: '500 14px/1 var(--font-body)' }}>→</span>
+                <input
+                  type="number"
+                  step="0.5"
+                  min={0}
+                  max={24}
+                  value={horaFimDe(horaInicio, duracao)}
+                  onChange={(e) => {
+                    const fim = Number(e.target.value);
+                    setDuracao(duracaoDeInicioFim(horaInicio, fim));
+                  }}
+                  style={{ ...input, flex: 1 }}
+                  placeholder="fim"
+                />
+              </div>
+            </Field>
+          )}
         </div>
 
         <Mono style={{ display: 'block', marginTop: 14, color: 'var(--ink-3)' }}>
