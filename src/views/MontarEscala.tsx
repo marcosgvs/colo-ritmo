@@ -663,6 +663,7 @@ interface CalendarioBloqueiosProps {
 }
 
 function CalendarioBloqueios({ dias, mes, bloqueios, plantoes, hospitais, onClickDia }: CalendarioBloqueiosProps) {
+  const isMobile = useIsMobile();
   const porDia = useMemo(() => {
     const m = new Map<string, { plantoes: BlocoPlantao[]; bloqueios: Bloco[] }>();
     for (const p of plantoes) {
@@ -678,16 +679,20 @@ function CalendarioBloqueios({ dias, mes, bloqueios, plantoes, hospitais, onClic
     return m;
   }, [plantoes, bloqueios]);
 
+  const gap = isMobile ? 2 : 4;
+  const padCell = isMobile ? 4 : 8;
+  const minH = isMobile ? 60 : 76;
+  const truncCell = isMobile ? 6 : 14;
   return (
     <div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, marginBottom: 6 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap, marginBottom: 6 }}>
         {DOWS.map((d) => (
           <Mono key={d} style={{ color: 'var(--ink-3)', textAlign: 'center', fontSize: 11 }}>
             {d}
           </Mono>
         ))}
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap }}>
         {dias.map((iso) => {
           const dataMes = iso.startsWith(mes);
           const e = porDia.get(iso) ?? { plantoes: [], bloqueios: [] };
@@ -699,8 +704,8 @@ function CalendarioBloqueios({ dias, mes, bloqueios, plantoes, hospitais, onClic
               disabled={!dataMes}
               style={{
                 textAlign: 'left',
-                padding: 8,
-                minHeight: 76,
+                padding: padCell,
+                minHeight: minH,
                 borderRadius: 'var(--r-sm)',
                 border: '1px solid var(--line-2)',
                 background: dataMes ? 'var(--bg)' : 'var(--bg-alt)',
@@ -708,7 +713,8 @@ function CalendarioBloqueios({ dias, mes, bloqueios, plantoes, hospitais, onClic
                 cursor: dataMes ? 'pointer' : 'default',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: 4,
+                gap: isMobile ? 2 : 4,
+                overflow: 'hidden',
               }}
             >
               <span style={{ font: '600 12px/1 var(--font-body)', color: 'var(--ink-2)' }}>
@@ -721,14 +727,14 @@ function CalendarioBloqueios({ dias, mes, bloqueios, plantoes, hospitais, onClic
                   <Mono
                     key={String(p.id)}
                     style={{
-                      fontSize: 10,
-                      padding: '2px 4px',
+                      fontSize: isMobile ? 9 : 10,
+                      padding: isMobile ? '1px 3px' : '2px 4px',
                       borderRadius: 'var(--r-xs, 4px)',
                       background: `var(--${cor}-surface)`,
                       color: `var(--${cor}-ink)`,
                     }}
                   >
-                    {h?.abrev} · {rotuloTurno(p.horaInicio, p.duracao, h) ?? fmtHora(p.horaInicio)}
+                    {isMobile ? (h?.abrev ?? '?') : `${h?.abrev} · ${rotuloTurno(p.horaInicio, p.duracao, h) ?? fmtHora(p.horaInicio)}`}
                   </Mono>
                 );
               })}
@@ -740,15 +746,15 @@ function CalendarioBloqueios({ dias, mes, bloqueios, plantoes, hospitais, onClic
                   <Mono
                     key={String(b.id)}
                     style={{
-                      fontSize: 10,
-                      padding: '2px 4px',
+                      fontSize: isMobile ? 9 : 10,
+                      padding: isMobile ? '1px 3px' : '2px 4px',
                       borderRadius: 'var(--r-xs, 4px)',
                       background: 'var(--bg-alt)',
                       color: 'var(--ink-3)',
                       borderLeft: '2px solid var(--ink-3)',
                     }}
                   >
-                    {motivo.length > 14 ? `${motivo.slice(0, 14)}…` : motivo}
+                    {motivo.length > truncCell ? `${motivo.slice(0, truncCell)}…` : motivo}
                   </Mono>
                 );
               })}
@@ -1189,6 +1195,7 @@ function CalendarioProposta({
   onRemoverPlantao,
   onAdicionarPlantao,
 }: CalendarioPropostaProps) {
+  const isMobile = useIsMobile();
   const dias = useMemo(() => listarDiasDoMes(mes), [mes]);
 
   const porDia = useMemo(() => {
@@ -1213,24 +1220,29 @@ function CalendarioProposta({
     return m;
   }, [blocos, mes]);
 
+  const gap = isMobile ? 2 : 4;
+  const padCell = isMobile ? 4 : 8;
+  const minH = isMobile ? 64 : 88;
+  const padPad = isMobile ? '14px 12px' : '20px 22px';
+  const truncCell = isMobile ? 6 : 12;
   return (
     <div
       style={{
         background: 'var(--bg)',
         border: '1px solid var(--line)',
         borderRadius: 'var(--r-lg)',
-        padding: '20px 22px',
+        padding: padPad,
         boxShadow: 'var(--shadow-sm)',
       }}
     >
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, marginBottom: 8 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap, marginBottom: 8 }}>
         {DOWS.map((d) => (
           <Mono key={d} style={{ color: 'var(--ink-3)', textAlign: 'center', fontSize: 11 }}>
             {d}
           </Mono>
         ))}
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap }}>
         {dias.map((iso) => {
           const dataMes = iso.startsWith(mes);
           const lista = porDia.get(iso) ?? [];
@@ -1241,8 +1253,8 @@ function CalendarioProposta({
               onClick={() => setDiaAberto(iso)}
               style={{
                 textAlign: 'left',
-                padding: 8,
-                minHeight: 88,
+                padding: padCell,
+                minHeight: minH,
                 borderRadius: 'var(--r-sm)',
                 border: '1px solid var(--line-2)',
                 background: dataMes ? 'var(--bg)' : 'var(--bg-alt)',
@@ -1250,7 +1262,8 @@ function CalendarioProposta({
                 cursor: 'pointer',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: 4,
+                gap: isMobile ? 2 : 4,
+                overflow: 'hidden',
               }}
             >
               <span style={{ font: '600 12px/1 var(--font-body)', color: dataMes ? 'var(--ink-2)' : 'var(--ink-3)' }}>
@@ -1265,16 +1278,16 @@ function CalendarioProposta({
                   <div
                     key={String(b.id)}
                     style={{
-                      padding: '3px 6px',
+                      padding: isMobile ? '1px 4px' : '3px 6px',
                       borderRadius: 'var(--r-xs, 4px)',
                       background: 'var(--bg-alt)',
                       borderLeft: '2px solid var(--ink-3)',
-                      font: '500 10px/1.2 var(--font-mono)',
+                      font: `500 ${isMobile ? 9 : 10}px/1.2 var(--font-mono)`,
                       color: 'var(--ink-3)',
                     }}
                     title={`${b.tipo} · ${fmtHora(b.horaInicio)}-${fmtHora((b.horaInicio + b.duracao) % 24)}`}
                   >
-                    {motivo.length > 12 ? `${motivo.slice(0, 12)}…` : motivo}
+                    {motivo.length > truncCell ? `${motivo.slice(0, truncCell)}…` : motivo}
                   </div>
                 );
               })}
@@ -1285,15 +1298,15 @@ function CalendarioProposta({
                   <div
                     key={p.id}
                     style={{
-                      padding: '3px 6px',
+                      padding: isMobile ? '1px 4px' : '3px 6px',
                       borderRadius: 'var(--r-xs, 4px)',
                       background: `var(--${cor}-surface)`,
                       borderLeft: `2px solid var(--${cor}-ink)`,
-                      font: '500 11px/1.2 var(--font-mono)',
+                      font: `500 ${isMobile ? 10 : 11}px/1.2 var(--font-mono)`,
                       color: `var(--${cor}-ink)`,
                     }}
                   >
-                    {h?.abrev ?? '?'} · {rotuloTurno(p.horaInicio, p.duracao, h) ?? fmtHora(p.horaInicio)}
+                    {isMobile ? (h?.abrev ?? '?') : `${h?.abrev ?? '?'} · ${rotuloTurno(p.horaInicio, p.duracao, h) ?? fmtHora(p.horaInicio)}`}
                   </div>
                 );
               })}
@@ -1550,8 +1563,16 @@ function Card({ titulo, eyebrow, children }: { titulo: string; eyebrow?: string;
 }
 
 function Linha({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
+  const isMobile = useIsMobile();
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr', gap: 16, alignItems: 'baseline' }}>
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: isMobile ? '1fr' : '160px 1fr',
+        gap: isMobile ? 8 : 16,
+        alignItems: isMobile ? 'stretch' : 'baseline',
+      }}
+    >
       <Eyebrow>{rotulo}</Eyebrow>
       {children}
     </div>
