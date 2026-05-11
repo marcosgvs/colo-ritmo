@@ -74,6 +74,25 @@ export async function enviarMagicLink(email: string): Promise<{ ok: true } | { o
   return { ok: true };
 }
 
+/**
+ * OAuth Google · resolve o problema do magic link em PWA (storage
+ * isolado). O redirect volta pra `/ritmo/` no mesmo contexto onde o
+ * user clicou (PWA standalone ou browser) e Supabase JS detecta
+ * `?code=...` na URL automaticamente.
+ */
+export async function entrarComGoogle(): Promise<{ ok: true } | { ok: false; erro: string }> {
+  const sb = supabase();
+  const { error } = await sb.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo:
+        typeof window !== 'undefined' ? `${window.location.origin}/ritmo/` : undefined,
+    },
+  });
+  if (error) return { ok: false, erro: traduzirErroAuth(error.message) };
+  return { ok: true };
+}
+
 export async function sair(): Promise<void> {
   await supabase().auth.signOut();
 }
