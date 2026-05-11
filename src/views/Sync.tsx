@@ -42,12 +42,20 @@ interface SyncProps {
 
 type Estado = 'parado' | 'lendo' | 'enviando' | 'pronto' | 'erro';
 
+interface Variante {
+  nome: string;
+  count: number;
+  blocoIds: Array<string | number>;
+}
+
 interface Resultado {
   blocos: BlocoPlantao[];
   janelas: Janela[];
   avisos: string[];
   /** Diferenciamos: ICS = só blocos, PDF = blocos + janelas + celulas */
   origem: 'ics' | 'pdf';
+  /** Variantes de nome que bateram no fuzzy · vazio ou 1 = sem ambiguidade. */
+  variantes: Variante[];
   /** Transcrição completa do PDF · só vem em import de PDF. */
   celulas?: CelulaEscala[];
   /** Texto bruto que o modelo devolveu quando não conseguimos organizar a resposta. */
@@ -60,8 +68,36 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
   const [mes, setMes] = useState<string>(() => new Date().toISOString().slice(0, 7));
   const [estado, setEstado] = useState<Estado>('parado');
   const [resultado, setResultado] = useState<Resultado | null>(null);
+  const [variantesSelecionadas, setVariantesSelecionadas] = useState<Set<string>>(new Set());
   const [erro, setErro] = useState<string | null>(null);
   const [icsTexto, setIcsTexto] = useState('');
+
+  // Quando há ambiguidade (>1 variante), filtra os blocos pelas variantes
+  // selecionadas pela usuária. Quando só tem 1 variante (ou ICS), mostra
+  // todos os blocos diretamente.
+  const blocosVisiveis: BlocoPlantao[] = (() => {
+    if (!resultado) return [];
+    if (resultado.variantes.length <= 1) return resultado.blocos;
+    const idsOk = new Set<string | number>();
+    for (const v of resultado.variantes) {
+      if (variantesSelecionadas.has(v.nome)) {
+        v.blocoIds.forEach((id) => idsOk.add(id));
+      }
+    }
+    return resultado.blocos.filter((b) => idsOk.has(b.id));
+  })();
+
+  const precisaConfirmarVariante = !!resultado && resultado.variantes.length > 1;
+  const podeConfirmar = blocosVisiveis.length > 0;
+
+  function toggleVariante(nome: string) {
+    setVariantesSelecionadas((prev) => {
+      const next = new Set(prev);
+      if (next.has(nome)) next.delete(nome);
+      else next.add(nome);
+      return next;
+    });
+  }
 
   const linkICS = icsToken ? `${origin()}/api/ics/${icsToken}.ics` : null;
 
@@ -107,19 +143,27 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
       }
       const json = (await resp.json()) as {
         blocos: BlocoPlantao[];
+        variantes?: Variante[];
         janelas?: Janela[];
         celulas?: CelulaEscala[];
         avisos?: string[];
         respostaCrua?: string;
       };
+      const variantes = json.variantes ?? [];
       setResultado({
         blocos: json.blocos,
+        variantes,
         janelas: json.janelas ?? [],
         avisos: json.avisos ?? [],
         origem: 'pdf',
         celulas: json.celulas,
         respostaCrua: json.respostaCrua,
       });
+      // Múltiplas variantes · força escolha consciente · começa nenhuma marcada.
+      // 1 variante · marca automático pra simplificar.
+      setVariantesSelecionadas(
+        variantes.length === 1 ? new Set([variantes[0]!.nome]) : new Set(),
+      );
       setEstado('pronto');
     } catch (err) {
       setErro((err as Error).message);
@@ -143,7 +187,8 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
         if (b) blocos.push(b);
         else avisos.push(`evento sem início/fim · pulei (${evt.summary ?? evt.uid})`);
       });
-      setResultado({ blocos, janelas: [], avisos, origem: 'ics' });
+      setResultado({ blocos, variantes: [], janelas: [], avisos, origem: 'ics' });
+      setVariantesSelecionadas(new Set());
       setEstado('pronto');
     } catch (err) {
       setErro((err as Error).message);
@@ -152,22 +197,31 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
   }
 
   function confirmarImport() {
-    if (!resultado) return;
+    if (!resultado || !podeConfirmar) return;
     if (resultado.origem === 'pdf' && onAplicarEscala) {
+      // Apelido confirmado · se houver ambiguidade, salva a primeira variante
+      // selecionada como apelidoUsado (próximos imports do mesmo hospital
+      // podem reusar).
+      const apelidoSalvo =
+        resultado.variantes.length > 1
+          ? Array.from(variantesSelecionadas)[0] ?? apelidoNaEscala.trim()
+          : apelidoNaEscala.trim();
+
       // PDF · substitui mês×hospital + atualiza janelas + arquiva transcrição
       onAplicarEscala({
         hospitalId,
         mesISO: mes,
-        blocos: resultado.blocos,
+        blocos: blocosVisiveis,
         janelas: resultado.janelas,
         celulas: resultado.celulas,
-        apelidoUsado: apelidoNaEscala.trim() || undefined,
+        apelidoUsado: apelidoSalvo || undefined,
       });
     } else {
       // ICS · só adiciona blocos
-      onAdicionarBlocos(resultado.blocos);
+      onAdicionarBlocos(blocosVisiveis);
     }
     setResultado(null);
+    setVariantesSelecionadas(new Set());
     setIcsTexto('');
     setEstado('parado');
   }
@@ -307,12 +361,63 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
           {resultado && (
             <Card
               titulo={
-                resultado.blocos.length === 1
+                blocosVisiveis.length === 1
                   ? '1 plantão pronto pra somar'
-                  : `${resultado.blocos.length} plantões prontos pra somar`
+                  : `${blocosVisiveis.length} plantões prontos pra somar`
               }
               eyebrow="revisa antes de salvar"
             >
+              {precisaConfirmarVariante && (
+                <div
+                  style={{
+                    background: 'var(--lavender-surface)',
+                    border: '1px solid var(--lavender-ink)',
+                    borderRadius: 'var(--r-md)',
+                    padding: '14px 16px',
+                    marginBottom: 14,
+                  }}
+                >
+                  <Eyebrow color="var(--lavender-ink)">
+                    achei {resultado.variantes.length} nomes parecidos · qual(is) é você?
+                  </Eyebrow>
+                  <Mono style={{ display: 'block', marginTop: 6, color: 'var(--ink-3)' }}>
+                    o chefe pode usar mais de uma grafia no mesmo mês · marque uma ou mais
+                  </Mono>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 12 }}>
+                    {resultado.variantes.map((v) => {
+                      const ativo = variantesSelecionadas.has(v.nome);
+                      return (
+                        <label
+                          key={v.nome}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 10,
+                            padding: '10px 12px',
+                            borderRadius: 'var(--r-sm)',
+                            border: ativo ? '1px solid var(--lavender-ink)' : '1px solid var(--line)',
+                            background: ativo ? 'var(--bg)' : 'transparent',
+                            cursor: 'pointer',
+                            font: '500 13px/1.2 var(--font-body)',
+                            color: 'var(--ink)',
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={ativo}
+                            onChange={() => toggleVariante(v.nome)}
+                          />
+                          <span style={{ flex: 1 }}>{v.nome}</span>
+                          <Mono style={{ color: 'var(--ink-3)' }}>
+                            {v.count} {v.count === 1 ? 'plantão' : 'plantões'}
+                          </Mono>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {resultado.avisos.length > 0 && (
                 <div
                   style={{
@@ -369,82 +474,95 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
                 />
               ) : (
                 <>
-                  <div
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 6,
-                      marginBottom: 14,
-                      maxHeight: 380,
-                      overflowY: 'auto',
-                    }}
-                  >
-                    {resultado.blocos
-                      .slice()
-                      .sort(
-                        (a, b) =>
-                          a.data.localeCompare(b.data) || a.horaInicio - b.horaInicio,
-                      )
-                      .map((b) => (
-                        <div
-                          key={String(b.id)}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 12,
-                            padding: '10px 12px',
-                            background: 'var(--bg-alt)',
-                            borderRadius: 'var(--r-sm)',
-                          }}
-                        >
-                          <Mono style={{ width: 130 }}>{fmtDate(b.data)}</Mono>
-                          <Mono>{fmtRange(b.horaInicio, b.duracao)}</Mono>
-                          <span style={{ flex: 1 }} />
-                          <Pill kind="info">{b.duracao}h</Pill>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setResultado((r) =>
-                                r
-                                  ? { ...r, blocos: r.blocos.filter((x) => x.id !== b.id) }
-                                  : r,
-                              )
-                            }
-                            aria-label="remover deste import"
-                            title="remover deste import"
+                  {blocosVisiveis.length > 0 ? (
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 6,
+                        marginBottom: 14,
+                        maxHeight: 380,
+                        overflowY: 'auto',
+                      }}
+                    >
+                      {blocosVisiveis
+                        .slice()
+                        .sort(
+                          (a, b) =>
+                            a.data.localeCompare(b.data) || a.horaInicio - b.horaInicio,
+                        )
+                        .map((b) => (
+                          <div
+                            key={String(b.id)}
                             style={{
-                              width: 28,
-                              height: 28,
-                              borderRadius: 999,
-                              border: '1px solid var(--coral-ink)',
-                              background: 'transparent',
-                              color: 'var(--coral-ink)',
-                              cursor: 'pointer',
                               display: 'flex',
                               alignItems: 'center',
-                              justifyContent: 'center',
+                              gap: 12,
+                              padding: '10px 12px',
+                              background: 'var(--bg-alt)',
+                              borderRadius: 'var(--r-sm)',
                             }}
                           >
-                            <svg
-                              width="11"
-                              height="11"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2.4"
-                              strokeLinecap="round"
+                            <Mono style={{ width: 130 }}>{fmtDate(b.data)}</Mono>
+                            <Mono>{fmtRange(b.horaInicio, b.duracao)}</Mono>
+                            <span style={{ flex: 1 }} />
+                            <Pill kind="info">{b.duracao}h</Pill>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setResultado((r) =>
+                                  r
+                                    ? { ...r, blocos: r.blocos.filter((x) => x.id !== b.id) }
+                                    : r,
+                                )
+                              }
+                              aria-label="remover deste import"
+                              title="remover deste import"
+                              style={{
+                                width: 28,
+                                height: 28,
+                                borderRadius: 999,
+                                border: '1px solid var(--coral-ink)',
+                                background: 'transparent',
+                                color: 'var(--coral-ink)',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                              }}
                             >
-                              <path d="M6 6l12 12M18 6L6 18" />
-                            </svg>
-                          </button>
-                        </div>
-                      ))}
-                  </div>
+                              <svg
+                                width="11"
+                                height="11"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2.4"
+                                strokeLinecap="round"
+                              >
+                                <path d="M6 6l12 12M18 6L6 18" />
+                              </svg>
+                            </button>
+                          </div>
+                        ))}
+                    </div>
+                  ) : precisaConfirmarVariante ? (
+                    <p
+                      style={{
+                        font: '400 13px/1.5 var(--font-body)',
+                        color: 'var(--ink-3)',
+                        margin: '0 0 14px',
+                      }}
+                    >
+                      marque pelo menos um nome acima pra ver os plantões correspondentes.
+                    </p>
+                  ) : null}
+
                   <div style={{ display: 'flex', gap: 10 }}>
                     <button
                       type="button"
                       onClick={confirmarImport}
-                      disabled={resultado.blocos.length === 0}
+                      disabled={!podeConfirmar}
                       style={{
                         font: '600 13px/1 var(--font-body)',
                         padding: '12px 20px',
@@ -452,17 +570,18 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
                         border: 'none',
                         background: 'var(--sage-ink)',
                         color: 'var(--bg)',
-                        cursor: resultado.blocos.length === 0 ? 'not-allowed' : 'pointer',
-                        opacity: resultado.blocos.length === 0 ? 0.5 : 1,
+                        cursor: !podeConfirmar ? 'not-allowed' : 'pointer',
+                        opacity: !podeConfirmar ? 0.5 : 1,
                       }}
                     >
-                      adicionar {resultado.blocos.length}{' '}
-                      {resultado.blocos.length === 1 ? 'plantão' : 'plantões'}
+                      adicionar {blocosVisiveis.length}{' '}
+                      {blocosVisiveis.length === 1 ? 'plantão' : 'plantões'}
                     </button>
                     <button
                       type="button"
                       onClick={() => {
                         setResultado(null);
+                        setVariantesSelecionadas(new Set());
                         setEstado('parado');
                       }}
                       style={{

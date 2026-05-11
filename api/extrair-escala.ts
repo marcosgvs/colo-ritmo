@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { envObrigatorio } from './_shared/env.js';
-import { fuzzyMatch } from '../src/lib/fuzzyMatch.js';
+import { fuzzyMatch, normalizarNome } from '../src/lib/fuzzyMatch.js';
 
 /**
  * /api/extrair-escala · OCR + extração estruturada via Claude Vision (tool use).
@@ -184,6 +184,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       const texto = json.content?.find((c) => c.type === 'text')?.text ?? '';
       res.status(200).json({
         blocos: [],
+        variantes: [],
         janelas: [],
         celulas: [],
         avisos: ['tive dificuldade pra organizar a resposta · veja abaixo o que recebi e tenta de novo'],
@@ -200,19 +201,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   }
 }
 
+interface BlocoImport {
+  id: string;
+  tipo: 'plantao';
+  hospitalId: string;
+  data: string;
+  horaInicio: number;
+  duracao: number;
+}
+
+interface Variante {
+  /** Grafia canônica (a primeira ocorrência que apareceu no PDF). */
+  nome: string;
+  /** Quantos plantões foram detectados com essa grafia. */
+  count: number;
+  /** ids dos blocos dessa variante · usados no frontend pra filtrar após o usuário escolher. */
+  blocoIds: string[];
+}
+
 function construirResposta(
   input: ToolInput,
   hospitalId: string,
   apelido: string,
 ): {
-  blocos: Array<{
-    id: string;
-    tipo: 'plantao';
-    hospitalId: string;
-    data: string;
-    horaInicio: number;
-    duracao: number;
-  }>;
+  blocos: BlocoImport[];
+  variantes: Variante[];
   janelas: Array<{ rotulo: string; inicio: number; duracao: number }>;
   celulas: Array<{ data: string; turno: string; nomes: string[] }>;
   avisos: string[];
@@ -230,21 +243,21 @@ function construirResposta(
 
   const avisos = [...(input.avisos ?? [])];
 
-  // Pra cada célula, descobre se a médica está lá (fuzzyMatch sobre cada nome).
-  // Se sim, mapeia o turno → janela pra calcular horaInicio/duracao.
+  // Pra cada célula, descobre quais nomes batem com o apelido. Cada nome
+  // distinto que bateu vira uma "variante" · o frontend mostra todas e o
+  // usuário escolhe qual(is) é/são ele.
+  // Normalização: agrupa "Mariana A" e "MARIANA A" na mesma variante,
+  // mas mantém "Mariana A" e "Mariana C" separados.
   const janelaPor = new Map(janelas.map((j) => [j.rotulo, j]));
-  const blocos: Array<{
-    id: string;
-    tipo: 'plantao';
-    hospitalId: string;
-    data: string;
-    horaInicio: number;
-    duracao: number;
-  }> = [];
+  const blocos: BlocoImport[] = [];
+  const variantesByKey = new Map<string, { nome: string; blocos: BlocoImport[] }>();
   const baseId = Date.now();
+
   for (const c of celulas) {
-    const matched = c.nomes.some((n) => fuzzyMatch(n, apelido));
-    if (!matched) continue;
+    // Acha o primeiro nome da célula que bate com o apelido (pra evitar
+    // duplicar plantão se uma célula tiver o mesmo nome duas vezes).
+    const nomeMatch = c.nomes.find((n) => fuzzyMatch(n, apelido));
+    if (!nomeMatch) continue;
     const janela = janelaPor.get(c.turno);
     if (!janela) {
       avisos.push(
@@ -252,17 +265,34 @@ function construirResposta(
       );
       continue;
     }
-    blocos.push({
+    const bloco: BlocoImport = {
       id: `import-${baseId}-${blocos.length}`,
       tipo: 'plantao',
       hospitalId,
       data: c.data,
       horaInicio: janela.inicio,
       duracao: janela.duracao,
-    });
+    };
+    blocos.push(bloco);
+
+    const chave = normalizarNome(nomeMatch);
+    const grupo = variantesByKey.get(chave);
+    if (grupo) {
+      grupo.blocos.push(bloco);
+    } else {
+      variantesByKey.set(chave, { nome: nomeMatch.trim(), blocos: [bloco] });
+    }
   }
 
-  return { blocos, janelas, celulas, avisos };
+  const variantes: Variante[] = Array.from(variantesByKey.values())
+    .map((g) => ({
+      nome: g.nome,
+      count: g.blocos.length,
+      blocoIds: g.blocos.map((b) => b.id),
+    }))
+    .sort((a, b) => b.count - a.count);
+
+  return { blocos, variantes, janelas, celulas, avisos };
 }
 
 function diaDaSemana(ano: number, mes: number, dia: number): string {

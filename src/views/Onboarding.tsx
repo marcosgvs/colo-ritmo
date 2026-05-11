@@ -13,6 +13,7 @@ type Passo = (typeof PASSOS)[number];
 export function Onboarding({ onConcluir, onPular }: OnboardingProps) {
   const [passo, setPasso] = useState<Passo>('boas-vindas');
   const [nome, setNome] = useState('');
+  const [erro, setErro] = useState<string | null>(null);
   const [hospitalNome, setHospitalNome] = useState('');
   const [hospitalAbrev, setHospitalAbrev] = useState('');
   const [valorPlantao, setValorPlantao] = useState(1800);
@@ -20,6 +21,14 @@ export function Onboarding({ onConcluir, onPular }: OnboardingProps) {
   const idx = PASSOS.indexOf(passo);
 
   function avancar() {
+    if (passo === 'boas-vindas') {
+      const partes = nome.trim().split(/\s+/).filter(Boolean);
+      if (partes.length < 2) {
+        setErro('precisa ser nome completo · pelo menos nome + sobrenome (ex: Mariana Pinheiro Araújo)');
+        return;
+      }
+    }
+    setErro(null);
     const proximo = PASSOS[idx + 1];
     if (proximo) setPasso(proximo);
     else concluir();
@@ -109,15 +118,23 @@ export function Onboarding({ onConcluir, onPular }: OnboardingProps) {
             <Hand color="var(--ink-2)" size={20}>
               vou te ajudar a olhar pra agenda sem que ela aperte. se algo aqui apertar, me avisa.
             </Hand>
-            <Field label="como te chamo">
+            <Field label="seu nome completo">
               <input
                 value={nome}
                 onChange={(e) => setNome(e.target.value)}
-                placeholder="Mariana"
+                placeholder="Mariana Pinheiro Araújo"
                 style={input}
                 autoFocus
               />
             </Field>
+            <Mono style={{ color: 'var(--ink-3)' }}>
+              precisamos do nome completo · ajuda a achar você nas escalas, mesmo quando o chefe usa abreviações
+            </Mono>
+            {erro && (
+              <p style={{ font: '500 13px/1.4 var(--font-body)', color: 'var(--coral-ink)', margin: 0 }}>
+                {erro}
+              </p>
+            )}
           </>
         )}
 

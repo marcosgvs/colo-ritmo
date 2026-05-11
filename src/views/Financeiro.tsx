@@ -1,14 +1,13 @@
 import { useMemo, useState } from 'react';
 import type { Bloco, HospitaisMap } from '@/types';
 import { calcRemuneracaoMes, fromISO, HOJE } from '@/lib/data';
-import { Eyebrow, Hand, Mono, Pill } from '@/components/atoms';
+import { Eyebrow, Hand, MonthPicker, Mono } from '@/components/atoms';
 import { EmptyState } from '@/components/empty';
 import { PageHead } from './_PageHead';
 
 interface FinanceiroProps {
   blocos: Bloco[];
   hospitais: HospitaisMap;
-  metaMensal?: number;
 }
 
 const MESES_LONG = [
@@ -16,10 +15,13 @@ const MESES_LONG = [
   'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro',
 ];
 
-export function Financeiro({ blocos, hospitais, metaMensal }: FinanceiroProps) {
-  const [refIso] = useState<string>(HOJE);
-  const d = fromISO(refIso);
-  const mesISO = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+export function Financeiro({ blocos, hospitais }: FinanceiroProps) {
+  const hojeMesISO = useMemo(() => {
+    const d = fromISO(HOJE);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  }, []);
+  const [mesISO, setMesISO] = useState<string>(hojeMesISO);
+  const d = fromISO(`${mesISO}-01`);
 
   const resumo = useMemo(
     () => calcRemuneracaoMes(blocos, hospitais, mesISO),
@@ -27,18 +29,34 @@ export function Financeiro({ blocos, hospitais, metaMensal }: FinanceiroProps) {
   );
 
   const total = resumo.total.bruto;
-  const pct = metaMensal ? Math.min(100, Math.round((total / metaMensal) * 100)) : null;
+  const eFuturo = mesISO > hojeMesISO;
+  const eAtual = mesISO === hojeMesISO;
+  const ePassado = mesISO < hojeMesISO;
+  const horizonteRotulo = eFuturo ? 'previsão' : ePassado ? 'realizado' : 'em andamento';
+
+  const picker = (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
+      <Eyebrow>mês</Eyebrow>
+      <MonthPicker value={mesISO} onChange={setMesISO} janela={18} />
+      <Mono style={{ color: 'var(--ink-3)' }}>{horizonteRotulo}</Mono>
+    </div>
+  );
 
   if (Object.keys(resumo.porHospital).length === 0) {
     return (
       <>
         <PageHead
           eyebrow={`${MESES_LONG[d.getMonth()]} ${d.getFullYear()}`}
-          titulo="ainda sem números."
+          titulo={eFuturo ? 'previsão em branco.' : 'ainda sem números.'}
         />
+        {picker}
         <EmptyState
-          titulo="esse mês está vazio."
-          recado="adiciona um plantão e os valores aparecem aqui automaticamente."
+          titulo={eFuturo ? 'esse mês ainda não tem plantões agendados.' : 'esse mês está vazio.'}
+          recado={
+            eFuturo
+              ? 'à medida que você adiciona plantões pra esse mês, os valores aparecem aqui.'
+              : 'adiciona um plantão e os valores aparecem aqui automaticamente.'
+          }
         />
       </>
     );
@@ -47,16 +65,17 @@ export function Financeiro({ blocos, hospitais, metaMensal }: FinanceiroProps) {
   return (
     <>
       <PageHead
-        eyebrow={`${MESES_LONG[d.getMonth()]} ${d.getFullYear()}`}
-        titulo="o que o mês vai pagar."
-        hand={
-          metaMensal
-            ? pct === 100
-              ? 'meta batida · pode tirar o pé do acelerador'
-              : `${pct}% da meta · faltam R$ ${(metaMensal - total).toLocaleString('pt-BR')}`
-            : `R$ ${total.toLocaleString('pt-BR')}`
+        eyebrow={`${MESES_LONG[d.getMonth()]} ${d.getFullYear()} · ${horizonteRotulo}`}
+        titulo={
+          eFuturo
+            ? 'o que o mês deve pagar.'
+            : eAtual
+              ? 'o que o mês vai pagar.'
+              : 'o que o mês pagou.'
         }
+        hand={`R$ ${total.toLocaleString('pt-BR')}`}
       />
+      {picker}
 
       <div
         style={{
@@ -148,25 +167,12 @@ export function Financeiro({ blocos, hospitais, metaMensal }: FinanceiroProps) {
             público é valor fixo mensal · privado é valor/hora × duração.
             adicional noturno soma quando o plantão cruza 22h–6h.
           </p>
-          {metaMensal && (
-            <div style={{ marginTop: 4 }}>
-              <Eyebrow>meta do mês</Eyebrow>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 6 }}>
-                <span style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 500 }}>
-                  R$ {metaMensal.toLocaleString('pt-BR')}
-                </span>
-                {pct !== null && (
-                  <Pill kind={pct >= 100 ? 'ok' : 'warn'}>
-                    {pct}%
-                  </Pill>
-                )}
-              </div>
-              <Hand color="var(--ink-2)" size={15} style={{ display: 'block', marginTop: 8 }}>
-                meta privada · você ajusta em "usuário"
-              </Hand>
-            </div>
-          )}
           <Mono style={{ color: 'var(--ink-3)' }}>cedidos não contam · trocas recebidas sim</Mono>
+          {eFuturo && (
+            <Hand color="var(--ink-3)" size={14} style={{ display: 'block', marginTop: 4 }}>
+              previsão · vai mudar conforme você adicionar/trocar plantões
+            </Hand>
+          )}
         </aside>
       </div>
     </>

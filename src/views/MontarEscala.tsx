@@ -893,7 +893,27 @@ function PreviewBlock({
   const totalDuracao = resultado.plantoes.reduce((s, p) => s + p.duracao, 0);
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 320px', gap: 24, alignItems: 'flex-start' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+      {resultado.justificativa && (
+        <div
+          style={{
+            padding: '20px 24px',
+            background: 'var(--lavender-surface)',
+            border: '1px solid var(--lavender-ink)',
+            borderRadius: 'var(--r-lg)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 8,
+          }}
+        >
+          <Eyebrow color="var(--lavender-ink)">por que assim · raciocínio</Eyebrow>
+          <p style={{ font: '400 14px/1.6 var(--font-body)', color: 'var(--ink)', margin: 0 }}>
+            {resultado.justificativa}
+          </p>
+        </div>
+      )}
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 320px', gap: 24, alignItems: 'flex-start' }}>
       <CalendarioProposta
         mes={mes}
         plantoes={resultado.plantoes}
@@ -906,12 +926,6 @@ function PreviewBlock({
       />
 
       <aside style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <Card titulo="por que assim" eyebrow="raciocínio">
-          <p style={{ font: '400 13px/1.55 var(--font-body)', color: 'var(--ink-2)', margin: 0 }}>
-            {resultado.justificativa}
-          </p>
-        </Card>
-
         <Card titulo="totais" eyebrow="estimativa">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <Total rotulo="plantões" valor={String(resultado.plantoes.length)} />
@@ -971,6 +985,7 @@ function PreviewBlock({
           </div>
         </div>
       </aside>
+      </div>
     </div>
   );
 }
