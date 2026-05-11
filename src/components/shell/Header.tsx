@@ -95,7 +95,12 @@ export function Header({
           <div style={{ flex: 1 }} />
           <CargaBadge horas={carga} compact />
           {notificacoes && onMarcarLida && (
-            <NotifSino notificacoes={notificacoes} onMarcarLida={onMarcarLida} />
+            <NotifSino
+              notificacoes={notificacoes}
+              onMarcarLida={onMarcarLida}
+              conflitos={active !== 'conflitos' ? conflitos : 0}
+              onAbrirConflitos={() => onNav?.('conflitos')}
+            />
           )}
           <button
             type="button"
@@ -112,34 +117,17 @@ export function Header({
               borderRadius: 999,
               cursor: 'pointer',
               color: 'var(--ink)',
-              position: 'relative',
             }}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <path d="M4 7h16M4 12h16M4 17h16" />
             </svg>
-            {conflitos > 0 && active !== 'conflitos' && (
-              <span
-                aria-hidden
-                style={{
-                  position: 'absolute',
-                  top: 2,
-                  right: 2,
-                  width: 9,
-                  height: 9,
-                  borderRadius: 999,
-                  background: 'var(--coral)',
-                  border: '1.5px solid var(--bg)',
-                }}
-              />
-            )}
           </button>
         </header>
         {menuOpen && (
           <MobileMenu
             active={active}
             mode={mode}
-            conflitos={conflitos}
             onNav={(k) => onNav?.(k)}
             onClose={() => setMenuOpen(false)}
           />
@@ -197,38 +185,6 @@ export function Header({
 
       <div style={{ flex: 1 }} />
 
-      {conflitos > 0 && active !== 'conflitos' && (
-        <button
-          type="button"
-          onClick={() => onNav?.('conflitos')}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 8,
-            padding: '6px 12px 6px 10px',
-            borderRadius: 999,
-            background: 'var(--coral-surface)',
-            border: '1px solid color-mix(in oklab, var(--coral-ink) 24%, transparent)',
-            color: 'var(--coral-ink)',
-            font: '600 12px/1 var(--font-body)',
-            cursor: 'pointer',
-            animation: 'colo-pulse-conflict 2.4s ease-in-out infinite',
-          }}
-          title="resolver conflitos"
-        >
-          <span
-            style={{
-              width: 8,
-              height: 8,
-              borderRadius: 999,
-              background: 'var(--coral)',
-              display: 'inline-block',
-            }}
-          />
-          {conflitos} conflito{conflitos > 1 ? 's' : ''}
-        </button>
-      )}
-
       <CargaBadge horas={carga} />
 
       <button
@@ -264,7 +220,12 @@ export function Header({
       </button>
 
       {notificacoes && onMarcarLida && (
-        <NotifSino notificacoes={notificacoes} onMarcarLida={onMarcarLida} />
+        <NotifSino
+          notificacoes={notificacoes}
+          onMarcarLida={onMarcarLida}
+          conflitos={active !== 'conflitos' ? conflitos : 0}
+          onAbrirConflitos={() => onNav?.('conflitos')}
+        />
       )}
 
       <button

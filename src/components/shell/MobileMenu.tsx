@@ -6,17 +6,17 @@ import { NavIcon } from './NavIcon';
 interface MobileMenuProps {
   active: NavKey;
   mode: Mode;
-  conflitos?: number;
   onNav: (k: NavKey) => void;
   onClose: () => void;
 }
 
 /**
  * MobileMenu · bottom-sheet que aparece em <720px ao tocar no botão ☰
- * do header. Empilha vertical: views (filtradas por mode), conflitos
- * (se houver), usuário no rodapé. ESC e tap-out fecham.
+ * do header. Empilha vertical: views (filtradas por mode) + usuário no
+ * rodapé. Conflitos ficam no sino do header (unifica notif + conflitos
+ * em um ponto só de atenção). ESC e tap-out fecham.
  */
-export function MobileMenu({ active, mode, conflitos = 0, onNav, onClose }: MobileMenuProps) {
+export function MobileMenu({ active, mode, onNav, onClose }: MobileMenuProps) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -28,7 +28,6 @@ export function MobileMenu({ active, mode, conflitos = 0, onNav, onClose }: Mobi
   // 'lista' some em mobile porque 'agenda' já renderiza ListaDoDia ·
   // mostrar os dois seria entrada redundante pro mesmo destino.
   const items = NAV_ITEMS.filter((i) => i.roles.includes(mode) && i.key !== 'lista');
-  const conflitoAtivo = active === 'conflitos';
 
   return (
     <div
@@ -103,45 +102,6 @@ export function MobileMenu({ active, mode, conflitos = 0, onNav, onClose }: Mobi
             );
           })}
         </nav>
-
-        {conflitos > 0 && !conflitoAtivo && (
-          <>
-            <Separador />
-            <button
-              type="button"
-              onClick={() => {
-                onNav('conflitos');
-                onClose();
-              }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 14,
-                padding: '14px 12px',
-                minHeight: 48,
-                font: '500 15px/1 var(--font-body)',
-                color: 'var(--coral-ink)',
-                background: 'var(--coral-surface)',
-                border: '1px solid color-mix(in oklab, var(--coral-ink) 24%, transparent)',
-                borderRadius: 12,
-                cursor: 'pointer',
-                textAlign: 'left',
-                width: '100%',
-              }}
-            >
-              <span
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: 999,
-                  background: 'var(--coral)',
-                  display: 'inline-block',
-                }}
-              />
-              {conflitos} conflito{conflitos > 1 ? 's' : ''} pra revisar
-            </button>
-          </>
-        )}
 
         <Separador />
 

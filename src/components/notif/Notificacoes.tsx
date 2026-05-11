@@ -13,15 +13,22 @@ export interface Notificacao {
 interface NotificacoesProps {
   notificacoes: Notificacao[];
   onMarcarLida: (id: string) => void;
+  /** Conflitos de agenda · entra como item destacado no topo do popover. */
+  conflitos?: number;
+  onAbrirConflitos?: () => void;
 }
 
 /**
- * Sino + drawer de notificações. Cai do topo direito. Agrupa em
- * "novas" e "já lidas". Cada item tem ícone tipado e ação inline.
+ * Sino + drawer · agrega notificações push e conflitos de agenda num
+ * único ponto de atenção. Cai do topo direito. Badge é a soma de notif
+ * não-lidas + conflitos · entrada destacada de conflitos fica no topo
+ * do popover quando count > 0.
  */
-export function NotifSino({ notificacoes, onMarcarLida }: NotificacoesProps) {
+export function NotifSino({ notificacoes, onMarcarLida, conflitos = 0, onAbrirConflitos }: NotificacoesProps) {
   const [aberto, setAberto] = useState(false);
   const naoLidas = notificacoes.filter((n) => !n.lida);
+  const totalAtencao = naoLidas.length + conflitos;
+  const vazio = notificacoes.length === 0 && conflitos === 0;
 
   return (
     <div style={{ position: 'relative' }}>
@@ -32,33 +39,39 @@ export function NotifSino({ notificacoes, onMarcarLida }: NotificacoesProps) {
           background: aberto ? 'var(--bg-alt)' : 'transparent',
           border: '1px solid var(--line)',
           borderRadius: 999,
-          padding: 8,
+          width: 44,
+          height: 44,
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
           cursor: 'pointer',
           color: 'var(--ink-2)',
           position: 'relative',
         }}
-        aria-label="notificações"
+        aria-label="avisos"
       >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
           <path d="M6 8a6 6 0 1112 0c0 7 3 9 3 9H3s3-2 3-9zM10 21a2 2 0 004 0" />
         </svg>
-        {naoLidas.length > 0 && (
+        {totalAtencao > 0 && (
           <span
             style={{
               position: 'absolute',
-              top: -3,
-              right: -3,
-              minWidth: 16,
-              height: 16,
-              padding: '0 4px',
+              top: 0,
+              right: 0,
+              minWidth: 18,
+              height: 18,
+              padding: '0 5px',
               borderRadius: 999,
               background: 'var(--coral-ink)',
               color: 'var(--bg)',
-              font: '700 9px/16px var(--font-body)',
+              font: '700 10px/18px var(--font-body)',
               textAlign: 'center',
+              border: '2px solid var(--bg)',
+              boxSizing: 'content-box',
             }}
           >
-            {naoLidas.length}
+            {totalAtencao}
           </span>
         )}
       </button>
@@ -75,7 +88,7 @@ export function NotifSino({ notificacoes, onMarcarLida }: NotificacoesProps) {
               position: 'absolute',
               top: '110%',
               right: 0,
-              width: 360,
+              width: 'min(360px, calc(100vw - 28px))',
               maxHeight: 480,
               overflowY: 'auto',
               background: 'var(--bg)',
@@ -99,10 +112,55 @@ export function NotifSino({ notificacoes, onMarcarLida }: NotificacoesProps) {
               >
                 avisos
               </h3>
-              {naoLidas.length > 0 && <Eyebrow>{naoLidas.length} novos</Eyebrow>}
+              {totalAtencao > 0 && <Eyebrow>{totalAtencao} {totalAtencao === 1 ? 'novo' : 'novos'}</Eyebrow>}
             </div>
 
-            {notificacoes.length === 0 && (
+            {conflitos > 0 && onAbrirConflitos && (
+              <button
+                type="button"
+                onClick={() => {
+                  setAberto(false);
+                  onAbrirConflitos();
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  width: '100%',
+                  textAlign: 'left',
+                  padding: '12px 14px',
+                  marginBottom: 14,
+                  background: 'var(--coral-surface)',
+                  border: '1px solid color-mix(in oklab, var(--coral-ink) 24%, transparent)',
+                  borderRadius: 'var(--r-sm)',
+                  cursor: 'pointer',
+                  color: 'var(--coral-ink)',
+                  font: '600 13px/1.3 var(--font-body)',
+                }}
+              >
+                <span
+                  aria-hidden
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: 999,
+                    background: 'var(--coral)',
+                    flexShrink: 0,
+                  }}
+                />
+                <span style={{ flex: 1 }}>
+                  {conflitos} conflito{conflitos > 1 ? 's' : ''} na agenda
+                  <span style={{ display: 'block', font: '400 12px/1.4 var(--font-body)', color: 'var(--coral-ink)', opacity: 0.85, marginTop: 2 }}>
+                    plantões se sobrepõem · clica pra resolver
+                  </span>
+                </span>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <path d="M9 6l6 6-6 6" />
+                </svg>
+              </button>
+            )}
+
+            {vazio && (
               <Hand color="var(--ink-2)" size={16} style={{ display: 'block' }}>
                 tudo em paz · sem avisos por enquanto.
               </Hand>
