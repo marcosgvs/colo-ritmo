@@ -5,7 +5,7 @@ import {
   getHospital,
   ehNoturno,
 } from '@/lib/data';
-import { Eyebrow, Hand, Mono, Pill } from '@/components/atoms';
+import { Eyebrow, Hand, IconConflito, Mono, Pill } from '@/components/atoms';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { PageHead } from './_PageHead';
 
@@ -70,7 +70,7 @@ export function Detalhe({ bloco, hospitais: _h, voltar, onTrocar, onCeder }: Det
         direita={
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {noturno && <Pill kind="info">noturno</Pill>}
-            {bloco.tipo === 'plantao' && bloco.conflito && <Pill kind="err">conflito</Pill>}
+            {bloco.tipo === 'plantao' && bloco.conflito && <IconConflito />}
             {bloco.tipo === 'plantao' && bloco.viaTroca && <Pill kind="lavender">via troca</Pill>}
           </div>
         }

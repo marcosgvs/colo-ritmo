@@ -13,7 +13,7 @@ import {
   MESES,
   semanaDe,
 } from '@/lib/data';
-import { Eyebrow, Hand, Mono, Pill } from '@/components/atoms';
+import { Eyebrow, Hand, IconConflito, Mono, Pill } from '@/components/atoms';
 import { EmptyState } from '@/components/empty';
 
 interface ListaDaSemanaProps {
@@ -204,7 +204,7 @@ function ItemLinha({ b, onClick }: { b: Bloco; onClick: () => void }) {
       <span style={{ flex: 1 }} />
       <Mono style={{ color: 'var(--ink-3)' }}>{b.duracao}h</Mono>
       {b.tipo === 'plantao' && b.viaTroca && <Pill kind="lavender">via troca</Pill>}
-      {b.tipo === 'plantao' && b.conflito && <Pill kind="err">conflito</Pill>}
+      {b.tipo === 'plantao' && b.conflito && <IconConflito />}
     </button>
   );
 }

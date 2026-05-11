@@ -8,7 +8,7 @@ import {
   getHospital,
   type Conflito,
 } from '@/lib/data';
-import { Eyebrow, Hand, Mono, Pill } from '@/components/atoms';
+import { Eyebrow, Hand, IconConflito, Mono, Pill } from '@/components/atoms';
 
 interface BlockDrawerProps {
   bloco: Bloco | null;
@@ -155,7 +155,7 @@ export function BlockDrawer({
           {bloco.tipo === 'plantao' && bloco.viaTroca && (
             <Pill kind="lavender">via troca</Pill>
           )}
-          {emConflito && <Pill kind="err">conflito</Pill>}
+          {emConflito && <IconConflito />}
           <span style={{ flex: 1 }} />
           <button
             type="button"
