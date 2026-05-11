@@ -44,10 +44,21 @@ export interface UserStateAPI {
 
 const SAVE_DEBOUNCE_MS = 800;
 
+/** Demo data · só pro modo preview (Marcos vendo agenda como X) e pra
+ * primeira renderização antes do select. Nunca persistido pra users
+ * reais — quem entra sem state vai ver onboarding e cadastra do zero. */
 const FALLBACK: UserStateValor = {
   blocos: BLOCOS_SEMANA,
   hospitais: HOSPITAIS,
   preferencias: PREFERENCIAS_ME,
+  escalasImportadas: [],
+};
+
+/** State inicial pra users novos · vazio · força o onboarding. */
+const STATE_VAZIO: UserStateValor = {
+  blocos: [],
+  hospitais: {},
+  preferencias: { nome: '' },
   escalasImportadas: [],
 };
 
@@ -151,9 +162,10 @@ export function useUserState(userId: string | null): UserStateAPI {
             escalasImportadas: blob.escalasImportadas ?? [],
           });
         } else {
-          // Primeiro acesso · semeia com defaults pra Mariana ver agenda.
-          setStateInternal(FALLBACK);
-          void persistir(FALLBACK);
+          // Primeiro acesso · começa vazio · App detecta hospitais={} e
+          // dispara onboarding. NÃO persiste seed da Mariana pra outros users.
+          setStateInternal(STATE_VAZIO);
+          void persistir(STATE_VAZIO);
         }
         setStatus('pronto');
       });
