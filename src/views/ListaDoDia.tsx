@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Bloco, HospitaisMap } from '@/types';
 import {
   adicionaDia,
@@ -23,35 +23,37 @@ interface ListaDaSemanaProps {
   onSelectBloco: (b: Bloco) => void;
 }
 
+const ALTURA_HORA = 56;
+const HORARIO_INICIAL_SCROLL = 6;
+
 /**
- * Lista da semana · layout 2 colunas (DATA | EVENTOS). Plantão noturno
- * que atravessa meia-noite aparece em DOIS dias, conectado visualmente:
- *   - no dia X: card com borda inferior reta + tag "termina amanhã 07h"
- *   - no dia X+1: card com borda superior reta + tag "começou ontem 19h"
- * mesma cor, mesma família, parecem um único bloco partido.
+ * Agenda mobile · timeline vertical 0-24h do dia selecionado. Chips no
+ * topo pra navegar entre dias da semana. Plantão que cruza meia-noite
+ * vira um card que vai do início até o fim do dia (canto inferior reto)
+ * e aparece no dia seguinte de 0h até o horário de fim (canto superior
+ * reto) · mesma cor, parecem partidos em dois.
  */
 export function ListaDoDia({ blocos, hospitais: _h, onSelectBloco }: ListaDaSemanaProps) {
-  const [refIso, setRefIso] = useState<string>(HOJE);
-  const semana = useMemo(() => semanaDe(refIso), [refIso]);
-  const inicio = semana[0]!;
-  const fim = semana[6]!;
-  const label = formatRangeSemana(inicio, fim);
+  const [diaSelecionado, setDiaSelecionado] = useState<string>(HOJE);
+  const semana = useMemo(() => semanaDe(diaSelecionado), [diaSelecionado]);
+  const segs = useMemo(() => segmentosDoDia(blocos, diaSelecionado), [blocos, diaSelecionado]);
 
-  const segmentosPorDia = useMemo(() => {
-    const m = new Map<string, SegmentoVisivel[]>();
-    for (const dia of semana) m.set(dia, segmentosDoDia(blocos, dia));
-    return m;
-  }, [blocos, semana]);
+  const dt = fromISO(diaSelecionado);
+  const dowLong = DOWS_LONG[diaSemanaBR(diaSelecionado)];
+  const isHoje = diaSelecionado === HOJE;
 
-  const totalBlocos = Array.from(segmentosPorDia.values()).reduce(
-    (s, a) => s + a.filter((seg) => !seg.continuaAntes).length,
-    0,
-  );
+  const refTimeline = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    // scroll inicial pras 6h (evita começar em 0 sempre vazio)
+    if (refTimeline.current) {
+      refTimeline.current.scrollTop = HORARIO_INICIAL_SCROLL * ALTURA_HORA - 40;
+    }
+  }, [diaSelecionado]);
 
   return (
     <>
-      <div style={{ marginBottom: 24 }}>
-        <Eyebrow>semana · {label}</Eyebrow>
+      <div style={{ marginBottom: 16 }}>
+        <Eyebrow>agenda · {DOWS[diaSemanaBR(diaSelecionado)]}</Eyebrow>
         <h1
           style={{
             fontFamily: 'var(--font-display)',
@@ -62,139 +64,337 @@ export function ListaDoDia({ blocos, hospitais: _h, onSelectBloco }: ListaDaSema
             color: 'var(--ink)',
           }}
         >
-          a semana em lista.
+          {dt.getDate()} {MESES[dt.getMonth()]} · {dowLong}
         </h1>
-        <Hand color="var(--lavender-ink)" size={20} style={{ display: 'block', marginTop: 8 }}>
-          {totalBlocos === 0
-            ? 'semana enxuta · nada agendado'
-            : `${totalBlocos} ${totalBlocos === 1 ? 'item' : 'itens'} pra olhar`}
-        </Hand>
+        {isHoje && (
+          <Hand color="var(--lavender-ink)" size={18} style={{ display: 'block', marginTop: 6 }}>
+            hoje
+          </Hand>
+        )}
       </div>
 
-      <div style={{ marginBottom: 18, display: 'flex', justifyContent: 'flex-end' }}>
-        <NavSemanaLista refIso={refIso} setRefIso={setRefIso} />
-      </div>
+      <ChipsSemana
+        semana={semana}
+        selecionado={diaSelecionado}
+        onSelecionar={setDiaSelecionado}
+        blocos={blocos}
+      />
 
-      {totalBlocos === 0 ? (
+      <NavDia diaSelecionado={diaSelecionado} setDiaSelecionado={setDiaSelecionado} />
+
+      {segs.length === 0 ? (
         <EmptyState
-          titulo="semana aberta."
-          recado="nada agendado por enquanto · vale aproveitar pra dormir adiantado."
+          titulo="dia aberto."
+          recado="nada agendado · aproveita pra respirar."
         />
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-          {semana.map((dia) => {
-            const segs = segmentosPorDia.get(dia) ?? [];
-            return (
-              <DiaLinha
-                key={dia}
-                dia={dia}
-                segs={segs}
-                onSelectBloco={onSelectBloco}
-              />
-            );
-          })}
+        <div
+          ref={refTimeline}
+          style={{
+            position: 'relative',
+            background: 'var(--bg)',
+            border: '1px solid var(--line)',
+            borderRadius: 14,
+            overflow: 'auto',
+            maxHeight: 'calc(100vh - 320px)',
+            minHeight: 400,
+          }}
+        >
+          <Timeline segs={segs} isHoje={isHoje} onSelectBloco={onSelectBloco} />
         </div>
       )}
     </>
   );
 }
 
-interface DiaLinhaProps {
-  dia: string;
-  segs: SegmentoVisivel[];
-  onSelectBloco: (b: Bloco) => void;
+interface ChipsSemanaProps {
+  semana: readonly string[];
+  selecionado: string;
+  onSelecionar: (dia: string) => void;
+  blocos: Bloco[];
 }
 
-function DiaLinha({ dia, segs, onSelectBloco }: DiaLinhaProps) {
-  const dt = fromISO(dia);
-  const isHoje = dia === HOJE;
+function ChipsSemana({ semana, selecionado, onSelecionar, blocos }: ChipsSemanaProps) {
+  // Mapa rápido: dia -> tem plantão (incluindo continuações)
+  const ocupacao = useMemo(() => {
+    const m = new Map<string, boolean>();
+    for (const dia of semana) {
+      const segs = segmentosDoDia(blocos, dia);
+      m.set(
+        dia,
+        segs.some((s) => s.bloco.tipo === 'plantao' || s.bloco.tipo === 'cedido'),
+      );
+    }
+    return m;
+  }, [blocos, semana]);
 
   return (
-    <section
+    <div
       style={{
         display: 'grid',
-        gridTemplateColumns: '56px 1fr',
-        gap: 14,
-        alignItems: 'stretch',
+        gridTemplateColumns: 'repeat(7, 1fr)',
+        gap: 6,
+        marginBottom: 18,
       }}
     >
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'flex-start',
-          paddingTop: 4,
-          minWidth: 0,
-        }}
-      >
-        <span
-          style={{
-            font: '500 28px/1 var(--font-display)',
-            color: isHoje ? 'var(--lavender-ink)' : 'var(--ink)',
-            letterSpacing: '-0.02em',
-          }}
-        >
-          {String(dt.getDate()).padStart(2, '0')}
-        </span>
-        <span
-          style={{
-            font: '600 10px/1 var(--font-body)',
-            color: isHoje ? 'var(--lavender-ink)' : 'var(--ink-3)',
-            letterSpacing: '0.1em',
-            marginTop: 6,
-            textTransform: 'uppercase',
-          }}
-        >
-          {DOWS[diaSemanaBR(dia)]}
-        </span>
-        {isHoje && (
-          <span
-            aria-hidden
+      {semana.map((dia) => {
+        const dt = fromISO(dia);
+        const sel = dia === selecionado;
+        const ehHoje = dia === HOJE;
+        const ocupado = ocupacao.get(dia) === true;
+        return (
+          <button
+            key={dia}
+            type="button"
+            onClick={() => onSelecionar(dia)}
             style={{
-              marginTop: 8,
-              width: 6,
-              height: 6,
-              borderRadius: 999,
-              background: 'var(--lavender-ink)',
-            }}
-          />
-        )}
-      </div>
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
-        {segs.length === 0 ? (
-          <div
-            style={{
-              border: '1px dashed var(--line-2)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 4,
+              padding: '10px 4px',
               borderRadius: 10,
-              padding: '14px 16px',
-              color: 'var(--ink-3)',
-              font: '500 13px/1 var(--font-body)',
+              background: sel
+                ? 'var(--ink)'
+                : ehHoje
+                ? 'var(--lavender-surface)'
+                : 'var(--bg)',
+              border: sel
+                ? 'none'
+                : ehHoje
+                ? '1px solid var(--lavender)'
+                : '1px solid var(--line)',
+              cursor: 'pointer',
+              color: sel ? 'var(--bg)' : ehHoje ? 'var(--lavender-ink)' : 'var(--ink-2)',
             }}
           >
-            aberto
-          </div>
-        ) : (
-          segs.map((seg, i) => (
-            <ItemCard
-              key={`${seg.bloco.id}-${seg.continuaAntes ? 'a' : 'b'}-${i}`}
-              seg={seg}
-              onClick={() => onSelectBloco(seg.bloco)}
+            <span
+              style={{
+                font: '600 9px/1 var(--font-body)',
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                opacity: sel ? 0.7 : 0.85,
+              }}
+            >
+              {DOWS[diaSemanaBR(dia)]}
+            </span>
+            <span
+              style={{
+                font: '500 17px/1 var(--font-display)',
+                letterSpacing: '-0.01em',
+              }}
+            >
+              {dt.getDate()}
+            </span>
+            <span
+              aria-hidden
+              style={{
+                width: 4,
+                height: 4,
+                borderRadius: 999,
+                background: ocupado
+                  ? sel
+                    ? 'var(--bg)'
+                    : 'var(--lavender-ink)'
+                  : 'transparent',
+              }}
             />
-          ))
-        )}
-      </div>
-    </section>
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
-interface ItemCardProps {
-  seg: SegmentoVisivel;
-  onClick: () => void;
+function NavDia({
+  diaSelecionado,
+  setDiaSelecionado,
+}: {
+  diaSelecionado: string;
+  setDiaSelecionado: (d: string) => void;
+}) {
+  const ehHoje = diaSelecionado === HOJE;
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 14,
+      }}
+    >
+      <button
+        type="button"
+        onClick={() => setDiaSelecionado(adicionaDia(diaSelecionado, -1))}
+        aria-label="dia anterior"
+        style={navBtn}
+      >
+        ‹
+      </button>
+      <button
+        type="button"
+        onClick={() => setDiaSelecionado(HOJE)}
+        disabled={ehHoje}
+        style={{
+          font: '600 12px/1 var(--font-body)',
+          padding: '8px 14px',
+          borderRadius: 999,
+          border: '1px solid var(--line)',
+          background: ehHoje ? 'var(--bg)' : 'var(--bg-alt)',
+          color: ehHoje ? 'var(--ink-3)' : 'var(--ink-2)',
+          cursor: ehHoje ? 'default' : 'pointer',
+          textTransform: 'lowercase',
+        }}
+      >
+        hoje
+      </button>
+      <button
+        type="button"
+        onClick={() => setDiaSelecionado(adicionaDia(diaSelecionado, 1))}
+        aria-label="próximo dia"
+        style={navBtn}
+      >
+        ›
+      </button>
+    </div>
+  );
 }
 
-function ItemCard({ seg, onClick }: ItemCardProps) {
-  const { bloco, continuaAntes, continuaDepois } = seg;
+interface TimelineProps {
+  segs: SegmentoVisivel[];
+  isHoje: boolean;
+  onSelectBloco: (b: Bloco) => void;
+}
+
+function Timeline({ segs, isHoje, onSelectBloco }: TimelineProps) {
+  const horaAgora = useHoraAgora(isHoje);
+
+  return (
+    <div
+      style={{
+        position: 'relative',
+        height: 24 * ALTURA_HORA,
+        display: 'grid',
+        gridTemplateColumns: '54px 1fr',
+      }}
+    >
+      {/* Coluna de horas */}
+      <div style={{ position: 'relative' }}>
+        {Array.from({ length: 24 }).map((_, h) => (
+          <div
+            key={h}
+            style={{
+              position: 'absolute',
+              top: h * ALTURA_HORA,
+              left: 0,
+              right: 0,
+              height: ALTURA_HORA,
+              display: 'flex',
+              alignItems: 'flex-start',
+              justifyContent: 'flex-end',
+              paddingTop: 4,
+              paddingRight: 8,
+            }}
+          >
+            <Mono
+              style={{
+                color: 'var(--ink-3)',
+                fontSize: 11,
+              }}
+            >
+              {String(h).padStart(2, '0')}:00
+            </Mono>
+          </div>
+        ))}
+      </div>
+
+      {/* Coluna de eventos */}
+      <div style={{ position: 'relative', borderLeft: '1px solid var(--line)' }}>
+        {/* Linhas horizontais por hora */}
+        {Array.from({ length: 24 }).map((_, h) => (
+          <span
+            key={h}
+            aria-hidden
+            style={{
+              position: 'absolute',
+              top: h * ALTURA_HORA,
+              left: 0,
+              right: 0,
+              height: 1,
+              background: 'var(--line-2)',
+              opacity: 0.5,
+            }}
+          />
+        ))}
+
+        {/* Linha "agora" se for hoje */}
+        {horaAgora != null && (
+          <>
+            <span
+              style={{
+                position: 'absolute',
+                top: horaAgora * ALTURA_HORA,
+                left: 0,
+                right: 0,
+                height: 2,
+                background: 'var(--lavender-ink)',
+                zIndex: 2,
+              }}
+            />
+            <span
+              style={{
+                position: 'absolute',
+                top: horaAgora * ALTURA_HORA - 5,
+                left: -6,
+                width: 12,
+                height: 12,
+                borderRadius: 999,
+                background: 'var(--lavender-ink)',
+                zIndex: 3,
+              }}
+            />
+          </>
+        )}
+
+        {/* Cards de eventos */}
+        {segs.map((seg, i) => (
+          <CardEvento
+            key={`${seg.bloco.id}-${seg.continuaAntes ? 'a' : 'b'}-${i}`}
+            seg={seg}
+            onClick={() => onSelectBloco(seg.bloco)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function useHoraAgora(ativo: boolean): number | null {
+  const [horaAgora, setHoraAgora] = useState<number | null>(null);
+  useEffect(() => {
+    if (!ativo) {
+      setHoraAgora(null);
+      return;
+    }
+    function calc() {
+      const d = new Date();
+      setHoraAgora(d.getHours() + d.getMinutes() / 60);
+    }
+    calc();
+    const interval = setInterval(calc, 60_000);
+    return () => clearInterval(interval);
+  }, [ativo]);
+  return horaAgora;
+}
+
+function CardEvento({
+  seg,
+  onClick,
+}: {
+  seg: SegmentoVisivel;
+  onClick: () => void;
+}) {
+  const { bloco, startHora, endHora, continuaAntes, continuaDepois } = seg;
   const hosp =
     bloco.tipo === 'plantao' || bloco.tipo === 'cedido'
       ? getHospital(bloco.hospitalId)
@@ -203,9 +403,11 @@ function ItemCard({ seg, onClick }: ItemCardProps) {
   const isPlantao = bloco.tipo === 'plantao';
   const cheio = isPlantao && cor !== null;
 
-  // Bordas chanfradas onde o card "se conecta" com o vizinho
-  const radiusTop = continuaAntes ? 0 : 10;
-  const radiusBottom = continuaDepois ? 0 : 10;
+  const top = startHora * ALTURA_HORA;
+  const height = Math.max(28, (endHora - startHora) * ALTURA_HORA - 2);
+  const radiusTop = continuaAntes ? 0 : 8;
+  const radiusBottom = continuaDepois ? 0 : 8;
+  const compacto = height < 60;
 
   const titulo =
     bloco.tipo === 'plantao' && hosp
@@ -226,56 +428,62 @@ function ItemCard({ seg, onClick }: ItemCardProps) {
       ? bloco.titulo
       : bloco.tipo;
 
-  // Horário mostrado é sempre o range total do plantão · os cards
-  // partidos repetem a info, os cantos retos contam a história.
   const horario = fmtRange(bloco.horaInicio, bloco.duracao);
+  const ehCedido = bloco.tipo === 'cedido';
 
   return (
     <button
       type="button"
       onClick={onClick}
       style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 12,
-        padding: '12px 14px',
+        position: 'absolute',
+        top,
+        left: 6,
+        right: 6,
+        height,
         background: cheio
           ? `var(--${cor})`
           : cor
           ? `var(--${cor}-surface)`
-          : 'var(--bg)',
+          : 'var(--bg-alt)',
         color: cheio ? 'var(--bg)' : 'var(--ink)',
-        border: cheio ? 'none' : '1px solid var(--line)',
+        border: cheio ? 'none' : `1px solid var(--line)`,
         borderLeft: cor && !cheio ? `3px solid var(--${cor})` : undefined,
         borderTopLeftRadius: radiusTop,
         borderTopRightRadius: radiusTop,
         borderBottomLeftRadius: radiusBottom,
         borderBottomRightRadius: radiusBottom,
-        cursor: 'pointer',
+        padding: compacto ? '6px 10px' : '8px 12px',
         textAlign: 'left',
-        width: '100%',
+        cursor: 'pointer',
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: compacto ? 2 : 4,
+        zIndex: 1,
+        ...(ehCedido && {
+          backgroundImage:
+            'repeating-linear-gradient(45deg, transparent 0 4px, rgba(255,255,255,0.4) 4px 7px)',
+          opacity: 0.85,
+        }),
       }}
     >
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <span
-          style={{
-            font: '500 14px/1.2 var(--font-display)',
-            letterSpacing: '-0.005em',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-            display: 'block',
-          }}
-        >
-          {titulo}
-        </span>
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+      <span
+        style={{
+          font: `500 ${compacto ? 12 : 14}px/1.15 var(--font-display)`,
+          letterSpacing: '-0.005em',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {titulo}
+      </span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
         <Mono
           style={{
-            color: cheio ? 'rgba(255,255,255,0.95)' : 'var(--ink-2)',
-            fontSize: 12,
-            whiteSpace: 'nowrap',
+            color: cheio ? 'rgba(255,255,255,0.9)' : 'var(--ink-3)',
+            fontSize: 10,
           }}
         >
           {horario}
@@ -291,17 +499,14 @@ function ItemCard({ seg, onClick }: ItemCardProps) {
 
 interface SegmentoVisivel {
   bloco: Bloco;
+  /** 0-24 · onde o segmento começa no dia. */
   startHora: number;
+  /** 0-24 · onde termina no dia. */
   endHora: number;
   continuaAntes: boolean;
   continuaDepois: boolean;
 }
 
-/**
- * Segmentos visíveis num dia · plantão noturno do dia anterior aparece
- * aqui em [0, fim%24] com continuaAntes=true. Plantão que ultrapassa
- * meia-noite aparece em [inicio, 24] com continuaDepois=true.
- */
 function segmentosDoDia(blocos: Bloco[], dia: string): SegmentoVisivel[] {
   const out: SegmentoVisivel[] = [];
   for (const b of blocos) {
@@ -319,12 +524,7 @@ function segmentosDoDia(blocos: Bloco[], dia: string): SegmentoVisivel[] {
       continuaDepois: fim > 24,
     });
   }
-  return out.sort((a, b) => {
-    // Continuações ficam no topo (eram da noite anterior)
-    if (a.continuaAntes && !b.continuaAntes) return -1;
-    if (b.continuaAntes && !a.continuaAntes) return 1;
-    return a.startHora - b.startHora;
-  });
+  return out.sort((a, b) => a.startHora - b.startHora);
 }
 
 function diffDias(a: string, b: string): number {
@@ -333,68 +533,16 @@ function diffDias(a: string, b: string): number {
   return Math.round((da - db) / (24 * 3600 * 1000));
 }
 
-function NavSemanaLista({ refIso, setRefIso }: { refIso: string; setRefIso: (i: string) => void }) {
-  const seg = inicioDaSemana(refIso);
-  const ehAtual = seg === inicioDaSemana(HOJE);
-  return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 6,
-        background: 'var(--bg-alt)',
-        borderRadius: 999,
-        padding: 4,
-        border: '1px solid var(--line)',
-      }}
-    >
-      <button type="button" aria-label="semana anterior" onClick={() => setRefIso(adicionaDia(seg, -7))} style={iconBtn}>
-        ‹
-      </button>
-      <button
-        type="button"
-        onClick={() => setRefIso(HOJE)}
-        disabled={ehAtual}
-        style={{
-          font: '600 12px/1 var(--font-body)',
-          padding: '8px 14px',
-          borderRadius: 999,
-          border: 'none',
-          cursor: ehAtual ? 'default' : 'pointer',
-          background: ehAtual ? 'var(--bg)' : 'transparent',
-          color: ehAtual ? 'var(--ink)' : 'var(--ink-2)',
-          boxShadow: ehAtual ? 'var(--shadow-sm)' : 'none',
-          textTransform: 'lowercase',
-        }}
-      >
-        hoje
-      </button>
-      <button type="button" aria-label="semana próxima" onClick={() => setRefIso(adicionaDia(seg, 7))} style={iconBtn}>
-        ›
-      </button>
-    </div>
-  );
-}
-
-const iconBtn: React.CSSProperties = {
-  font: '600 14px/1 var(--font-body)',
-  width: 32,
-  height: 32,
+const navBtn: React.CSSProperties = {
+  font: '600 16px/1 var(--font-body)',
+  width: 36,
+  height: 36,
   borderRadius: 999,
-  border: 'none',
-  background: 'transparent',
+  border: '1px solid var(--line)',
+  background: 'var(--bg-alt)',
   color: 'var(--ink-2)',
   cursor: 'pointer',
 };
 
-function formatRangeSemana(inicio: string, fim: string): string {
-  const dIni = fromISO(inicio);
-  const dFim = fromISO(fim);
-  const mesIni = MESES[dIni.getMonth()];
-  const mesFim = MESES[dFim.getMonth()];
-  if (mesIni === mesFim) return `${dIni.getDate()}–${dFim.getDate()} ${mesIni} ${dIni.getFullYear()}`;
-  return `${dIni.getDate()} ${mesIni} – ${dFim.getDate()} ${mesFim} ${dFim.getFullYear()}`;
-}
-
 void fmtDate;
-void DOWS_LONG;
+void inicioDaSemana;
