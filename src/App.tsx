@@ -537,8 +537,14 @@ function ViewSwitch({
           preferencias={state.preferencias}
           blocos={state.blocos}
           escalasImportadas={state.escalasImportadas}
+          propostasMontar={state.propostasMontar}
           onCriarBloco={(b) =>
             userState.setState({ blocos: [...userState.state.blocos, b] })
+          }
+          onSalvarProposta={(p) =>
+            userState.setState({
+              propostasMontar: [p, ...userState.state.propostasMontar].slice(0, 10),
+            })
           }
         />
       );

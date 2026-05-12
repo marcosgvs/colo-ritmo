@@ -5,7 +5,9 @@ import type {
   EscalaImportada,
   HospitaisMap,
   Janela,
+  PlantaoSugerido,
   Preferencias,
+  PropostaHistorico,
 } from '@/types';
 import {
   DOWS,
@@ -45,15 +47,6 @@ const ETAPAS: Array<{ id: Etapa; label: string }> = [
   { id: 'exportar', label: 'exportar' },
 ];
 
-interface PlantaoSugerido {
-  id: string;
-  hospitalId: string;
-  data: string;
-  horaInicio: number;
-  duracao: number;
-  razao?: string;
-}
-
 interface PropostaResultado {
   plantoes: PlantaoSugerido[];
   justificativa: string;
@@ -67,7 +60,9 @@ interface MontarEscalaProps {
   preferencias: Preferencias;
   blocos: Bloco[];
   escalasImportadas: EscalaImportada[];
+  propostasMontar: PropostaHistorico[];
   onCriarBloco: (b: Bloco) => void;
+  onSalvarProposta: (p: PropostaHistorico) => void;
 }
 
 const LENTES: Array<{ id: Lente; titulo: string; recado: string }> = [
@@ -81,7 +76,9 @@ export function MontarEscala({
   preferencias,
   blocos,
   escalasImportadas,
+  propostasMontar,
   onCriarBloco,
+  onSalvarProposta,
 }: MontarEscalaProps) {
   const proximoMes = useMemo(() => {
     const hoje = new Date();
@@ -174,18 +171,48 @@ export function MontarEscala({
 
       const json = (await resp.json()) as PropostaResultado;
       const baseId = Date.now();
+      const plantoesNormalizados = (json.plantoes ?? []).map((p, i) => ({
+        ...p,
+        id: p.id || `sug-${baseId}-${i}`,
+      }));
       setResultado({
         ...json,
-        plantoes: (json.plantoes ?? []).map((p, i) => ({
-          ...p,
-          id: p.id || `sug-${baseId}-${i}`,
-        })),
+        plantoes: plantoesNormalizados,
+      });
+      // Persiste no histórico (auto-limita a 10 entradas no useUserState)
+      onSalvarProposta({
+        id: `prop-${baseId}`,
+        geradoEm: new Date().toISOString(),
+        mes,
+        lente,
+        acelerarPercentual: acelPct,
+        acelerarValor: acelVal,
+        hospitaisIds: Array.from(hospitaisSel),
+        plantoes: plantoesNormalizados,
+        justificativa: json.justificativa ?? '',
+        valorEstimado: json.valorEstimado ?? 0,
+        avisos: json.avisos ?? [],
       });
       setEtapa('preview');
     } catch (err) {
       setErro((err as Error).message);
       setEtapa('setup');
     }
+  }
+
+  function carregarProposta(p: PropostaHistorico) {
+    setMes(p.mes);
+    setLente(p.lente);
+    setAcelerarPercentual(p.acelerarPercentual != null ? String(p.acelerarPercentual) : '');
+    setAcelerarValor(p.acelerarValor != null ? String(p.acelerarValor) : '');
+    setHospitaisSel(new Set(p.hospitaisIds));
+    setResultado({
+      plantoes: p.plantoes,
+      justificativa: p.justificativa,
+      valorEstimado: p.valorEstimado,
+      avisos: p.avisos,
+    });
+    setEtapa('preview');
   }
 
   function regerar() {
@@ -229,6 +256,14 @@ export function MontarEscala({
       />
 
       <StepBar etapa={etapa} />
+
+      {etapa === 'setup' && propostasMontar.length > 0 && (
+        <HistoricoPropostas
+          propostas={propostasMontar}
+          hospitais={hospitais}
+          onCarregar={carregarProposta}
+        />
+      )}
 
       {etapa === 'setup' && (
         <SetupCard
@@ -378,6 +413,133 @@ function StepBar({ etapa }: { etapa: Etapa }) {
       })}
     </div>
   );
+}
+
+// --- Histórico de propostas ------------------------------------------------
+
+const LABEL_LENTE: Record<PropostaHistorico['lente'], string> = {
+  descansar: 'descansar',
+  equilibrar: 'equilibrar',
+  acelerar: 'acelerar',
+};
+
+function HistoricoPropostas({
+  propostas,
+  hospitais,
+  onCarregar,
+}: {
+  propostas: PropostaHistorico[];
+  hospitais: HospitaisMap;
+  onCarregar: (p: PropostaHistorico) => void;
+}) {
+  const [aberto, setAberto] = useState(false);
+  const visiveis = aberto ? propostas : propostas.slice(0, 3);
+
+  return (
+    <div
+      style={{
+        background: 'var(--bg-alt)',
+        border: '1px solid var(--line)',
+        borderRadius: 'var(--r-md)',
+        padding: '14px 16px',
+        marginBottom: 18,
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'baseline',
+          justifyContent: 'space-between',
+          marginBottom: 10,
+        }}
+      >
+        <Eyebrow>tentativas anteriores · {propostas.length}</Eyebrow>
+        {propostas.length > 3 && (
+          <button
+            type="button"
+            onClick={() => setAberto((v) => !v)}
+            style={{
+              font: '600 11px/1 var(--font-body)',
+              background: 'transparent',
+              border: 'none',
+              color: 'var(--ink-2)',
+              cursor: 'pointer',
+              padding: 4,
+            }}
+          >
+            {aberto ? 'mostrar só recentes' : `ver todas (${propostas.length})`}
+          </button>
+        )}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {visiveis.map((p) => (
+          <button
+            key={p.id}
+            type="button"
+            onClick={() => onCarregar(p)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              padding: '10px 12px',
+              background: 'var(--bg)',
+              border: '1px solid var(--line)',
+              borderRadius: 'var(--r-sm)',
+              cursor: 'pointer',
+              textAlign: 'left',
+              flexWrap: 'wrap',
+            }}
+          >
+            <Mono style={{ color: 'var(--ink-3)', fontSize: 11 }}>
+              {fmtTempoRelativo(p.geradoEm)}
+            </Mono>
+            <span
+              style={{
+                font: '600 13px/1.2 var(--font-display)',
+                color: 'var(--ink)',
+                flex: 1,
+                minWidth: 0,
+              }}
+            >
+              {labelMes(p.mes)} · {LABEL_LENTE[p.lente]}
+              {p.lente === 'acelerar' && p.acelerarPercentual
+                ? ` +${p.acelerarPercentual}%`
+                : ''}
+              {p.lente === 'acelerar' && p.acelerarValor
+                ? ` R$${p.acelerarValor.toLocaleString('pt-BR')}`
+                : ''}
+            </span>
+            <Mono style={{ color: 'var(--ink-2)', fontSize: 11 }}>
+              {p.plantoes.length} {p.plantoes.length === 1 ? 'plantão' : 'plantões'} ·{' '}
+              {p.hospitaisIds
+                .map((id) => hospitais[id]?.abrev ?? '?')
+                .join('+')}
+            </Mono>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function fmtTempoRelativo(iso: string): string {
+  const d = new Date(iso);
+  const agora = new Date();
+  const diffMs = agora.getTime() - d.getTime();
+  const min = Math.floor(diffMs / 60000);
+  if (min < 1) return 'agora';
+  if (min < 60) return `${min}min atrás`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `${h}h atrás`;
+  const dias = Math.floor(h / 24);
+  if (dias < 7) return `${dias}d atrás`;
+  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+}
+
+function labelMes(mesISO: string): string {
+  const [a, m] = mesISO.split('-');
+  const idx = parseInt(m ?? '1', 10) - 1;
+  return `${MESES[idx] ?? ''} ${a?.slice(-2) ?? ''}`;
 }
 
 // --- Etapa 1 · Setup --------------------------------------------------------

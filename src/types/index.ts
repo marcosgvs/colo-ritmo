@@ -209,6 +209,39 @@ export interface CelulaEscala {
  *
  * Re-importar substitui a entrada anterior do mesmo (hospital, ano, mes).
  */
+/**
+ * Plantão sugerido pelo Montar · forma simplificada de Bloco usada nas
+ * propostas (id próprio, sem campos de troca/conflito).
+ */
+export interface PlantaoSugerido {
+  id: string;
+  hospitalId: string;
+  data: string;
+  horaInicio: number;
+  duracao: number;
+  razao?: string;
+}
+
+/**
+ * Snapshot de uma proposta gerada pelo Montar · histórico pra a médica
+ * comparar tentativas (ex: rodou "equilibrar" e depois "acelerar +15%",
+ * quer ver as duas lado a lado antes de escolher). Auto-limita a últimas
+ * N entradas no useUserState.
+ */
+export interface PropostaHistorico {
+  id: string;
+  geradoEm: string;
+  mes: string;
+  lente: 'descansar' | 'equilibrar' | 'acelerar';
+  acelerarPercentual?: number;
+  acelerarValor?: number;
+  hospitaisIds: string[];
+  plantoes: PlantaoSugerido[];
+  justificativa: string;
+  valorEstimado: number;
+  avisos: string[];
+}
+
 export interface EscalaImportada {
   hospitalId: string;
   ano: number;

@@ -5,9 +5,12 @@ import type {
   EscalaImportada,
   Hospital,
   Preferencias,
+  PropostaHistorico,
 } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { marcarConflitos } from '@/lib/data';
+
+const MAX_PROPOSTAS_HISTORICO = 10;
 
 /**
  * Shape do JSON em `user_state.state`. Mantemos compatibilidade com
@@ -20,6 +23,7 @@ export interface UserStateBlob {
   hospitais?: Record<string, Hospital>;
   preferencias?: Preferencias;
   escalasImportadas?: EscalaImportada[];
+  propostasMontar?: PropostaHistorico[];
   updatedAt?: string;
 }
 
@@ -30,6 +34,7 @@ export interface UserStateValor {
   hospitais: Record<string, Hospital>;
   preferencias: Preferencias;
   escalasImportadas: EscalaImportada[];
+  propostasMontar: PropostaHistorico[];
 }
 
 export interface UserStateAPI {
@@ -51,6 +56,7 @@ const STATE_VAZIO: UserStateValor = {
   hospitais: {},
   preferencias: { nome: '', hospitaisPreferidos: [] },
   escalasImportadas: [],
+  propostasMontar: [],
 };
 
 /**
@@ -77,6 +83,7 @@ export function useUserState(userId: string | null): UserStateAPI {
         hospitais: valor.hospitais,
         preferencias: valor.preferencias,
         escalasImportadas: valor.escalasImportadas,
+        propostasMontar: valor.propostasMontar.slice(0, MAX_PROPOSTAS_HISTORICO),
         updatedAt: new Date().toISOString(),
       };
       const { error } = await supabase()
@@ -107,6 +114,7 @@ export function useUserState(userId: string | null): UserStateAPI {
           hospitais: next.hospitais ?? prev.hospitais,
           preferencias: next.preferencias ?? prev.preferencias,
           escalasImportadas: next.escalasImportadas ?? prev.escalasImportadas,
+          propostasMontar: next.propostasMontar ?? prev.propostasMontar,
         };
         pendingRef.current = merged;
         if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -151,6 +159,7 @@ export function useUserState(userId: string | null): UserStateAPI {
             hospitais: blob.hospitais ?? STATE_VAZIO.hospitais,
             preferencias: blob.preferencias ?? STATE_VAZIO.preferencias,
             escalasImportadas: blob.escalasImportadas ?? [],
+            propostasMontar: blob.propostasMontar ?? [],
           });
         } else {
           // Primeiro acesso · começa vazio · App detecta hospitais={} e
@@ -180,6 +189,7 @@ export function useUserState(userId: string | null): UserStateAPI {
             hospitais: novoState.hospitais ?? prev.hospitais,
             preferencias: novoState.preferencias ?? prev.preferencias,
             escalasImportadas: novoState.escalasImportadas ?? prev.escalasImportadas,
+            propostasMontar: novoState.propostasMontar ?? prev.propostasMontar,
           }));
         },
       )
