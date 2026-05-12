@@ -342,10 +342,19 @@ function Resumo({
 }
 
 function Linha({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
+  const isMobile = useIsMobile();
   return (
-    <div style={{ display: 'flex', gap: 12 }}>
-      <Eyebrow style={{ width: 100, flexShrink: 0 }}>{rotulo}</Eyebrow>
-      <span style={{ font: '500 14px/1.4 var(--font-body)', color: 'var(--ink)' }}>{children}</span>
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: isMobile ? 'column' : 'row',
+        gap: isMobile ? 4 : 12,
+      }}
+    >
+      <Eyebrow style={{ width: isMobile ? 'auto' : 100, flexShrink: 0 }}>{rotulo}</Eyebrow>
+      <span style={{ font: '500 14px/1.4 var(--font-body)', color: 'var(--ink)', minWidth: 0 }}>
+        {children}
+      </span>
     </div>
   );
 }
@@ -359,21 +368,24 @@ function Card({
   eyebrow?: string;
   children: React.ReactNode;
 }) {
+  const isMobile = useIsMobile();
   return (
     <div
       style={{
         background: 'var(--bg)',
         border: '1px solid var(--line)',
         borderRadius: 18,
-        padding: '20px 22px',
+        padding: isMobile ? '16px 16px' : '20px 22px',
         boxShadow: 'var(--shadow-sm)',
       }}
     >
       <div
         style={{
           display: 'flex',
+          flexDirection: isMobile ? 'column' : 'row',
           justifyContent: 'space-between',
-          alignItems: 'baseline',
+          alignItems: isMobile ? 'flex-start' : 'baseline',
+          gap: isMobile ? 4 : 12,
           marginBottom: 12,
         }}
       >

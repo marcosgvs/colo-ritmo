@@ -413,6 +413,7 @@ function SetupCard({
   erro,
   onAvancar,
 }: SetupCardProps) {
+  const isMobile = useIsMobile();
   return (
     <div
       style={{
@@ -504,25 +505,33 @@ function SetupCard({
             <Mono style={{ color: 'var(--ink-3)', fontSize: 11 }}>
               preencha pelo menos um · pode preencher os dois e a gente honra o mais demandante
             </Mono>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, font: '500 13px/1.3 var(--font-body)' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', font: '500 13px/1.3 var(--font-body)' }}>
               <span>+</span>
               <input
                 inputMode="numeric"
                 value={acelerarPercentual}
                 onChange={(e) => setAcelerarPercentual(e.target.value.replace(/\D/g, ''))}
                 placeholder="15"
-                style={{ ...inputBase, width: 70, textAlign: 'right' }}
+                style={{
+                  ...inputBase,
+                  width: isMobile ? 64 : 70,
+                  textAlign: 'right',
+                }}
               />
               <span>% de plantões a mais que seu normal histórico</span>
             </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, font: '500 13px/1.3 var(--font-body)' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', font: '500 13px/1.3 var(--font-body)' }}>
               <span>chegar até R$</span>
               <input
                 inputMode="numeric"
                 value={acelerarValor}
                 onChange={(e) => setAcelerarValor(e.target.value.replace(/\D/g, ''))}
                 placeholder="25000"
-                style={{ ...inputBase, width: 110, textAlign: 'right' }}
+                style={{
+                  ...inputBase,
+                  width: isMobile ? 90 : 110,
+                  textAlign: 'right',
+                }}
               />
               <span>estimado no mês</span>
             </label>
@@ -786,6 +795,7 @@ function BloqueioFormModal({
   onSalvar: (b: Bloco) => void;
   onFechar: () => void;
 }) {
+  const isMobile = useIsMobile();
   const [tipo, setTipo] = useState<TipoAtividade>('bloqueio');
   const [motivo, setMotivo] = useState('');
   const [horaInicio, setHoraInicio] = useState(8);
@@ -832,7 +842,13 @@ function BloqueioFormModal({
         />
       </Field>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
+          gap: 10,
+        }}
+      >
         <Field label="início">
           <input
             type="number"
@@ -1541,6 +1557,7 @@ function Modal({ children, onFechar }: { children: React.ReactNode; onFechar: ()
 }
 
 function Card({ titulo, eyebrow, children }: { titulo: string; eyebrow?: string; children: React.ReactNode }) {
+  const isMobile = useIsMobile();
   return (
     <div
       style={{
@@ -1551,7 +1568,16 @@ function Card({ titulo, eyebrow, children }: { titulo: string; eyebrow?: string;
         boxShadow: 'var(--shadow-sm)',
       }}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: isMobile ? 'column' : 'row',
+          justifyContent: 'space-between',
+          alignItems: isMobile ? 'flex-start' : 'baseline',
+          gap: isMobile ? 4 : 12,
+          marginBottom: 10,
+        }}
+      >
         <span style={{ fontFamily: 'var(--font-display)', fontWeight: 500, fontSize: 16, color: 'var(--ink)' }}>
           {titulo}
         </span>
