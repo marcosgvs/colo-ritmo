@@ -1,21 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Bloco, HospitaisMap } from '@/types';
 import {
-  adicionaDia,
-  diaSemanaBR,
   DOWS,
-  DOWS_LONG,
-  fmtDate,
+  diaSemanaBR,
   fmtRange,
   fromISO,
   getHospital,
   HOJE,
-  inicioDaSemana,
   MESES,
   semanaDe,
 } from '@/lib/data';
-import { Eyebrow, Hand, IconConflito, Mono, Pill } from '@/components/atoms';
-import { EmptyState } from '@/components/empty';
+import { Eyebrow, Hand, Mono } from '@/components/atoms';
 
 interface ListaDaSemanaProps {
   blocos: Bloco[];
@@ -23,526 +18,1102 @@ interface ListaDaSemanaProps {
   onSelectBloco: (b: Bloco) => void;
 }
 
-const ALTURA_HORA = 56;
-const HORARIO_INICIAL_SCROLL = 6;
+const HOUR_PX = 22;
+const DAY_PX = 24 * HOUR_PX;
+const RAIL_W = 48;
+const N_DIAS = 7;
 
 /**
- * Agenda mobile · timeline vertical 0-24h do dia selecionado. Chips no
- * topo pra navegar entre dias da semana. Plantão que cruza meia-noite
- * vira um card que vai do início até o fim do dia (canto inferior reto)
- * e aparece no dia seguinte de 0h até o horário de fim (canto superior
- * reto) · mesma cor, parecem partidos em dois.
+ * Semana mobile · timeline linear vertical contínua. O tempo flui de
+ * cima pra baixo num único eixo (7 dias × 24h = 3696px). Plantões
+ * noturnos são UM bloco que atravessa naturalmente a divisão dos dias
+ * — sem precisar partir/duplicar/marcar.
+ *
+ * Orientação espacial vem de 3 camadas:
+ *   1. Chips de dia sticky no topo · tap = scrollTo
+ *   2. Rail lateral à esquerda · régua de fundo + badge sticky do dia
+ *      atualmente visível (clamp dentro do bloco do dia)
+ *   3. Divisor de dia atravessando a timeline com pílula nomeando o dia
  */
 export function ListaDoDia({ blocos, hospitais: _h, onSelectBloco }: ListaDaSemanaProps) {
-  const [diaSelecionado, setDiaSelecionado] = useState<string>(HOJE);
-  const semana = useMemo(() => semanaDe(diaSelecionado), [diaSelecionado]);
-  const segs = useMemo(() => segmentosDoDia(blocos, diaSelecionado), [blocos, diaSelecionado]);
+  const [refIso, setRefIso] = useState<string>(HOJE);
+  const semana = useMemo(() => semanaDe(refIso), [refIso]);
+  const hojeIdx = semana.indexOf(HOJE);
 
-  const dt = fromISO(diaSelecionado);
-  const dowLong = DOWS_LONG[diaSemanaBR(diaSelecionado)];
-  const isHoje = diaSelecionado === HOJE;
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [scrollTop, setScrollTop] = useState(0);
+  const [currentDay, setCurrentDay] = useState<number>(hojeIdx >= 0 ? hojeIdx : 0);
+  const [agora, setAgora] = useState<number>(horaDecimalAgora());
 
-  const refTimeline = useRef<HTMLDivElement>(null);
+  // Atualiza "agora" a cada minuto enquanto a view está aberta
   useEffect(() => {
-    // scroll inicial pras 6h (evita começar em 0 sempre vazio)
-    if (refTimeline.current) {
-      refTimeline.current.scrollTop = HORARIO_INICIAL_SCROLL * ALTURA_HORA - 40;
+    const t = setInterval(() => setAgora(horaDecimalAgora()), 60_000);
+    return () => clearInterval(t);
+  }, []);
+
+  // Scroll inicial: se hoje está na semana, abre próximo do "agora";
+  // senão, abre no início do primeiro dia.
+  useEffect(() => {
+    if (!scrollRef.current) return;
+    if (hojeIdx >= 0) {
+      const nowTop = (hojeIdx * 24 + agora) * HOUR_PX;
+      scrollRef.current.scrollTop = Math.max(0, nowTop - 200);
+    } else {
+      scrollRef.current.scrollTop = 0;
     }
-  }, [diaSelecionado]);
+    setCurrentDay(hojeIdx >= 0 ? hojeIdx : 0);
+    // não depende de `agora` · só queremos o scroll inicial na mudança
+    // de semana de referência
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refIso]);
 
-  return (
-    <>
-      <div style={{ marginBottom: 16 }}>
-        <Eyebrow>agenda · {DOWS[diaSemanaBR(diaSelecionado)]}</Eyebrow>
-        <h1
-          style={{
-            fontFamily: 'var(--font-display)',
-            fontWeight: 500,
-            fontSize: 'clamp(28px, 3.5vw, 40px)',
-            letterSpacing: '-0.02em',
-            margin: '8px 0 0',
-            color: 'var(--ink)',
-          }}
-        >
-          {dt.getDate()} {MESES[dt.getMonth()]} · {dowLong}
-        </h1>
-        {isHoje && (
-          <Hand color="var(--lavender-ink)" size={18} style={{ display: 'block', marginTop: 6 }}>
-            hoje
-          </Hand>
-        )}
-      </div>
+  function onScroll(e: React.UIEvent<HTMLDivElement>) {
+    const t = e.currentTarget.scrollTop;
+    setScrollTop(t);
+    const probe = t + 120;
+    const d = Math.max(0, Math.min(N_DIAS - 1, Math.floor(probe / DAY_PX)));
+    setCurrentDay(d);
+  }
 
-      <ChipsSemana
-        semana={semana}
-        selecionado={diaSelecionado}
-        onSelecionar={setDiaSelecionado}
-        blocos={blocos}
-      />
+  function scrollToDay(i: number) {
+    if (!scrollRef.current) return;
+    scrollRef.current.scrollTo({ top: i * DAY_PX - 8, behavior: 'smooth' });
+  }
 
-      <NavDia diaSelecionado={diaSelecionado} setDiaSelecionado={setDiaSelecionado} />
-
-      {segs.length === 0 ? (
-        <EmptyState
-          titulo="dia aberto."
-          recado="nada agendado · aproveita pra respirar."
-        />
-      ) : (
-        <div
-          ref={refTimeline}
-          style={{
-            position: 'relative',
-            background: 'var(--bg)',
-            border: '1px solid var(--line)',
-            borderRadius: 14,
-            overflow: 'auto',
-            maxHeight: 'calc(100vh - 320px)',
-            minHeight: 400,
-          }}
-        >
-          <Timeline segs={segs} isHoje={isHoje} onSelectBloco={onSelectBloco} />
-        </div>
-      )}
-    </>
+  const items = useMemo(
+    () =>
+      blocos.filter((b) => {
+        if (b.tipo === 'deslocamento') return false;
+        // Inclui blocos cujo dia de início está na semana visível
+        return semana.includes(b.data);
+      }),
+    [blocos, semana],
   );
-}
 
-interface ChipsSemanaProps {
-  semana: readonly string[];
-  selecionado: string;
-  onSelecionar: (dia: string) => void;
-  blocos: Bloco[];
-}
-
-function ChipsSemana({ semana, selecionado, onSelecionar, blocos }: ChipsSemanaProps) {
-  // Mapa rápido: dia -> tem plantão (incluindo continuações)
-  const ocupacao = useMemo(() => {
-    const m = new Map<string, boolean>();
-    for (const dia of semana) {
-      const segs = segmentosDoDia(blocos, dia);
-      m.set(
-        dia,
-        segs.some((s) => s.bloco.tipo === 'plantao' || s.bloco.tipo === 'cedido'),
-      );
-    }
-    return m;
-  }, [blocos, semana]);
+  const inicioSemana = semana[0]!;
+  const fimSemana = semana[6]!;
 
   return (
     <div
       style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(7, 1fr)',
-        gap: 6,
-        marginBottom: 18,
+        // anula o padding do main pra ocupar full-bleed mobile
+        margin: '-32px -28px -120px',
+        display: 'flex',
+        flexDirection: 'column',
+        height: 'calc(100vh - 56px)',
+        background: 'var(--bg)',
       }}
     >
-      {semana.map((dia) => {
-        const dt = fromISO(dia);
-        const sel = dia === selecionado;
-        const ehHoje = dia === HOJE;
-        const ocupado = ocupacao.get(dia) === true;
-        return (
-          <button
-            key={dia}
-            type="button"
-            onClick={() => onSelecionar(dia)}
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: 4,
-              padding: '10px 4px',
-              borderRadius: 10,
-              background: sel
-                ? 'var(--ink)'
-                : ehHoje
-                ? 'var(--lavender-surface)'
-                : 'var(--bg)',
-              border: sel
-                ? 'none'
-                : ehHoje
-                ? '1px solid var(--lavender)'
-                : '1px solid var(--line)',
-              cursor: 'pointer',
-              color: sel ? 'var(--bg)' : ehHoje ? 'var(--lavender-ink)' : 'var(--ink-2)',
-            }}
-          >
-            <span
-              style={{
-                font: '600 9px/1 var(--font-body)',
-                letterSpacing: '0.08em',
-                textTransform: 'uppercase',
-                opacity: sel ? 0.7 : 0.85,
-              }}
-            >
-              {DOWS[diaSemanaBR(dia)]}
-            </span>
-            <span
-              style={{
-                font: '500 17px/1 var(--font-display)',
-                letterSpacing: '-0.01em',
-              }}
-            >
-              {dt.getDate()}
-            </span>
-            <span
-              aria-hidden
-              style={{
-                width: 4,
-                height: 4,
-                borderRadius: 999,
-                background: ocupado
-                  ? sel
-                    ? 'var(--bg)'
-                    : 'var(--lavender-ink)'
-                  : 'transparent',
-              }}
-            />
-          </button>
-        );
-      })}
+      <HeaderSemana
+        inicio={inicioSemana}
+        fim={fimSemana}
+        refIso={refIso}
+        setRefIso={setRefIso}
+      />
+
+      <DayChips
+        semana={semana}
+        currentDay={currentDay}
+        hojeIdx={hojeIdx}
+        items={items}
+        onPick={scrollToDay}
+      />
+
+      <div
+        ref={scrollRef}
+        onScroll={onScroll}
+        style={{
+          flex: 1,
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          position: 'relative',
+          background: 'var(--bg)',
+          WebkitOverflowScrolling: 'touch',
+        }}
+      >
+        <Timeline
+          semana={semana}
+          items={items}
+          hojeIdx={hojeIdx}
+          currentDay={currentDay}
+          scrollTop={scrollTop}
+          agora={agora}
+          onSelectBloco={onSelectBloco}
+        />
+      </div>
     </div>
   );
 }
 
-function NavDia({
-  diaSelecionado,
-  setDiaSelecionado,
+function HeaderSemana({
+  inicio,
+  fim,
+  refIso,
+  setRefIso,
 }: {
-  diaSelecionado: string;
-  setDiaSelecionado: (d: string) => void;
+  inicio: string;
+  fim: string;
+  refIso: string;
+  setRefIso: (i: string) => void;
 }) {
-  const ehHoje = diaSelecionado === HOJE;
+  const titulo = labelRangeSemana(inicio, fim);
+  const inicioHoje = semanaDe(HOJE)[0];
+  const ehAtual = semanaDe(refIso)[0] === inicioHoje;
   return (
     <div
       style={{
+        padding: '14px 18px 8px',
         display: 'flex',
-        alignItems: 'center',
+        alignItems: 'flex-end',
         justifyContent: 'space-between',
-        marginBottom: 14,
+        gap: 12,
+        flexShrink: 0,
       }}
     >
-      <button
-        type="button"
-        onClick={() => setDiaSelecionado(adicionaDia(diaSelecionado, -1))}
-        aria-label="dia anterior"
-        style={navBtn}
-      >
-        ‹
-      </button>
-      <button
-        type="button"
-        onClick={() => setDiaSelecionado(HOJE)}
-        disabled={ehHoje}
+      <div style={{ minWidth: 0 }}>
+        <Eyebrow style={{ fontSize: 10 }}>sua semana</Eyebrow>
+        <h2
+          style={{
+            fontFamily: 'var(--font-display)',
+            fontSize: 24,
+            fontWeight: 500,
+            letterSpacing: '-0.02em',
+            marginTop: 2,
+            color: 'var(--ink)',
+          }}
+        >
+          {titulo}
+        </h2>
+      </div>
+      <div style={{ display: 'flex', gap: 4 }}>
+        <button
+          type="button"
+          aria-label="semana anterior"
+          onClick={() => setRefIso(adicionaDiaISO(inicio, -7))}
+          style={navBtn}
+        >
+          ‹
+        </button>
+        <button
+          type="button"
+          aria-label="semana próxima"
+          onClick={() => setRefIso(adicionaDiaISO(inicio, 7))}
+          style={navBtn}
+        >
+          ›
+        </button>
+        {!ehAtual && (
+          <button
+            type="button"
+            onClick={() => setRefIso(HOJE)}
+            style={{
+              font: '600 12px/1 var(--font-body)',
+              padding: '8px 12px',
+              borderRadius: 999,
+              border: '1px solid var(--line)',
+              background: 'var(--bg-alt)',
+              color: 'var(--ink-2)',
+              cursor: 'pointer',
+              textTransform: 'lowercase',
+            }}
+          >
+            hoje
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+interface DayChipsProps {
+  semana: readonly string[];
+  currentDay: number;
+  hojeIdx: number;
+  items: Bloco[];
+  onPick: (i: number) => void;
+}
+
+function DayChips({ semana, currentDay, hojeIdx, items, onPick }: DayChipsProps) {
+  const temPlantao = (i: number) =>
+    items.some((b) => semana.indexOf(b.data) === i && (b.tipo === 'plantao' || b.tipo === 'cedido'));
+
+  return (
+    <div
+      style={{
+        borderTop: '1px solid var(--line)',
+        borderBottom: '1px solid var(--line)',
+        background: 'var(--bg-alt)',
+        flexShrink: 0,
+      }}
+    >
+      <div
         style={{
-          font: '600 12px/1 var(--font-body)',
-          padding: '8px 14px',
-          borderRadius: 999,
-          border: '1px solid var(--line)',
-          background: ehHoje ? 'var(--bg)' : 'var(--bg-alt)',
-          color: ehHoje ? 'var(--ink-3)' : 'var(--ink-2)',
-          cursor: ehHoje ? 'default' : 'pointer',
-          textTransform: 'lowercase',
+          display: 'grid',
+          gridTemplateColumns: 'repeat(7, 1fr)',
+          padding: '8px 6px',
         }}
       >
-        hoje
-      </button>
-      <button
-        type="button"
-        onClick={() => setDiaSelecionado(adicionaDia(diaSelecionado, 1))}
-        aria-label="próximo dia"
-        style={navBtn}
-      >
-        ›
-      </button>
+        {semana.map((d, i) => {
+          const isActive = i === currentDay;
+          const isHoje = i === hojeIdx;
+          const tp = temPlantao(i);
+          return (
+            <button
+              key={d}
+              type="button"
+              onClick={() => onPick(i)}
+              style={{
+                position: 'relative',
+                border: 'none',
+                background: 'transparent',
+                padding: '6px 0 8px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 2,
+                cursor: 'pointer',
+              }}
+            >
+              <span
+                style={{
+                  font: '700 9px/1 var(--font-body)',
+                  letterSpacing: '0.06em',
+                  textTransform: 'uppercase',
+                  color: isHoje ? 'var(--lavender-ink)' : 'var(--ink-3)',
+                }}
+              >
+                {DOWS[diaSemanaBR(d)]}
+              </span>
+              <span
+                style={{
+                  fontFamily: 'var(--font-display)',
+                  fontWeight: 500,
+                  fontSize: 18,
+                  lineHeight: 1,
+                  letterSpacing: '-0.02em',
+                  color: isHoje ? 'var(--lavender-ink)' : 'var(--ink)',
+                  width: 26,
+                  height: 26,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: 999,
+                  background: isActive
+                    ? isHoje
+                      ? 'var(--lavender-surface)'
+                      : 'var(--bg)'
+                    : 'transparent',
+                  outline: isActive
+                    ? `1.5px solid ${isHoje ? 'var(--lavender-ink)' : 'var(--ink)'}`
+                    : 'none',
+                  transition: 'all 160ms ease',
+                }}
+              >
+                {fromISO(d).getDate()}
+              </span>
+              <span
+                aria-hidden
+                style={{
+                  width: 4,
+                  height: 4,
+                  borderRadius: 999,
+                  background: tp
+                    ? isHoje
+                      ? 'var(--lavender-ink)'
+                      : 'var(--ink-3)'
+                    : 'transparent',
+                }}
+              />
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
 
 interface TimelineProps {
-  segs: SegmentoVisivel[];
-  isHoje: boolean;
+  semana: readonly string[];
+  items: Bloco[];
+  hojeIdx: number;
+  currentDay: number;
+  scrollTop: number;
+  agora: number;
   onSelectBloco: (b: Bloco) => void;
 }
 
-function Timeline({ segs, isHoje, onSelectBloco }: TimelineProps) {
-  const horaAgora = useHoraAgora(isHoje);
+function Timeline({
+  semana,
+  items,
+  hojeIdx,
+  currentDay,
+  scrollTop,
+  agora,
+  onSelectBloco,
+}: TimelineProps) {
+  const total = N_DIAS * DAY_PX;
+  const nowTop = hojeIdx >= 0 ? (hojeIdx * 24 + agora) * HOUR_PX : null;
 
   return (
     <div
       style={{
         position: 'relative',
-        height: 24 * ALTURA_HORA,
-        display: 'grid',
-        gridTemplateColumns: '54px 1fr',
+        height: total + 80,
+        minHeight: total + 80,
+        paddingBottom: 60,
       }}
     >
-      {/* Coluna de horas */}
-      <div style={{ position: 'relative' }}>
-        {Array.from({ length: 24 }).map((_, h) => (
-          <div
-            key={h}
-            style={{
-              position: 'absolute',
-              top: h * ALTURA_HORA,
-              left: 0,
-              right: 0,
-              height: ALTURA_HORA,
-              display: 'flex',
-              alignItems: 'flex-start',
-              justifyContent: 'flex-end',
-              paddingTop: 4,
-              paddingRight: 8,
-            }}
-          >
-            <Mono
-              style={{
-                color: 'var(--ink-3)',
-                fontSize: 11,
-              }}
-            >
-              {String(h).padStart(2, '0')}:00
-            </Mono>
-          </div>
-        ))}
-      </div>
+      <HourGrid />
+      {/* faixas de madrugada (00–06h de cada dia) */}
+      {Array.from({ length: N_DIAS }).map((_, i) => (
+        <span
+          key={`mad-${i}`}
+          aria-hidden
+          style={{
+            position: 'absolute',
+            left: RAIL_W,
+            right: 0,
+            top: i * DAY_PX,
+            height: 6 * HOUR_PX,
+            background:
+              'linear-gradient(180deg, rgba(58,46,42,0.04), rgba(58,46,42,0.015) 70%, transparent)',
+            pointerEvents: 'none',
+          }}
+        />
+      ))}
 
-      {/* Coluna de eventos */}
-      <div style={{ position: 'relative', borderLeft: '1px solid var(--line)' }}>
-        {/* Linhas horizontais por hora */}
-        {Array.from({ length: 24 }).map((_, h) => (
-          <span
-            key={h}
-            aria-hidden
-            style={{
-              position: 'absolute',
-              top: h * ALTURA_HORA,
-              left: 0,
-              right: 0,
-              height: 1,
-              background: 'var(--line-2)',
-              opacity: 0.5,
-            }}
-          />
-        ))}
+      {/* divisores de dia */}
+      {Array.from({ length: N_DIAS }).map((_, i) => (
+        <DayDivider key={`div-${i}`} semana={semana} idx={i} hojeIdx={hojeIdx} />
+      ))}
 
-        {/* Linha "agora" se for hoje */}
-        {horaAgora != null && (
-          <>
-            <span
-              style={{
-                position: 'absolute',
-                top: horaAgora * ALTURA_HORA,
-                left: 0,
-                right: 0,
-                height: 2,
-                background: 'var(--lavender-ink)',
-                zIndex: 2,
-              }}
-            />
-            <span
-              style={{
-                position: 'absolute',
-                top: horaAgora * ALTURA_HORA - 5,
-                left: -6,
-                width: 12,
-                height: 12,
-                borderRadius: 999,
-                background: 'var(--lavender-ink)',
-                zIndex: 3,
-              }}
-            />
-          </>
-        )}
+      <SideRail
+        semana={semana}
+        currentDay={currentDay}
+        scrollTop={scrollTop}
+        hojeIdx={hojeIdx}
+      />
 
-        {/* Cards de eventos */}
-        {segs.map((seg, i) => (
-          <CardEvento
-            key={`${seg.bloco.id}-${seg.continuaAntes ? 'a' : 'b'}-${i}`}
-            seg={seg}
-            onClick={() => onSelectBloco(seg.bloco)}
-          />
-        ))}
+      {nowTop != null && <NowLine top={nowTop} agora={agora} />}
+
+      {items.map((b) => (
+        <BlocoLinear
+          key={`${b.id}-${b.data}`}
+          b={b}
+          semana={semana}
+          onClick={() => onSelectBloco(b)}
+        />
+      ))}
+
+      {/* fim da semana */}
+      <div
+        style={{
+          position: 'absolute',
+          top: total + 12,
+          left: RAIL_W + 12,
+          right: 18,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+        }}
+      >
+        <span style={{ height: 1, flex: 1, background: 'var(--line-2)' }} />
+        <Mono style={{ color: 'var(--ink-3)' }}>próxima semana</Mono>
+        <span style={{ height: 1, flex: 1, background: 'var(--line-2)' }} />
       </div>
     </div>
   );
 }
 
-function useHoraAgora(ativo: boolean): number | null {
-  const [horaAgora, setHoraAgora] = useState<number | null>(null);
-  useEffect(() => {
-    if (!ativo) {
-      setHoraAgora(null);
-      return;
+function HourGrid() {
+  const linhas: React.ReactNode[] = [];
+  for (let d = 0; d < N_DIAS; d++) {
+    for (let h = 1; h < 24; h++) {
+      const top = d * DAY_PX + h * HOUR_PX;
+      const major = h % 6 === 0;
+      linhas.push(
+        <span
+          key={`l-${d}-${h}`}
+          aria-hidden
+          style={{
+            position: 'absolute',
+            left: RAIL_W,
+            right: 0,
+            top,
+            height: 1,
+            background: 'var(--line)',
+            opacity: major ? 0.9 : 0.35,
+          }}
+        />,
+      );
+      if (major) {
+        linhas.push(
+          <span
+            key={`hl-${d}-${h}`}
+            style={{
+              position: 'absolute',
+              left: RAIL_W + 6,
+              top: top - 6,
+              fontFamily: 'var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)',
+              fontSize: 9,
+              color: 'var(--ink-3)',
+              background: 'var(--bg)',
+              padding: '0 4px',
+            }}
+          >
+            {String(h).padStart(2, '0')}h
+          </span>,
+        );
+      }
     }
-    function calc() {
-      const d = new Date();
-      setHoraAgora(d.getHours() + d.getMinutes() / 60);
-    }
-    calc();
-    const interval = setInterval(calc, 60_000);
-    return () => clearInterval(interval);
-  }, [ativo]);
-  return horaAgora;
+  }
+  return <>{linhas}</>;
 }
 
-function CardEvento({
-  seg,
-  onClick,
+function DayDivider({
+  semana,
+  idx,
+  hojeIdx,
 }: {
-  seg: SegmentoVisivel;
-  onClick: () => void;
+  semana: readonly string[];
+  idx: number;
+  hojeIdx: number;
 }) {
-  const { bloco, startHora, endHora, continuaAntes, continuaDepois } = seg;
-  const hosp =
-    bloco.tipo === 'plantao' || bloco.tipo === 'cedido'
-      ? getHospital(bloco.hospitalId)
-      : undefined;
-  const cor = hosp?.cor ?? null;
-  const isPlantao = bloco.tipo === 'plantao';
-  const cheio = isPlantao && cor !== null;
-
-  const top = startHora * ALTURA_HORA;
-  const height = Math.max(28, (endHora - startHora) * ALTURA_HORA - 2);
-  const radiusTop = continuaAntes ? 0 : 8;
-  const radiusBottom = continuaDepois ? 0 : 8;
-  const compacto = height < 60;
-
-  const titulo =
-    bloco.tipo === 'plantao' && hosp
-      ? hosp.nome
-      : bloco.tipo === 'sono'
-      ? 'sono protegido'
-      : bloco.tipo === 'bloqueio'
-      ? `bloqueio${bloco.motivo ? ` · ${bloco.motivo}` : ''}`
-      : bloco.tipo === 'cedido' && hosp
-      ? `cedido · ${bloco.cedidoPara}`
-      : bloco.tipo === 'consulta'
-      ? `consulta${bloco.local ? ` · ${bloco.local}` : ''}`
-      : bloco.tipo === 'estudo' && bloco.titulo
-      ? bloco.titulo
-      : bloco.tipo === 'pessoal' && bloco.titulo
-      ? bloco.titulo
-      : bloco.tipo === 'outros' && bloco.titulo
-      ? bloco.titulo
-      : bloco.tipo;
-
-  const horario = fmtRange(bloco.horaInicio, bloco.duracao);
-  const ehCedido = bloco.tipo === 'cedido';
-
+  const top = idx * DAY_PX;
+  const data = semana[idx]!;
+  const isHoje = idx === hojeIdx;
+  const dt = fromISO(data);
   return (
-    <button
-      type="button"
-      onClick={onClick}
+    <div
       style={{
         position: 'absolute',
+        left: 0,
+        right: 0,
         top,
-        left: 6,
-        right: 6,
-        height,
-        background: cheio
-          ? `var(--${cor})`
-          : cor
-          ? `var(--${cor}-surface)`
-          : 'var(--bg-alt)',
-        color: cheio ? 'var(--bg)' : 'var(--ink)',
-        border: cheio ? 'none' : `1px solid var(--line)`,
-        borderLeft: cor && !cheio ? `3px solid var(--${cor})` : undefined,
-        borderTopLeftRadius: radiusTop,
-        borderTopRightRadius: radiusTop,
-        borderBottomLeftRadius: radiusBottom,
-        borderBottomRightRadius: radiusBottom,
-        padding: compacto ? '6px 10px' : '8px 12px',
-        textAlign: 'left',
-        cursor: 'pointer',
-        overflow: 'hidden',
+        height: 28,
+        pointerEvents: 'none',
         display: 'flex',
-        flexDirection: 'column',
-        gap: compacto ? 2 : 4,
-        zIndex: 1,
-        ...(ehCedido && {
-          backgroundImage:
-            'repeating-linear-gradient(45deg, transparent 0 4px, rgba(255,255,255,0.4) 4px 7px)',
-          opacity: 0.85,
-        }),
+        alignItems: 'center',
+        zIndex: 4,
+      }}
+    >
+      <div style={{ width: RAIL_W }} />
+      <div
+        style={{
+          flex: 1,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          paddingLeft: 4,
+          paddingRight: 14,
+        }}
+      >
+        <span
+          style={{
+            font: '700 10px/1 var(--font-body)',
+            letterSpacing: '0.08em',
+            textTransform: 'uppercase',
+            color: isHoje ? 'var(--lavender-ink)' : 'var(--ink-3)',
+            background: 'var(--bg)',
+            padding: '4px 8px',
+            borderRadius: 999,
+            border: `1px solid ${isHoje ? 'var(--lavender)' : 'var(--line-2)'}`,
+          }}
+        >
+          {DOWS[diaSemanaBR(data)]} {dt.getDate()}
+          {isHoje ? ' · hoje' : ''}
+        </span>
+        <span
+          aria-hidden
+          style={{
+            flex: 1,
+            height: 1,
+            borderTop: `1.5px dashed ${isHoje ? 'var(--lavender)' : 'var(--line-2)'}`,
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function SideRail({
+  semana,
+  currentDay,
+  scrollTop,
+  hojeIdx,
+}: {
+  semana: readonly string[];
+  currentDay: number;
+  scrollTop: number;
+  hojeIdx: number;
+}) {
+  const total = N_DIAS * DAY_PX;
+  const dayTop = currentDay * DAY_PX;
+  const dayBot = dayTop + DAY_PX;
+  const stickyTop = scrollTop + 8;
+  const railBadgeY = Math.max(dayTop + 12, Math.min(stickyTop, dayBot - 90));
+  const data = semana[currentDay]!;
+  const isHoje = currentDay === hojeIdx;
+  const dt = fromISO(data);
+
+  return (
+    <>
+      <div
+        aria-hidden
+        style={{
+          position: 'absolute',
+          left: 0,
+          top: 0,
+          width: RAIL_W,
+          height: total,
+          borderRight: '1px solid var(--line)',
+          background: 'var(--bg-alt)',
+        }}
+      />
+
+      {/* régua de fundo · cada dia mostra sigla + número discretos */}
+      {semana.map((d, i) => {
+        const dDt = fromISO(d);
+        const dEhHoje = i === hojeIdx;
+        return (
+          <div
+            key={`mk-${d}`}
+            aria-hidden
+            style={{
+              position: 'absolute',
+              left: 0,
+              top: i * DAY_PX,
+              width: RAIL_W,
+              height: DAY_PX,
+              pointerEvents: 'none',
+            }}
+          >
+            <span
+              style={{
+                position: 'absolute',
+                top: 40,
+                left: 0,
+                right: 6,
+                textAlign: 'center',
+                font: '700 9px/1 var(--font-body)',
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                color: dEhHoje ? 'var(--lavender-ink)' : 'var(--ink-3)',
+                opacity: 0.6,
+              }}
+            >
+              {DOWS[diaSemanaBR(d)]}
+            </span>
+            <span
+              style={{
+                position: 'absolute',
+                top: 56,
+                left: 0,
+                right: 6,
+                textAlign: 'center',
+                fontFamily: 'var(--font-display)',
+                fontWeight: 500,
+                fontSize: 16,
+                lineHeight: 1,
+                color: dEhHoje ? 'var(--lavender-ink)' : 'var(--ink-2)',
+                letterSpacing: '-0.02em',
+                opacity: 0.7,
+              }}
+            >
+              {dDt.getDate()}
+            </span>
+          </div>
+        );
+      })}
+
+      {/* badge sticky · dia atual em destaque */}
+      <div
+        aria-hidden
+        style={{
+          position: 'absolute',
+          left: 4,
+          top: railBadgeY,
+          width: RAIL_W - 8,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          padding: '8px 0 10px',
+          background: isHoje ? 'var(--lavender-ink)' : 'var(--ink)',
+          color: 'var(--bg)',
+          borderRadius: 12,
+          boxShadow: '0 4px 12px rgba(58,46,42,0.18)',
+          transition: 'top 240ms cubic-bezier(.2,.7,.2,1), background 200ms',
+          zIndex: 5,
+        }}
+      >
+        <span
+          style={{
+            font: '700 9px/1 var(--font-body)',
+            letterSpacing: '0.08em',
+            textTransform: 'uppercase',
+            opacity: 0.7,
+          }}
+        >
+          {DOWS[diaSemanaBR(data)]}
+        </span>
+        <span
+          style={{
+            fontFamily: 'var(--font-display)',
+            fontWeight: 500,
+            fontSize: 22,
+            lineHeight: 1,
+            letterSpacing: '-0.02em',
+            marginTop: 4,
+          }}
+        >
+          {dt.getDate()}
+        </span>
+        {isHoje && (
+          <span
+            style={{
+              fontFamily: 'var(--font-handwritten, "Caveat", cursive)',
+              fontSize: 13,
+              lineHeight: 1,
+              marginTop: 4,
+              opacity: 0.95,
+            }}
+          >
+            hoje
+          </span>
+        )}
+      </div>
+    </>
+  );
+}
+
+function NowLine({ top, agora }: { top: number; agora: number }) {
+  const hh = Math.floor(agora);
+  const mm = Math.floor((agora - hh) * 60);
+  const label = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+  return (
+    <div
+      aria-hidden
+      style={{
+        position: 'absolute',
+        left: RAIL_W,
+        right: 0,
+        top,
+        height: 0,
+        borderTop: '2px solid var(--lavender-ink)',
+        zIndex: 6,
+        pointerEvents: 'none',
       }}
     >
       <span
         style={{
-          font: `500 ${compacto ? 12 : 14}px/1.15 var(--font-display)`,
-          letterSpacing: '-0.005em',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
+          position: 'absolute',
+          left: -1,
+          top: -5,
+          width: 10,
+          height: 10,
+          borderRadius: 999,
+          background: 'var(--lavender-ink)',
+          boxShadow: '0 0 0 3px var(--bg)',
+        }}
+      />
+      <span
+        style={{
+          position: 'absolute',
+          right: 8,
+          top: -16,
+          font: '700 9px/1 var(--font-body)',
+          letterSpacing: '0.06em',
+          textTransform: 'uppercase',
+          color: 'var(--lavender-ink)',
+          background: 'var(--bg)',
+          padding: '2px 6px',
+          borderRadius: 999,
+          border: '1px solid var(--lavender)',
         }}
       >
-        {titulo}
+        agora · {label}
       </span>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-        <Mono
-          style={{
-            color: cheio ? 'rgba(255,255,255,0.9)' : 'var(--ink-3)',
-            fontSize: 10,
-          }}
-        >
-          {horario}
-        </Mono>
-        {bloco.tipo === 'plantao' && bloco.viaTroca && !continuaAntes && (
-          <Pill kind={cheio ? 'neutral' : 'lavender'}>via troca</Pill>
-        )}
-        {bloco.tipo === 'plantao' && bloco.conflito && !continuaAntes && <IconConflito />}
-      </div>
-    </button>
+    </div>
   );
 }
 
-interface SegmentoVisivel {
-  bloco: Bloco;
-  /** 0-24 · onde o segmento começa no dia. */
-  startHora: number;
-  /** 0-24 · onde termina no dia. */
-  endHora: number;
-  continuaAntes: boolean;
-  continuaDepois: boolean;
-}
+function BlocoLinear({
+  b,
+  semana,
+  onClick,
+}: {
+  b: Bloco;
+  semana: readonly string[];
+  onClick: () => void;
+}) {
+  const dIdx = semana.indexOf(b.data);
+  if (dIdx < 0) return null;
+  const top = (dIdx * 24 + b.horaInicio) * HOUR_PX;
+  const height = b.duracao * HOUR_PX;
+  const cruza = b.horaInicio + b.duracao > 24;
+  const baseStyle: React.CSSProperties = {
+    position: 'absolute',
+    left: RAIL_W + 14,
+    right: 14,
+    top,
+    height,
+    boxSizing: 'border-box',
+    cursor: 'pointer',
+    overflow: 'hidden',
+  };
 
-function segmentosDoDia(blocos: Bloco[], dia: string): SegmentoVisivel[] {
-  const out: SegmentoVisivel[] = [];
-  for (const b of blocos) {
-    if (b.tipo === 'deslocamento') continue;
-    const ini = b.horaInicio - 24 * diffDias(dia, b.data);
-    const fim = ini + b.duracao;
-    if (fim <= 0 || ini >= 24) continue;
-    const startHora = Math.max(0, ini);
-    const endHora = Math.min(24, fim);
-    out.push({
-      bloco: b,
-      startHora,
-      endHora,
-      continuaAntes: ini < 0,
-      continuaDepois: fim > 24,
-    });
+  if (b.tipo === 'plantao') {
+    const hosp = getHospital(b.hospitalId);
+    if (!hosp) return null;
+    const ate24px = (24 - b.horaInicio) * HOUR_PX;
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        style={{
+          ...baseStyle,
+          background: `var(--${hosp.cor}-surface)`,
+          borderLeft: `4px solid var(--${hosp.cor})`,
+          borderRadius: 14,
+          padding: '10px 12px',
+          boxShadow: '0 1px 2px rgba(58,46,42,0.06)',
+          textAlign: 'left',
+          color: 'var(--ink)',
+          zIndex: 3,
+        }}
+      >
+        {b.conflito && (
+          <span
+            aria-hidden
+            style={{
+              position: 'absolute',
+              inset: 0,
+              borderRadius: 14,
+              border: '2px solid var(--coral-ink)',
+              pointerEvents: 'none',
+              animation: 'colo-pulse-conflict 2.4s ease-in-out infinite',
+            }}
+          />
+        )}
+        {b.viaTroca && (
+          <span
+            aria-hidden
+            title="recebido em troca"
+            style={{
+              position: 'absolute',
+              top: 8,
+              right: 10,
+              width: 8,
+              height: 8,
+              borderRadius: 999,
+              background: 'var(--lavender)',
+              boxShadow: '0 0 0 2px var(--bg)',
+            }}
+          />
+        )}
+
+        <Eyebrow color={`var(--${hosp.cor}-ink)`}>{hosp.abrev}</Eyebrow>
+        <div style={{ font: '600 14px/1.15 var(--font-body)', color: 'var(--ink)', marginTop: 4 }}>
+          {fmtRange(b.horaInicio, b.duracao)}
+        </div>
+        <div
+          style={{
+            fontFamily: 'var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)',
+            fontSize: 11,
+            color: 'var(--ink-2)',
+            marginTop: 4,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            flexWrap: 'wrap',
+          }}
+        >
+          {b.duracao}h
+          {cruza && (
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 3,
+                padding: '2px 6px',
+                background: 'var(--bg)',
+                borderRadius: 999,
+                border: `1px solid var(--${hosp.cor})`,
+                color: `var(--${hosp.cor}-ink)`,
+                font: '700 9px/1 var(--font-body)',
+                letterSpacing: '0.05em',
+                textTransform: 'uppercase',
+              }}
+            >
+              ⌄ vira o dia
+            </span>
+          )}
+        </div>
+
+        {cruza && (
+          <span
+            aria-hidden
+            style={{
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              top: ate24px - 1,
+              height: 2,
+              background: `repeating-linear-gradient(90deg, var(--${hosp.cor}-ink) 0 4px, transparent 4px 8px)`,
+              opacity: 0.55,
+              pointerEvents: 'none',
+            }}
+          />
+        )}
+
+        {height > 100 && b.viaTroca && (
+          <div
+            style={{
+              position: 'absolute',
+              bottom: 8,
+              left: 12,
+              font: '500 11px/1.2 var(--font-body)',
+              color: 'var(--lavender-ink)',
+              fontStyle: 'italic',
+            }}
+          >
+            via troca
+          </div>
+        )}
+      </button>
+    );
   }
-  return out.sort((a, b) => a.startHora - b.startHora);
+
+  if (b.tipo === 'sono') {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        style={{
+          ...baseStyle,
+          background: 'var(--sage-surface)',
+          borderRadius: 14,
+          padding: '8px 12px',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          textAlign: 'left',
+          border: 'none',
+          zIndex: 2,
+        }}
+      >
+        <Hand color="var(--sage-ink)" size={height > 80 ? 18 : 14}>
+          sono protegido
+        </Hand>
+        {height > 56 && (
+          <Mono style={{ color: 'var(--sage-ink)', opacity: 0.8, marginTop: 4 }}>
+            {b.duracao}h livres
+          </Mono>
+        )}
+      </button>
+    );
+  }
+
+  if (b.tipo === 'bloqueio') {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        style={{
+          ...baseStyle,
+          background:
+            'repeating-linear-gradient(135deg, var(--bg-alt), var(--bg-alt) 6px, var(--bg) 6px, var(--bg) 12px)',
+          border: '1px dashed rgba(58,46,42,0.18)',
+          borderRadius: 14,
+          padding: '10px 12px',
+          textAlign: 'left',
+          color: 'var(--ink-2)',
+          zIndex: 2,
+        }}
+      >
+        <Eyebrow>bloqueio</Eyebrow>
+        {b.motivo && (
+          <div style={{ font: '500 13px/1.3 var(--font-body)', color: 'var(--ink-2)', marginTop: 4 }}>
+            {b.motivo}
+          </div>
+        )}
+      </button>
+    );
+  }
+
+  if (b.tipo === 'cedido') {
+    const hosp = getHospital(b.hospitalId);
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        style={{
+          ...baseStyle,
+          background:
+            'repeating-linear-gradient(135deg, var(--sand-surface), var(--sand-surface) 5px, transparent 5px, transparent 10px)',
+          opacity: 0.75,
+          borderRadius: 14,
+          padding: '8px 12px',
+          textAlign: 'left',
+          border: 'none',
+          zIndex: 2,
+        }}
+      >
+        <Eyebrow
+          style={{ textDecoration: 'line-through' }}
+          color={hosp ? `var(--${hosp.cor}-ink)` : undefined}
+        >
+          cedido · {b.cedidoPara}
+        </Eyebrow>
+        <Mono style={{ color: 'var(--ink-3)', marginTop: 3 }}>
+          {fmtRange(b.horaInicio, b.duracao)} · não soma
+        </Mono>
+      </button>
+    );
+  }
+
+  if (b.tipo === 'consulta') {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        style={{
+          ...baseStyle,
+          background: 'var(--bg)',
+          border: '1px solid var(--coral)',
+          borderLeft: '4px solid var(--coral-ink)',
+          borderRadius: 14,
+          padding: '10px 12px',
+          textAlign: 'left',
+          color: 'var(--ink)',
+          zIndex: 2,
+        }}
+      >
+        <Eyebrow color="var(--coral-ink)">consulta{b.local ? ` · ${b.local}` : ''}</Eyebrow>
+        <div style={{ font: '600 13px/1.2 var(--font-body)', marginTop: 4 }}>
+          {fmtRange(b.horaInicio, b.duracao)}
+        </div>
+      </button>
+    );
+  }
+
+  if (b.tipo === 'estudo') {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        style={{
+          ...baseStyle,
+          background: 'var(--blue-surface)',
+          borderLeft: '4px solid var(--blue-ink)',
+          borderRadius: 14,
+          padding: '10px 12px',
+          textAlign: 'left',
+          color: 'var(--ink)',
+          border: '1px solid transparent',
+          zIndex: 2,
+        }}
+      >
+        <Eyebrow color="var(--blue-ink)">
+          estudo{b.titulo ? ` · ${b.titulo}` : ''}
+        </Eyebrow>
+        <div style={{ font: '600 13px/1.2 var(--font-body)', marginTop: 4 }}>
+          {fmtRange(b.horaInicio, b.duracao)}
+        </div>
+      </button>
+    );
+  }
+
+  if (b.tipo === 'pessoal') {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        style={{
+          ...baseStyle,
+          background: 'var(--sand-surface)',
+          borderLeft: '4px solid var(--sand-ink)',
+          borderRadius: 14,
+          padding: '10px 12px',
+          textAlign: 'left',
+          color: 'var(--ink)',
+          border: '1px solid transparent',
+          zIndex: 2,
+        }}
+      >
+        <Eyebrow color="var(--sand-ink)">pessoal</Eyebrow>
+        <div style={{ font: '500 13px/1.3 var(--font-body)', marginTop: 4 }}>
+          {b.titulo || 'compromisso'}
+        </div>
+        {height > 60 && (
+          <Mono style={{ color: 'var(--ink-3)', marginTop: 3 }}>
+            {fmtRange(b.horaInicio, b.duracao)}
+          </Mono>
+        )}
+      </button>
+    );
+  }
+
+  if (b.tipo === 'outros') {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        style={{
+          ...baseStyle,
+          background: 'var(--bg)',
+          border: '1px solid var(--line)',
+          borderLeft: '4px solid var(--ink-3)',
+          borderRadius: 14,
+          padding: '10px 12px',
+          textAlign: 'left',
+          color: 'var(--ink)',
+          zIndex: 2,
+        }}
+      >
+        <Eyebrow>{b.titulo ? 'evento' : 'outros'}</Eyebrow>
+        <div style={{ font: '500 13px/1.3 var(--font-body)', marginTop: 4 }}>
+          {b.titulo || 'evento'}
+        </div>
+        {height > 60 && (
+          <Mono style={{ color: 'var(--ink-3)', marginTop: 3 }}>
+            {fmtRange(b.horaInicio, b.duracao)}
+          </Mono>
+        )}
+      </button>
+    );
+  }
+
+  return null;
 }
 
-function diffDias(a: string, b: string): number {
-  const da = fromISO(a).getTime();
-  const db = fromISO(b).getTime();
-  return Math.round((da - db) / (24 * 3600 * 1000));
+function horaDecimalAgora(): number {
+  const d = new Date();
+  return d.getHours() + d.getMinutes() / 60;
+}
+
+function adicionaDiaISO(iso: string, n: number): string {
+  const d = fromISO(iso);
+  d.setDate(d.getDate() + n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function labelRangeSemana(inicio: string, fim: string): string {
+  const dIni = fromISO(inicio);
+  const dFim = fromISO(fim);
+  const mesIni = MESES[dIni.getMonth()];
+  const mesFim = MESES[dFim.getMonth()];
+  if (mesIni === mesFim) return `${dIni.getDate()}–${dFim.getDate()} ${mesIni}`;
+  return `${dIni.getDate()} ${mesIni} – ${dFim.getDate()} ${mesFim}`;
 }
 
 const navBtn: React.CSSProperties = {
   font: '600 16px/1 var(--font-body)',
-  width: 36,
-  height: 36,
+  width: 32,
+  height: 32,
   borderRadius: 999,
   border: '1px solid var(--line)',
   background: 'var(--bg-alt)',
   color: 'var(--ink-2)',
   cursor: 'pointer',
 };
-
-void fmtDate;
-void inicioDaSemana;
