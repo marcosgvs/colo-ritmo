@@ -3,6 +3,7 @@ import type { Bloco, HospitaisMap } from '@/types';
 import {
   adicionaDia,
   diaSemanaBR,
+  DOWS,
   DOWS_LONG,
   fmtDate,
   fmtRange,
@@ -23,9 +24,11 @@ interface ListaDaSemanaProps {
 }
 
 /**
- * Lista da semana · view linear, dia a dia, ordenada cronologicamente.
- * Cada dia da semana vira um header e os blocos do dia aparecem embaixo.
- * Dias sem nada mostram um separador sutil "aberto".
+ * Lista da semana · layout 2 colunas (DATA | EVENTOS). Plantão noturno
+ * que atravessa meia-noite aparece em DOIS dias, conectado visualmente:
+ *   - no dia X: card com borda inferior reta + tag "termina amanhã 07h"
+ *   - no dia X+1: card com borda superior reta + tag "começou ontem 19h"
+ * mesma cor, mesma família, parecem um único bloco partido.
  */
 export function ListaDoDia({ blocos, hospitais: _h, onSelectBloco }: ListaDaSemanaProps) {
   const [refIso, setRefIso] = useState<string>(HOJE);
@@ -34,20 +37,16 @@ export function ListaDoDia({ blocos, hospitais: _h, onSelectBloco }: ListaDaSema
   const fim = semana[6]!;
   const label = formatRangeSemana(inicio, fim);
 
-  const blocosPorDia = useMemo(() => {
-    const m = new Map<string, Bloco[]>();
-    for (const dia of semana) m.set(dia, []);
-    for (const b of blocos) {
-      if (!semana.includes(b.data)) continue;
-      m.get(b.data)!.push(b);
-    }
-    for (const arr of m.values()) {
-      arr.sort((a, b) => a.horaInicio - b.horaInicio);
-    }
+  const segmentosPorDia = useMemo(() => {
+    const m = new Map<string, SegmentoVisivel[]>();
+    for (const dia of semana) m.set(dia, segmentosDoDia(blocos, dia));
     return m;
   }, [blocos, semana]);
 
-  const totalBlocos = Array.from(blocosPorDia.values()).reduce((s, a) => s + a.length, 0);
+  const totalBlocos = Array.from(segmentosPorDia.values()).reduce(
+    (s, a) => s + a.filter((seg) => !seg.continuaAntes).length,
+    0,
+  );
 
   return (
     <>
@@ -84,69 +83,14 @@ export function ListaDoDia({ blocos, hospitais: _h, onSelectBloco }: ListaDaSema
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
           {semana.map((dia) => {
-            const items = blocosPorDia.get(dia) ?? [];
-            const dt = fromISO(dia);
-            const dow = DOWS_LONG[diaSemanaBR(dia)];
-            const isHoje = dia === HOJE;
+            const segs = segmentosPorDia.get(dia) ?? [];
             return (
-              <section key={dia}>
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'baseline',
-                    gap: 12,
-                    paddingBottom: 6,
-                    marginBottom: 8,
-                    borderBottom: '1px solid var(--line)',
-                  }}
-                >
-                  <span
-                    style={{
-                      fontFamily: 'var(--font-display)',
-                      fontWeight: 500,
-                      fontSize: 22,
-                      letterSpacing: '-0.01em',
-                      color: isHoje ? 'var(--lavender-ink)' : 'var(--ink)',
-                    }}
-                  >
-                    {dt.getDate()} {MESES[dt.getMonth()]}
-                  </span>
-                  <span
-                    style={{
-                      font: '500 13px/1 var(--font-body)',
-                      color: 'var(--ink-3)',
-                      textTransform: 'lowercase',
-                    }}
-                  >
-                    {dow}
-                  </span>
-                  {isHoje && (
-                    <Hand color="var(--lavender-ink)" size={14}>
-                      hoje
-                    </Hand>
-                  )}
-                  <span style={{ flex: 1 }} />
-                  <Mono style={{ color: 'var(--ink-3)' }}>
-                    {items.length === 0
-                      ? 'sem itens'
-                      : `${items.length} ${items.length === 1 ? 'item' : 'itens'}`}
-                  </Mono>
-                </div>
-
-                <TimelineDia dia={dia} blocos={blocos} />
-
-                {items.length === 0 ? (
-                  <Mono style={{ color: 'var(--ink-3)', display: 'block', padding: '4px 4px 8px' }}>
-                    aberto
-                  </Mono>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {items.map((b) => (
-                      <ItemLinha key={`${b.id}-${b.data}`} b={b} onClick={() => onSelectBloco(b)} />
-                    ))}
-                  </div>
-                )}
-              </section>
+              <DiaLinha
+                key={dia}
+                dia={dia}
+                segs={segs}
+                onSelectBloco={onSelectBloco}
+              />
             );
           })}
         </div>
@@ -155,148 +99,151 @@ export function ListaDoDia({ blocos, hospitais: _h, onSelectBloco }: ListaDaSema
   );
 }
 
-/**
- * Mini-timeline horizontal de 24h pra cada dia · plantão que cruza
- * meia-noite aparece também no dia seguinte (em 0-Xh), com cantos retos
- * do lado em que continua. Ajuda a ver "o sábado tá tomado até as 7h"
- * sem precisar repetir o item na lista.
- */
-function TimelineDia({ dia, blocos }: { dia: string; blocos: Bloco[] }) {
-  const segmentos = segmentosDoDia(blocos, dia);
-  if (segmentos.length === 0) return null;
+interface DiaLinhaProps {
+  dia: string;
+  segs: SegmentoVisivel[];
+  onSelectBloco: (b: Bloco) => void;
+}
+
+function DiaLinha({ dia, segs, onSelectBloco }: DiaLinhaProps) {
+  const dt = fromISO(dia);
+  const isHoje = dia === HOJE;
 
   return (
-    <div
+    <section
       style={{
-        position: 'relative',
-        height: 14,
-        background: 'var(--bg-alt)',
-        borderRadius: 4,
-        marginBottom: 10,
-        overflow: 'hidden',
+        display: 'grid',
+        gridTemplateColumns: '56px 1fr',
+        gap: 14,
+        alignItems: 'stretch',
       }}
     >
-      {/* marcadores 6h / 12h / 18h */}
-      {[6, 12, 18].map((h) => (
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'flex-start',
+          paddingTop: 4,
+          minWidth: 0,
+        }}
+      >
         <span
-          key={h}
           style={{
-            position: 'absolute',
-            top: 0,
-            bottom: 0,
-            left: `${(h / 24) * 100}%`,
-            width: 1,
-            background: 'var(--line-2)',
-            opacity: 0.6,
+            font: '500 28px/1 var(--font-display)',
+            color: isHoje ? 'var(--lavender-ink)' : 'var(--ink)',
+            letterSpacing: '-0.02em',
           }}
-        />
-      ))}
-      {segmentos.map((s, i) => {
-        const hosp =
-          s.bloco.tipo === 'plantao' || s.bloco.tipo === 'cedido'
-            ? getHospital(s.bloco.hospitalId)
-            : undefined;
-        const cor = hosp ? `var(--${hosp.cor})` : 'var(--ink-3)';
-        const ehCedido = s.bloco.tipo === 'cedido';
-        return (
+        >
+          {String(dt.getDate()).padStart(2, '0')}
+        </span>
+        <span
+          style={{
+            font: '600 10px/1 var(--font-body)',
+            color: isHoje ? 'var(--lavender-ink)' : 'var(--ink-3)',
+            letterSpacing: '0.1em',
+            marginTop: 6,
+            textTransform: 'uppercase',
+          }}
+        >
+          {DOWS[diaSemanaBR(dia)]}
+        </span>
+        {isHoje && (
           <span
-            key={`${s.bloco.id}-${i}`}
-            title={tooltipSegmento(s)}
+            aria-hidden
             style={{
-              position: 'absolute',
-              top: 2,
-              bottom: 2,
-              left: `${(s.startHora / 24) * 100}%`,
-              width: `${(s.durHora / 24) * 100}%`,
-              background: cor,
-              opacity: ehCedido ? 0.4 : 0.85,
-              borderTopLeftRadius: s.continuaAntes ? 0 : 3,
-              borderBottomLeftRadius: s.continuaAntes ? 0 : 3,
-              borderTopRightRadius: s.continuaDepois ? 0 : 3,
-              borderBottomRightRadius: s.continuaDepois ? 0 : 3,
-              ...(ehCedido
-                ? {
-                    backgroundImage:
-                      'repeating-linear-gradient(45deg, transparent 0 3px, rgba(255,255,255,0.5) 3px 5px)',
-                  }
-                : null),
+              marginTop: 8,
+              width: 6,
+              height: 6,
+              borderRadius: 999,
+              background: 'var(--lavender-ink)',
             }}
           />
-        );
-      })}
-    </div>
+        )}
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+        {segs.length === 0 ? (
+          <div
+            style={{
+              border: '1px dashed var(--line-2)',
+              borderRadius: 10,
+              padding: '14px 16px',
+              color: 'var(--ink-3)',
+              font: '500 13px/1 var(--font-body)',
+            }}
+          >
+            aberto
+          </div>
+        ) : (
+          segs.map((seg, i) => (
+            <ItemCard
+              key={`${seg.bloco.id}-${seg.continuaAntes ? 'a' : 'b'}-${i}`}
+              seg={seg}
+              onClick={() => onSelectBloco(seg.bloco)}
+            />
+          ))
+        )}
+      </div>
+    </section>
   );
 }
 
-interface SegmentoDia {
-  bloco: Bloco;
-  /** 0-24 · hora local de início do segmento naquele dia. */
-  startHora: number;
-  /** Em horas · sempre dentro de [0, 24-startHora]. */
-  durHora: number;
-  continuaAntes: boolean;
-  continuaDepois: boolean;
+interface ItemCardProps {
+  seg: SegmentoVisivel;
+  onClick: () => void;
 }
 
-/**
- * Retorna segmentos visíveis na timeline do `dia`. Considera apenas
- * tipos com horário (plantão/cedido/sono/bloqueio). Plantão noturno do
- * dia anterior vira segmento `continuaAntes=true` em 0-Xh deste dia.
- */
-function segmentosDoDia(blocos: Bloco[], dia: string): SegmentoDia[] {
-  const out: SegmentoDia[] = [];
-  for (const b of blocos) {
-    if (b.tipo === 'deslocamento') continue;
-    const inicioH = b.horaInicio + 24 * diffDias(b.data, dia) * -1;
-    // simplificado: trabalha em "horas relativas ao dia"
-    const ini = b.horaInicio - 24 * diffDias(dia, b.data);
-    const fim = ini + b.duracao;
-    if (fim <= 0 || ini >= 24) continue;
-    void inicioH;
-    const startHora = Math.max(0, ini);
-    const endHora = Math.min(24, fim);
-    out.push({
-      bloco: b,
-      startHora,
-      durHora: endHora - startHora,
-      continuaAntes: ini < 0,
-      continuaDepois: fim > 24,
-    });
-  }
-  return out.sort((a, b) => a.startHora - b.startHora);
-}
-
-/** Diferença em dias entre dois ISOs (a-b). */
-function diffDias(a: string, b: string): number {
-  const da = fromISO(a).getTime();
-  const db = fromISO(b).getTime();
-  return Math.round((da - db) / (24 * 3600 * 1000));
-}
-
-function tooltipSegmento(s: SegmentoDia): string {
-  const b = s.bloco;
-  if (b.tipo === 'plantao' || b.tipo === 'cedido') {
-    const hosp = getHospital(b.hospitalId);
-    const prefixo = b.tipo === 'cedido' ? 'cedido · ' : '';
-    return `${prefixo}${hosp?.abrev ?? '?'} · ${fmtRange(b.horaInicio, b.duracao)}`;
-  }
-  return `${b.tipo} · ${fmtRange(b.horaInicio, b.duracao)}`;
-}
-
-function ItemLinha({ b, onClick }: { b: Bloco; onClick: () => void }) {
+function ItemCard({ seg, onClick }: ItemCardProps) {
+  const { bloco, continuaAntes, continuaDepois } = seg;
   const hosp =
-    b.tipo === 'plantao' || b.tipo === 'cedido' ? getHospital(b.hospitalId) : undefined;
+    bloco.tipo === 'plantao' || bloco.tipo === 'cedido'
+      ? getHospital(bloco.hospitalId)
+      : undefined;
   const cor = hosp?.cor ?? null;
+  const isPlantao = bloco.tipo === 'plantao';
+  const cheio = isPlantao && cor !== null;
+
+  // Bordas chanfradas onde o card "se conecta" com o vizinho
+  const radiusTop = continuaAntes ? 0 : 10;
+  const radiusBottom = continuaDepois ? 0 : 10;
+
   const titulo =
-    b.tipo === 'plantao' && hosp
-      ? hosp.abrev
-      : b.tipo === 'sono'
-        ? 'sono protegido'
-        : b.tipo === 'bloqueio'
-          ? `bloqueio${b.motivo ? ` · ${b.motivo}` : ''}`
-          : b.tipo === 'cedido' && hosp
-            ? `cedido · ${b.cedidoPara}`
-            : b.tipo;
+    bloco.tipo === 'plantao' && hosp
+      ? hosp.nome
+      : bloco.tipo === 'sono'
+      ? 'sono protegido'
+      : bloco.tipo === 'bloqueio'
+      ? `bloqueio${bloco.motivo ? ` · ${bloco.motivo}` : ''}`
+      : bloco.tipo === 'cedido' && hosp
+      ? `cedido · ${bloco.cedidoPara}`
+      : bloco.tipo === 'consulta'
+      ? `consulta${bloco.local ? ` · ${bloco.local}` : ''}`
+      : bloco.tipo === 'estudo' && bloco.titulo
+      ? bloco.titulo
+      : bloco.tipo === 'pessoal' && bloco.titulo
+      ? bloco.titulo
+      : bloco.tipo === 'outros' && bloco.titulo
+      ? bloco.titulo
+      : bloco.tipo;
+
+  // Horário mostrado no card varia conforme parte do segmento
+  // - Sem split: range total do plantão
+  // - continuaDepois: "19:00 → 24:00" + tag "→ 07:00 amanhã"
+  // - continuaAntes: "00:00 → 07:00" + tag "veio 19:00 ontem"
+  const fimAbs = bloco.horaInicio + bloco.duracao;
+  const horaFimDia = fimAbs % 24;
+
+  let horario: string;
+  let tagContinuacao: string | null = null;
+  if (continuaDepois) {
+    horario = `${fmtHora(bloco.horaInicio)} → 24:00`;
+    tagContinuacao = `↓ termina ${fmtHora(horaFimDia)} amanhã`;
+  } else if (continuaAntes) {
+    horario = `00:00 → ${fmtHora(horaFimDia)}`;
+    tagContinuacao = `↑ veio ${fmtHora(bloco.horaInicio)} ontem`;
+  } else {
+    horario = fmtRange(bloco.horaInicio, bloco.duracao);
+  }
 
   return (
     <button
@@ -305,38 +252,116 @@ function ItemLinha({ b, onClick }: { b: Bloco; onClick: () => void }) {
       style={{
         display: 'flex',
         alignItems: 'center',
-        gap: 14,
-        background: cor ? `var(--${cor}-surface)` : 'var(--bg)',
-        borderLeft: cor ? `3px solid var(--${cor})` : '3px solid var(--line-2)',
-        border: '1px solid var(--line)',
-        borderRadius: 10,
-        padding: '12px 16px',
+        gap: 12,
+        padding: '12px 14px',
+        background: cheio
+          ? `var(--${cor})`
+          : cor
+          ? `var(--${cor}-surface)`
+          : 'var(--bg)',
+        color: cheio ? 'var(--bg)' : 'var(--ink)',
+        border: cheio ? 'none' : '1px solid var(--line)',
+        borderLeft: cor && !cheio ? `3px solid var(--${cor})` : undefined,
+        borderTopLeftRadius: radiusTop,
+        borderTopRightRadius: radiusTop,
+        borderBottomLeftRadius: radiusBottom,
+        borderBottomRightRadius: radiusBottom,
         cursor: 'pointer',
         textAlign: 'left',
-        font: '500 14px/1.3 var(--font-body)',
-        color: 'var(--ink)',
         width: '100%',
       }}
     >
-      <Mono style={{ color: 'var(--ink-2)', minWidth: 110 }}>
-        {fmtRange(b.horaInicio, b.duracao)}
-      </Mono>
-      <span
-        style={{
-          fontFamily: 'var(--font-display)',
-          fontWeight: 500,
-          fontSize: 17,
-          letterSpacing: '-0.005em',
-        }}
-      >
-        {titulo}
-      </span>
-      <span style={{ flex: 1 }} />
-      <Mono style={{ color: 'var(--ink-3)' }}>{b.duracao}h</Mono>
-      {b.tipo === 'plantao' && b.viaTroca && <Pill kind="lavender">via troca</Pill>}
-      {b.tipo === 'plantao' && b.conflito && <IconConflito />}
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <span
+          style={{
+            font: '500 14px/1.2 var(--font-display)',
+            letterSpacing: '-0.005em',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {titulo}
+        </span>
+        {tagContinuacao && (
+          <span
+            style={{
+              font: '500 10px/1 var(--font-body)',
+              color: cheio ? 'rgba(255,255,255,0.8)' : 'var(--ink-3)',
+              letterSpacing: '0.02em',
+            }}
+          >
+            {tagContinuacao}
+          </span>
+        )}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+        <Mono
+          style={{
+            color: cheio ? 'rgba(255,255,255,0.95)' : 'var(--ink-2)',
+            fontSize: 12,
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {horario}
+        </Mono>
+        {bloco.tipo === 'plantao' && bloco.viaTroca && !continuaAntes && (
+          <Pill kind={cheio ? 'neutral' : 'lavender'}>via troca</Pill>
+        )}
+        {bloco.tipo === 'plantao' && bloco.conflito && !continuaAntes && <IconConflito />}
+      </div>
     </button>
   );
+}
+
+function fmtHora(h: number): string {
+  const intH = Math.floor(h);
+  const min = Math.round((h - intH) * 60);
+  return `${String(intH).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
+}
+
+interface SegmentoVisivel {
+  bloco: Bloco;
+  startHora: number;
+  endHora: number;
+  continuaAntes: boolean;
+  continuaDepois: boolean;
+}
+
+/**
+ * Segmentos visíveis num dia · plantão noturno do dia anterior aparece
+ * aqui em [0, fim%24] com continuaAntes=true. Plantão que ultrapassa
+ * meia-noite aparece em [inicio, 24] com continuaDepois=true.
+ */
+function segmentosDoDia(blocos: Bloco[], dia: string): SegmentoVisivel[] {
+  const out: SegmentoVisivel[] = [];
+  for (const b of blocos) {
+    if (b.tipo === 'deslocamento') continue;
+    const ini = b.horaInicio - 24 * diffDias(dia, b.data);
+    const fim = ini + b.duracao;
+    if (fim <= 0 || ini >= 24) continue;
+    const startHora = Math.max(0, ini);
+    const endHora = Math.min(24, fim);
+    out.push({
+      bloco: b,
+      startHora,
+      endHora,
+      continuaAntes: ini < 0,
+      continuaDepois: fim > 24,
+    });
+  }
+  return out.sort((a, b) => {
+    // Continuações ficam no topo (eram da noite anterior)
+    if (a.continuaAntes && !b.continuaAntes) return -1;
+    if (b.continuaAntes && !a.continuaAntes) return 1;
+    return a.startHora - b.startHora;
+  });
+}
+
+function diffDias(a: string, b: string): number {
+  const da = fromISO(a).getTime();
+  const db = fromISO(b).getTime();
+  return Math.round((da - db) / (24 * 3600 * 1000));
 }
 
 function NavSemanaLista({ refIso, setRefIso }: { refIso: string; setRefIso: (i: string) => void }) {
@@ -403,3 +428,4 @@ function formatRangeSemana(inicio: string, fim: string): string {
 }
 
 void fmtDate;
+void DOWS_LONG;
