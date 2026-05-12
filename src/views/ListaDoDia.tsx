@@ -226,24 +226,9 @@ function ItemCard({ seg, onClick }: ItemCardProps) {
       ? bloco.titulo
       : bloco.tipo;
 
-  // Horário mostrado no card varia conforme parte do segmento
-  // - Sem split: range total do plantão
-  // - continuaDepois: "19:00 → 24:00" + tag "→ 07:00 amanhã"
-  // - continuaAntes: "00:00 → 07:00" + tag "veio 19:00 ontem"
-  const fimAbs = bloco.horaInicio + bloco.duracao;
-  const horaFimDia = fimAbs % 24;
-
-  let horario: string;
-  let tagContinuacao: string | null = null;
-  if (continuaDepois) {
-    horario = `${fmtHora(bloco.horaInicio)} → 24:00`;
-    tagContinuacao = `↓ termina ${fmtHora(horaFimDia)} amanhã`;
-  } else if (continuaAntes) {
-    horario = `00:00 → ${fmtHora(horaFimDia)}`;
-    tagContinuacao = `↑ veio ${fmtHora(bloco.horaInicio)} ontem`;
-  } else {
-    horario = fmtRange(bloco.horaInicio, bloco.duracao);
-  }
+  // Horário mostrado é sempre o range total do plantão · os cards
+  // partidos repetem a info, os cantos retos contam a história.
+  const horario = fmtRange(bloco.horaInicio, bloco.duracao);
 
   return (
     <button
@@ -271,7 +256,7 @@ function ItemCard({ seg, onClick }: ItemCardProps) {
         width: '100%',
       }}
     >
-      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
         <span
           style={{
             font: '500 14px/1.2 var(--font-display)',
@@ -279,21 +264,11 @@ function ItemCard({ seg, onClick }: ItemCardProps) {
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
+            display: 'block',
           }}
         >
           {titulo}
         </span>
-        {tagContinuacao && (
-          <span
-            style={{
-              font: '500 10px/1 var(--font-body)',
-              color: cheio ? 'rgba(255,255,255,0.8)' : 'var(--ink-3)',
-              letterSpacing: '0.02em',
-            }}
-          >
-            {tagContinuacao}
-          </span>
-        )}
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
         <Mono
@@ -312,12 +287,6 @@ function ItemCard({ seg, onClick }: ItemCardProps) {
       </div>
     </button>
   );
-}
-
-function fmtHora(h: number): string {
-  const intH = Math.floor(h);
-  const min = Math.round((h - intH) * 60);
-  return `${String(intH).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
 }
 
 interface SegmentoVisivel {
