@@ -41,7 +41,7 @@ interface SyncProps {
   nomeUser?: string;
 }
 
-type Estado = 'parado' | 'lendo' | 'enviando' | 'pronto' | 'erro';
+type Estado = 'parado' | 'lendo' | 'enviando' | 'pronto' | 'erro' | 'completou';
 
 interface Variante {
   nome: string;
@@ -73,6 +73,13 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
   const [variantesSelecionadas, setVariantesSelecionadas] = useState<Set<string>>(new Set());
   const [erro, setErro] = useState<string | null>(null);
   const [icsTexto, setIcsTexto] = useState('');
+  // Guarda o PDF em memória pra permitir "rodar de novo" caso o user
+  // tenha errado o mês (sem precisar fazer upload de novo).
+  const [pdfBase64, setPdfBase64] = useState<string | null>(null);
+  const [pdfNome, setPdfNome] = useState<string | null>(null);
+  const [qtdImportada, setQtdImportada] = useState(0);
+
+  const apelidoOk = apelidoNaEscala.trim().length > 0;
 
   // Quando há ambiguidade (>1 variante), filtra os blocos pelas variantes
   // selecionadas pela usuária. Quando só tem 1 variante (ou ICS), mostra
@@ -103,24 +110,16 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
 
   const linkICS = icsToken ? `${origin()}/api/ics/${icsToken}.ics` : null;
 
-  async function onPdf(e: ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file || !hospitalId) return;
-    if (file.size > 20 * 1024 * 1024) {
-      setErro('arquivo > 20mb · pode ser uma escala muito grande?');
-      setEstado('erro');
-      return;
-    }
+  async function processarPdf(base64: string) {
+    if (!hospitalId || !apelidoOk) return;
     if (!nomeUser) {
       setErro('cadastre seu nome em "usuário" antes · preciso pra achar você na escala');
       setEstado('erro');
       return;
     }
-    setEstado('lendo');
+    setEstado('enviando');
     setErro(null);
     try {
-      const base64 = await fileToBase64(file);
-      setEstado('enviando');
       const [ano, mesNum] = mes.split('-').map((v) => parseInt(v, 10));
       const hospital = hospitais[hospitalId];
       const resp = await fetch('/api/extrair-escala', {
@@ -133,7 +132,7 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
           ano,
           mes: mesNum,
           nome: nomeUser,
-          apelidoNaEscala: apelidoNaEscala.trim() || undefined,
+          apelidoNaEscala: apelidoNaEscala.trim(),
         }),
       });
       if (!resp.ok) {
@@ -161,8 +160,6 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
         celulas: json.celulas,
         respostaCrua: json.respostaCrua,
       });
-      // Múltiplas variantes · força escolha consciente · começa nenhuma marcada.
-      // 1 variante · marca automático pra simplificar.
       setVariantesSelecionadas(
         variantes.length === 1 ? new Set([variantes[0]!.nome]) : new Set(),
       );
@@ -170,9 +167,41 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
     } catch (err) {
       setErro((err as Error).message);
       setEstado('erro');
+    }
+  }
+
+  async function onPdf(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !hospitalId) return;
+    if (file.size > 20 * 1024 * 1024) {
+      setErro('arquivo > 20mb · pode ser uma escala muito grande?');
+      setEstado('erro');
+      return;
+    }
+    if (!apelidoOk) {
+      setErro('precisa preencher "seu nome na escala" antes · é como o chefe te chama no pdf');
+      setEstado('erro');
+      e.target.value = '';
+      return;
+    }
+    setEstado('lendo');
+    setErro(null);
+    try {
+      const base64 = await fileToBase64(file);
+      setPdfBase64(base64);
+      setPdfNome(file.name);
+      await processarPdf(base64);
+    } catch (err) {
+      setErro((err as Error).message);
+      setEstado('erro');
     } finally {
       e.target.value = '';
     }
+  }
+
+  async function rodarDeNovo() {
+    if (!pdfBase64) return;
+    await processarPdf(pdfBase64);
   }
 
   function importarICSColado() {
@@ -200,16 +229,12 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
 
   function confirmarImport() {
     if (!resultado || !podeConfirmar) return;
+    const qtd = blocosVisiveis.length;
     if (resultado.origem === 'pdf' && onAplicarEscala) {
-      // Apelido confirmado · se houver ambiguidade, salva a primeira variante
-      // selecionada como apelidoUsado (próximos imports do mesmo hospital
-      // podem reusar).
       const apelidoSalvo =
         resultado.variantes.length > 1
           ? Array.from(variantesSelecionadas)[0] ?? apelidoNaEscala.trim()
           : apelidoNaEscala.trim();
-
-      // PDF · substitui mês×hospital + atualiza janelas + arquiva transcrição
       onAplicarEscala({
         hospitalId,
         mesISO: mes,
@@ -219,13 +244,19 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
         apelidoUsado: apelidoSalvo || undefined,
       });
     } else {
-      // ICS · só adiciona blocos
       onAdicionarBlocos(blocosVisiveis);
     }
     setResultado(null);
     setVariantesSelecionadas(new Set());
     setIcsTexto('');
-    setEstado('parado');
+    setPdfBase64(null);
+    setPdfNome(null);
+    setQtdImportada(qtd);
+    setEstado('completou');
+    setTimeout(() => {
+      setEstado('parado');
+      setQtdImportada(0);
+    }, 2600);
   }
 
   function exportarICS() {
@@ -247,6 +278,50 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
         hand="solta o pdf da escala ou cola de outro calendário — eu organizo."
       />
 
+      {estado === 'completou' && (
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            marginBottom: 18,
+            padding: '14px 18px',
+            background: 'var(--sage-surface)',
+            borderLeft: '3px solid var(--sage-ink)',
+            borderRadius: 'var(--r-md)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+          }}
+        >
+          <span
+            aria-hidden
+            style={{
+              width: 28,
+              height: 28,
+              borderRadius: 999,
+              background: 'var(--sage-ink)',
+              color: 'var(--bg)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M5 12l5 5L20 7" />
+            </svg>
+          </span>
+          <div style={{ minWidth: 0 }}>
+            <Eyebrow color="var(--sage-ink)">completou</Eyebrow>
+            <div style={{ font: '500 14px/1.3 var(--font-body)', color: 'var(--ink)', marginTop: 2 }}>
+              {qtdImportada === 1
+                ? '1 plantão adicionado à sua agenda.'
+                : `${qtdImportada} plantões adicionados à sua agenda.`}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div
         style={{
           display: 'grid',
@@ -256,7 +331,7 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
         }}
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <Card titulo="importar pdf da escala">
+          <Card titulo="importar pdf da escala" order={1}>
             <p style={{ font: '400 14px/1.5 var(--font-body)', color: 'var(--ink-2)', margin: '0 0 14px' }}>
               passo linha por linha pra encontrar seus plantões · se algo ficar duvidoso,
               marco como aviso pra você revisar antes de salvar.
@@ -284,13 +359,20 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
                   ))}
                 </select>
               </Field>
-              <Field label="seu nome na escala">
+              <Field label="seu nome na escala · obrigatório">
                 <input
                   type="text"
                   value={apelidoNaEscala}
                   onChange={(e) => setApelidoNaEscala(e.target.value)}
                   placeholder="ex: Mpinheiro"
-                  style={{ ...inputStyle, minWidth: isMobile ? 0 : 200, width: isMobile ? '100%' : undefined }}
+                  required
+                  aria-required="true"
+                  style={{
+                    ...inputStyle,
+                    minWidth: isMobile ? 0 : 200,
+                    width: isMobile ? '100%' : undefined,
+                    borderColor: apelidoOk ? 'var(--line)' : 'var(--coral)',
+                  }}
                 />
               </Field>
               <Field label="mês">
@@ -306,27 +388,71 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
                 padding: '32px 24px',
                 background: 'var(--bg-alt)',
                 textAlign: 'center',
-                cursor: estado === 'lendo' || estado === 'enviando' ? 'wait' : 'pointer',
+                cursor:
+                  estado === 'lendo' || estado === 'enviando'
+                    ? 'wait'
+                    : apelidoOk
+                    ? 'pointer'
+                    : 'not-allowed',
+                opacity: apelidoOk ? 1 : 0.55,
               }}
             >
               <input
                 type="file"
                 accept="application/pdf"
                 onChange={onPdf}
-                disabled={estado === 'lendo' || estado === 'enviando' || !hospitalId}
+                disabled={
+                  estado === 'lendo' || estado === 'enviando' || !hospitalId || !apelidoOk
+                }
                 style={{ display: 'none' }}
               />
               {estado === 'enviando' ? (
                 <LoadingFrases frases={FRASES_PDF} fontSize={16} />
               ) : (
                 <p style={{ font: '600 16px/1.3 var(--font-body)', color: 'var(--ink)', margin: 0 }}>
-                  {estado === 'lendo' ? 'lendo arquivo…' : 'arrasta ou clica pra escolher'}
+                  {estado === 'lendo'
+                    ? 'lendo arquivo…'
+                    : !apelidoOk
+                    ? 'preencha seu nome na escala primeiro'
+                    : 'arrasta ou clica pra escolher'}
                 </p>
               )}
               <Mono style={{ display: 'block', marginTop: 6, color: 'var(--ink-3)' }}>
                 {estado === 'enviando' ? 'isso pode levar alguns segundos' : 'pdf · até 20mb'}
               </Mono>
             </label>
+            {pdfBase64 && estado !== 'enviando' && estado !== 'lendo' && (
+              <div
+                style={{
+                  marginTop: 12,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  flexWrap: 'wrap',
+                }}
+              >
+                <Mono style={{ color: 'var(--ink-3)' }}>
+                  {pdfNome ?? 'pdf carregado'} · pronto pra reprocessar
+                </Mono>
+                <button
+                  type="button"
+                  onClick={() => void rodarDeNovo()}
+                  disabled={!apelidoOk}
+                  style={{
+                    font: '600 12px/1 var(--font-body)',
+                    padding: '9px 16px',
+                    borderRadius: 999,
+                    border: '1px solid var(--lavender-ink)',
+                    background: 'var(--lavender-surface)',
+                    color: 'var(--lavender-ink)',
+                    cursor: apelidoOk ? 'pointer' : 'not-allowed',
+                    opacity: apelidoOk ? 1 : 0.5,
+                  }}
+                >
+                  começar de novo
+                </button>
+              </div>
+            )}
             {erro && (
               <p style={{ font: '500 13px/1.4 var(--font-body)', color: 'var(--coral-ink)', marginTop: 10 }}>
                 {erro}
@@ -334,7 +460,7 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
             )}
           </Card>
 
-          <Card titulo="ou colar de outro calendário" eyebrow="útil pra google · apple">
+          <Card titulo="ou colar de outro calendário" eyebrow="útil pra google · apple" order={3}>
             <textarea
               value={icsTexto}
               onChange={(e) => setIcsTexto(e.target.value)}
@@ -376,6 +502,7 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
                   : `${blocosVisiveis.length} plantões prontos pra somar`
               }
               eyebrow="revisa antes de salvar"
+              order={2}
             >
               {precisaConfirmarVariante && (
                 <div
@@ -712,10 +839,12 @@ function Card({
   titulo,
   eyebrow,
   children,
+  order,
 }: {
   titulo: string;
   eyebrow?: string;
   children: React.ReactNode;
+  order?: number;
 }) {
   const isMobile = useIsMobile();
   return (
@@ -726,6 +855,7 @@ function Card({
         borderRadius: 18,
         padding: isMobile ? '16px 16px' : '20px 22px',
         boxShadow: 'var(--shadow-sm)',
+        order,
       }}
     >
       <div

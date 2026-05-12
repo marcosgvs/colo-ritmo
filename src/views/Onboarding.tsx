@@ -1,6 +1,10 @@
-import { useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import type { Hospital, Preferencias, TipoHospital } from '@/types';
 import { ColoMark, Eyebrow, Hand, Mono } from '@/components/atoms';
+import {
+  buscarSugestoesHospitais,
+  type SugestaoHospital,
+} from '@/lib/hospitaisBrasilia';
 
 interface OnboardingProps {
   onConcluir: (dados: { hospitais: Hospital[]; preferencias: Partial<Preferencias> }) => void;
@@ -19,6 +23,19 @@ export function Onboarding({ onConcluir, onPular }: OnboardingProps) {
   const [hospitalTipo, setHospitalTipo] = useState<TipoHospital>('publico');
   const [valorFixo, setValorFixo] = useState(0);
   const [valorHora, setValorHora] = useState(0);
+  const [sugestoesAbertas, setSugestoesAbertas] = useState(false);
+  const fechaSugestoesTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sugestoes = useMemo(
+    () => (sugestoesAbertas ? buscarSugestoesHospitais(hospitalNome) : []),
+    [hospitalNome, sugestoesAbertas],
+  );
+
+  function selecionarSugestao(s: SugestaoHospital) {
+    setHospitalNome(s.nome);
+    if (!hospitalAbrev.trim()) setHospitalAbrev(s.abrev);
+    setHospitalTipo(s.tipo);
+    setSugestoesAbertas(false);
+  }
 
   const idx = PASSOS.indexOf(passo);
 
@@ -187,12 +204,77 @@ export function Onboarding({ onConcluir, onPular }: OnboardingProps) {
               depois você adiciona os outros e detalha as regras. agora é só pra ter um chão.
             </p>
             <Field label="nome">
-              <input
-                value={hospitalNome}
-                onChange={(e) => setHospitalNome(e.target.value)}
-                placeholder="Hospital Santa Lúcia"
-                style={input}
-              />
+              <div style={{ position: 'relative' }}>
+                <input
+                  value={hospitalNome}
+                  onChange={(e) => {
+                    setHospitalNome(e.target.value);
+                    setSugestoesAbertas(true);
+                  }}
+                  onFocus={() => setSugestoesAbertas(true)}
+                  onBlur={() => {
+                    fechaSugestoesTimer.current = setTimeout(
+                      () => setSugestoesAbertas(false),
+                      150,
+                    );
+                  }}
+                  placeholder="começa a digitar · sugiro hospitais"
+                  autoComplete="off"
+                  style={input}
+                />
+                {sugestoesAbertas && sugestoes.length > 0 && (
+                  <ul
+                    style={{
+                      position: 'absolute',
+                      top: 'calc(100% + 4px)',
+                      left: 0,
+                      right: 0,
+                      zIndex: 20,
+                      listStyle: 'none',
+                      margin: 0,
+                      padding: 6,
+                      background: 'var(--bg)',
+                      border: '1px solid var(--line)',
+                      borderRadius: 'var(--r-md)',
+                      boxShadow: 'var(--shadow-lg)',
+                      maxHeight: 240,
+                      overflowY: 'auto',
+                    }}
+                  >
+                    {sugestoes.map((s) => (
+                      <li key={`${s.abrev}-${s.endereco.cidade}`}>
+                        <button
+                          type="button"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            if (fechaSugestoesTimer.current) {
+                              clearTimeout(fechaSugestoesTimer.current);
+                            }
+                            selecionarSugestao(s);
+                          }}
+                          style={{
+                            display: 'block',
+                            width: '100%',
+                            textAlign: 'left',
+                            padding: '8px 10px',
+                            background: 'transparent',
+                            border: 'none',
+                            borderRadius: 'var(--r-sm)',
+                            cursor: 'pointer',
+                            color: 'var(--ink)',
+                            font: '500 13px/1.3 var(--font-body)',
+                          }}
+                        >
+                          <div style={{ fontWeight: 500 }}>{s.nome}</div>
+                          <Mono style={{ color: 'var(--ink-3)', fontSize: 11 }}>
+                            {s.endereco.bairro} · {s.endereco.cidade} · {s.endereco.uf}
+                          </Mono>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </Field>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <Field label="abreviação">
