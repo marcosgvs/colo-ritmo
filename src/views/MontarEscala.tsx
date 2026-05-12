@@ -1263,9 +1263,9 @@ function ExportarHospitalCard({ hospital, plantoes, ano, mes, preferencias, chef
     duracao: p.duracao,
   }));
 
-  async function copiarTexto() {
+  async function montarTexto(): Promise<string> {
     const mod = await import('@/lib/exportarMontar');
-    const texto = mod.montarMensagem({
+    return mod.montarMensagem({
       hospital,
       plantoes: blocosPlantao,
       ano,
@@ -1273,9 +1273,27 @@ function ExportarHospitalCard({ hospital, plantoes, ano, mes, preferencias, chef
       preferencias,
       chefe: chefe.trim() || undefined,
     });
+  }
+
+  async function copiarTexto() {
+    const texto = await montarTexto();
     await navigator.clipboard.writeText(texto);
     setStatusTexto('copiado');
     setTimeout(() => setStatusTexto('idle'), 2000);
+  }
+
+  async function enviarWhatsApp() {
+    const texto = await montarTexto();
+    const url = `https://wa.me/?text=${encodeURIComponent(texto)}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }
+
+  async function enviarEmail() {
+    const texto = await montarTexto();
+    const nomeMes = MESES[mes - 1] ?? '';
+    const subject = `Proposta de escala · ${hospital.abrev} · ${nomeMes} ${ano}`;
+    const url = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(texto)}`;
+    window.location.href = url;
   }
 
   async function baixarPdf() {
@@ -1336,6 +1354,12 @@ function ExportarHospitalCard({ hospital, plantoes, ano, mes, preferencias, chef
       </Field>
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 14 }}>
+        <button type="button" onClick={enviarWhatsApp} style={btnExport(false, 'sage')}>
+          enviar por whatsapp
+        </button>
+        <button type="button" onClick={enviarEmail} style={btnExport(false, 'sage')}>
+          enviar por email
+        </button>
         <button type="button" onClick={copiarTexto} style={btnExport(statusTexto === 'copiado')}>
           {statusTexto === 'copiado' ? 'texto copiado!' : 'copiar texto'}
         </button>
@@ -1346,6 +1370,9 @@ function ExportarHospitalCard({ hospital, plantoes, ano, mes, preferencias, chef
           {exportando === 'xlsx' ? 'gerando…' : 'baixar excel'}
         </button>
       </div>
+      <Mono style={{ display: 'block', marginTop: 8, color: 'var(--ink-3)', fontSize: 11 }}>
+        whatsapp e email enviam o texto · pra anexar o pdf, baixa e anexa manualmente
+      </Mono>
     </Card>
   );
 }
@@ -1815,13 +1842,18 @@ const btnSecundario: React.CSSProperties = {
   cursor: 'pointer',
 };
 
-function btnExport(success: boolean): React.CSSProperties {
+function btnExport(success: boolean, variant: 'ink' | 'sage' = 'ink'): React.CSSProperties {
+  const bg = success
+    ? 'var(--sage-ink)'
+    : variant === 'sage'
+    ? 'var(--sage-ink)'
+    : 'var(--ink)';
   return {
     font: '600 13px/1 var(--font-body)',
     padding: '11px 18px',
     borderRadius: 999,
     border: 'none',
-    background: success ? 'var(--sage-ink)' : 'var(--ink)',
+    background: bg,
     color: 'var(--bg)',
     cursor: 'pointer',
   };
