@@ -13,6 +13,16 @@ import { marcarConflitos } from '@/lib/data';
 const MAX_PROPOSTAS_HISTORICO = 10;
 
 /**
+ * Mapping persistente bloco↔event do Google Calendar. v1 (push-only)
+ * já guarda etag pra sessão 2 (2-way) detectar conflitos via If-Match.
+ */
+export interface GcalConfig {
+  calendarId: string;
+  mapping: Record<string, { eventId: string; etag?: string }>;
+  lastSyncedAt?: string;
+}
+
+/**
  * Shape do JSON em `user_state.state`. Mantemos compatibilidade com
  * leitura "vazia" — qualquer campo ausente cai pro default. Quando a
  * tabela é populada pela primeira vez (signup), gravamos um state com
@@ -24,6 +34,7 @@ export interface UserStateBlob {
   preferencias?: Preferencias;
   escalasImportadas?: EscalaImportada[];
   propostasMontar?: PropostaHistorico[];
+  gcalConfig?: GcalConfig;
   updatedAt?: string;
 }
 
@@ -35,6 +46,7 @@ export interface UserStateValor {
   preferencias: Preferencias;
   escalasImportadas: EscalaImportada[];
   propostasMontar: PropostaHistorico[];
+  gcalConfig?: GcalConfig;
 }
 
 export interface UserStateAPI {
@@ -84,6 +96,7 @@ export function useUserState(userId: string | null): UserStateAPI {
         preferencias: valor.preferencias,
         escalasImportadas: valor.escalasImportadas,
         propostasMontar: valor.propostasMontar.slice(0, MAX_PROPOSTAS_HISTORICO),
+        ...(valor.gcalConfig ? { gcalConfig: valor.gcalConfig } : {}),
         updatedAt: new Date().toISOString(),
       };
       const { error } = await supabase()
@@ -115,6 +128,9 @@ export function useUserState(userId: string | null): UserStateAPI {
           preferencias: next.preferencias ?? prev.preferencias,
           escalasImportadas: next.escalasImportadas ?? prev.escalasImportadas,
           propostasMontar: next.propostasMontar ?? prev.propostasMontar,
+          gcalConfig:
+            // setar como null/undefined zera (desconectar) · sem chave preserva
+            'gcalConfig' in next ? next.gcalConfig : prev.gcalConfig,
         };
         pendingRef.current = merged;
         if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -160,6 +176,7 @@ export function useUserState(userId: string | null): UserStateAPI {
             preferencias: blob.preferencias ?? STATE_VAZIO.preferencias,
             escalasImportadas: blob.escalasImportadas ?? [],
             propostasMontar: blob.propostasMontar ?? [],
+            gcalConfig: blob.gcalConfig,
           });
         } else {
           // Primeiro acesso · começa vazio · App detecta hospitais={} e
@@ -190,6 +207,7 @@ export function useUserState(userId: string | null): UserStateAPI {
             preferencias: novoState.preferencias ?? prev.preferencias,
             escalasImportadas: novoState.escalasImportadas ?? prev.escalasImportadas,
             propostasMontar: novoState.propostasMontar ?? prev.propostasMontar,
+            gcalConfig: novoState.gcalConfig ?? prev.gcalConfig,
           }));
         },
       )

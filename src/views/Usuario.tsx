@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import type { Preferencias } from '@/types';
+import type { Bloco, Hospital, Preferencias } from '@/types';
 import { sair } from '@/hooks/useAuth';
 import { usePush } from '@/hooks/usePush';
 import { useInstallPrompt } from '@/hooks/useInstallPrompt';
 import { useSnapshotsShares } from '@/hooks/useSnapshotsShares';
 import { useIsMobile } from '@/hooks/useIsMobile';
+import { useGcalSync } from '@/hooks/useGcalSync';
+import type { GcalConfig } from '@/hooks/useUserState';
 import { Eyebrow, Hand, MonthPicker, Mono, Pill } from '@/components/atoms';
 import { PageHead } from './_PageHead';
 
@@ -13,13 +15,32 @@ interface UsuarioProps {
   userId: string | null;
   preferencias: Preferencias;
   onSalvarPreferencias: (p: Preferencias) => void;
+  blocos: Bloco[];
+  hospitais: Record<string, Hospital>;
+  gcalConfig: GcalConfig | undefined;
+  onSalvarGcalConfig: (c: GcalConfig | undefined) => void;
 }
 
-export function Usuario({ email, userId, preferencias, onSalvarPreferencias }: UsuarioProps) {
+export function Usuario({
+  email,
+  userId,
+  preferencias,
+  onSalvarPreferencias,
+  blocos,
+  hospitais,
+  gcalConfig,
+  onSalvarGcalConfig,
+}: UsuarioProps) {
   const isMobile = useIsMobile();
   const push = usePush(userId);
   const install = useInstallPrompt();
   const snapshotsShares = useSnapshotsShares(userId);
+  const gcal = useGcalSync({
+    blocos,
+    hospitais,
+    config: gcalConfig,
+    onConfig: onSalvarGcalConfig,
+  });
   const [draft, setDraft] = useState(preferencias);
   const sujo = JSON.stringify(draft) !== JSON.stringify(preferencias);
   const [criandoShare, setCriandoShare] = useState(false);
@@ -403,6 +424,117 @@ export function Usuario({ email, userId, preferencias, onSalvarPreferencias }: U
                   </div>
                 ))}
               </div>
+            )}
+          </Card>
+
+          <Card titulo="google calendar" eyebrow="espelha plantões no seu agenda">
+            {gcal.status === 'desconectado' && (
+              <>
+                <Hand color="var(--ink-2)" size={16}>
+                  cria um calendário separado "plantões colo ritmo" e manda só os plantões pra lá ·
+                  não mexe nos seus outros calendários.
+                </Hand>
+                <button
+                  type="button"
+                  onClick={() => void gcal.conectar()}
+                  style={{
+                    marginTop: 14,
+                    font: '600 13px/1 var(--font-body)',
+                    padding: '11px 18px',
+                    borderRadius: 999,
+                    border: 'none',
+                    background: 'var(--ink)',
+                    color: 'var(--bg)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  conectar
+                </button>
+              </>
+            )}
+
+            {gcal.status === 'conectando' && (
+              <Pill kind="lavender">conectando…</Pill>
+            )}
+
+            {(gcal.status === 'conectado' || gcal.status === 'sincronizando') && (
+              <>
+                <Pill kind="ok" style={{ marginBottom: 12 }}>
+                  {gcal.status === 'sincronizando' ? 'sincronizando…' : 'conectado'}
+                </Pill>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12 }}>
+                  <Mono style={{ color: 'var(--ink-2)' }}>
+                    {gcal.sincronizados} plantões no google
+                    {gcal.pendentes > 0 ? ` · ${gcal.pendentes} pendentes` : ''}
+                  </Mono>
+                  {gcal.config?.lastSyncedAt && (
+                    <Mono style={{ color: 'var(--ink-3)', fontSize: 11 }}>
+                      última sync · {new Date(gcal.config.lastSyncedAt).toLocaleString('pt-BR')}
+                    </Mono>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    type="button"
+                    onClick={() => void gcal.sincronizar()}
+                    disabled={gcal.status === 'sincronizando'}
+                    style={{
+                      font: '600 13px/1 var(--font-body)',
+                      padding: '11px 18px',
+                      borderRadius: 999,
+                      border: 'none',
+                      background: 'var(--ink)',
+                      color: 'var(--bg)',
+                      cursor: gcal.status === 'sincronizando' ? 'not-allowed' : 'pointer',
+                      opacity: gcal.status === 'sincronizando' ? 0.6 : 1,
+                      flex: 1,
+                    }}
+                  >
+                    {gcal.pendentes > 0 ? `sincronizar (${gcal.pendentes})` : 'sincronizar'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!confirm('desconectar do google calendar? os eventos já criados ficam lá.')) return;
+                      void gcal.desconectar();
+                    }}
+                    style={{
+                      font: '600 13px/1 var(--font-body)',
+                      padding: '11px 14px',
+                      borderRadius: 999,
+                      border: '1px solid var(--line)',
+                      background: 'transparent',
+                      color: 'var(--ink-2)',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    desconectar
+                  </button>
+                </div>
+              </>
+            )}
+
+            {gcal.status === 'erro' && (
+              <>
+                <Mono style={{ display: 'block', marginBottom: 10, color: 'var(--coral-ink)' }}>
+                  {gcal.erro}
+                </Mono>
+                <button
+                  type="button"
+                  onClick={() => void (gcal.config ? gcal.sincronizar() : gcal.conectar())}
+                  style={{
+                    font: '600 13px/1 var(--font-body)',
+                    padding: '11px 18px',
+                    borderRadius: 999,
+                    border: '1px solid var(--line)',
+                    background: 'transparent',
+                    color: 'var(--ink)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  tentar de novo
+                </button>
+              </>
             )}
           </Card>
 

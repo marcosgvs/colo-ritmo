@@ -566,6 +566,10 @@ function ViewSwitch({
           userId={userId}
           preferencias={state.preferencias}
           onSalvarPreferencias={salvarPreferencias}
+          blocos={state.blocos}
+          hospitais={state.hospitais}
+          gcalConfig={state.gcalConfig}
+          onSalvarGcalConfig={(c) => userState.setState({ gcalConfig: c })}
         />
       );
 
