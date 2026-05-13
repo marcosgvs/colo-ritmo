@@ -8,9 +8,14 @@ export default defineConfig({
   // App vive em colopediatria.com.br/ritmo · raiz fica livre pro site
   // do consultório (Colo Pediatria) que vai ser montado depois.
   base: '/ritmo/',
+  // Expõe VERCEL_GIT_COMMIT_SHA pro client (usado como release no Sentry).
+  envPrefix: ['VITE_', 'VERCEL_'],
   build: {
     outDir: 'dist/ritmo',
     emptyOutDir: true,
+    // Source maps públicos · Sentry consegue desminificar stack traces
+    // sem precisar de auth token. App não tem segredos no client.
+    sourcemap: true,
   },
   resolve: {
     alias: {

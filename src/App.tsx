@@ -16,6 +16,7 @@ import { usePreviewMode } from '@/hooks/usePreviewMode';
 import { useNotificacoes } from '@/hooks/useNotificacoes';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { registrarServiceWorker } from '@/lib/push';
+import { identificarUsuario } from '@/lib/monitoring';
 
 // Telas críticas (Login + Semana = first paint) ficam eager — o resto
 // é code-split via React.lazy. Vite gera chunks separados; o user só
@@ -84,6 +85,15 @@ export function App() {
   useEffect(() => {
     void registrarServiceWorker();
   }, []);
+
+  // Vincula sessão Supabase ao Sentry · todo erro reportado já vem com id+email.
+  useEffect(() => {
+    if (auth.status === 'logado' && auth.user) {
+      identificarUsuario(auth.user.id, auth.user.email ?? undefined);
+    } else if (auth.status === 'deslogado') {
+      identificarUsuario(null);
+    }
+  }, [auth.status, auth.user]);
 
   // Atualiza o map runtime de hospitais · permite que getHospital() resolva
   // hospitais customizados (id "H-...") em qualquer view.

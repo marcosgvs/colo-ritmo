@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { capturarErro } from '@/lib/monitoring';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -11,7 +12,7 @@ interface ErrorBoundaryState {
 /**
  * Captura erros React em qualquer view e mostra tela amigável em vez
  * de tela branca. Botão "recarregar" volta pro shell · o user nunca fica
- * preso. Erros vão pro console (Marcos vê no DevTools quando precisar).
+ * preso. Erros vão pro console e pro Sentry (se VITE_SENTRY_DSN setado).
  */
 export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   override state: ErrorBoundaryState = { erro: null };
@@ -23,6 +24,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   override componentDidCatch(erro: Error, info: ErrorInfo): void {
     console.error('[colo-ritmo] erro não tratado:', erro);
     console.error('[colo-ritmo] componente:', info.componentStack);
+    capturarErro(erro, { componentStack: info.componentStack });
   }
 
   resetar = (): void => {
