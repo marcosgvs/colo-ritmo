@@ -1,13 +1,18 @@
-import { useState, type ChangeEvent } from 'react';
+import { useEffect, useState, type ChangeEvent } from 'react';
 import type { Bloco, BlocoPlantao, CelulaEscala, HospitaisMap, Janela } from '@/types';
 import {
-  eventoParaBloco,
   fmtDate,
   fmtRange,
   gerarICS,
-  parsearICS,
   toISO,
 } from '@/lib/data';
+import {
+  eventoParaPlantao,
+  listarCalendarios,
+  listarEventos,
+  type CalendarListItem,
+} from '@/lib/gcal';
+import { supabase } from '@/lib/supabase';
 import { Eyebrow, Hand, LoadingFrases, MonthPicker, Mono, Pill } from '@/components/atoms';
 
 const FRASES_PDF = [
@@ -72,12 +77,19 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
   const [resultado, setResultado] = useState<Resultado | null>(null);
   const [variantesSelecionadas, setVariantesSelecionadas] = useState<Set<string>>(new Set());
   const [erro, setErro] = useState<string | null>(null);
-  const [icsTexto, setIcsTexto] = useState('');
   // Guarda o PDF em memória pra permitir "rodar de novo" caso o user
   // tenha errado o mês (sem precisar fazer upload de novo).
   const [pdfBase64, setPdfBase64] = useState<string | null>(null);
   const [pdfNome, setPdfNome] = useState<string | null>(null);
   const [qtdImportada, setQtdImportada] = useState(0);
+
+  // Estado da importação via Google Calendar.
+  // gcalCalendars=null indica "ainda não carregou" (ou sem conexão).
+  const [gcalCalendars, setGcalCalendars] = useState<CalendarListItem[] | null>(null);
+  const [gcalSelectedId, setGcalSelectedId] = useState<string>('');
+  const [gcalMeses, setGcalMeses] = useState<number>(3);
+  const [gcalBuscando, setGcalBuscando] = useState(false);
+  const [gcalErro, setGcalErro] = useState<string | null>(null);
 
   const apelidoOk = apelidoNaEscala.trim().length > 0;
 
@@ -204,26 +216,73 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
     await processarPdf(pdfBase64);
   }
 
-  function importarICSColado() {
-    if (!hospitalId || !icsTexto.trim()) return;
+  /**
+   * Busca a lista de calendários acessíveis pela conta Google conectada.
+   * Roda no mount · se o user não tiver provider_token, fica em null e
+   * a UI mostra "conecta o google calendar primeiro" no card.
+   */
+  useEffect(() => {
+    let cancel = false;
+    async function carregar(): Promise<void> {
+      const { data } = await supabase().auth.getSession();
+      const token = data.session?.provider_token;
+      if (!token) {
+        if (!cancel) setGcalCalendars(null);
+        return;
+      }
+      const r = await listarCalendarios(token);
+      if (cancel) return;
+      if (!r.ok) {
+        setGcalCalendars([]);
+        setGcalErro(r.erro);
+        return;
+      }
+      setGcalCalendars(r.valor);
+      // Default: calendário primário, ou primeiro da lista.
+      const primario = r.valor.find((c) => c.primary)?.id ?? r.valor[0]?.id ?? '';
+      setGcalSelectedId(primario);
+    }
+    void carregar();
+    return () => {
+      cancel = true;
+    };
+  }, []);
+
+  async function buscarDoGoogle(): Promise<void> {
+    if (!hospitalId || !gcalSelectedId) return;
+    setGcalErro(null);
+    setGcalBuscando(true);
     try {
-      const eventos = parsearICS(icsTexto);
-      const blocos: BlocoPlantao[] = [];
+      const { data } = await supabase().auth.getSession();
+      const token = data.session?.provider_token;
+      if (!token) {
+        setGcalErro('sessão do google expirou · entra de novo em "você"');
+        return;
+      }
+      const agora = new Date();
+      const fim = new Date(agora);
+      fim.setMonth(fim.getMonth() + gcalMeses);
+      const r = await listarEventos(token, gcalSelectedId, agora.toISOString(), fim.toISOString());
+      if (!r.ok) {
+        setGcalErro(r.erro);
+        return;
+      }
+      const plantoes: BlocoPlantao[] = [];
       const avisos: string[] = [];
-      eventos.forEach((evt, i) => {
-        const b = eventoParaBloco(evt, {
-          id: `ics-${Date.now()}-${i}`,
-          hospitalId,
-        });
-        if (b) blocos.push(b);
-        else avisos.push(`evento sem início/fim · pulei (${evt.summary ?? evt.uid})`);
-      });
-      setResultado({ blocos, variantes: [], janelas: [], avisos, origem: 'ics' });
+      for (const evt of r.valor) {
+        const b = eventoParaPlantao(evt, hospitalId);
+        if (b) plantoes.push(b);
+        else if (evt.summary) avisos.push(`pulei "${evt.summary}" · sem horário ou maior que 24h`);
+      }
+      if (plantoes.length === 0) {
+        setGcalErro('nenhum evento com horário no período · talvez o calendário só tenha all-day');
+        return;
+      }
+      setResultado({ blocos: plantoes, variantes: [], janelas: [], avisos, origem: 'ics' });
       setVariantesSelecionadas(new Set());
       setEstado('pronto');
-    } catch (err) {
-      setErro((err as Error).message);
-      setEstado('erro');
+    } finally {
+      setGcalBuscando(false);
     }
   }
 
@@ -248,7 +307,6 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
     }
     setResultado(null);
     setVariantesSelecionadas(new Set());
-    setIcsTexto('');
     setPdfBase64(null);
     setPdfNome(null);
     setQtdImportada(qtd);
@@ -359,7 +417,7 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
                   ))}
                 </select>
               </Field>
-              <Field label="seu nome na escala · obrigatório">
+              <Field label="seu nome na escala">
                 <input
                   type="text"
                   value={apelidoNaEscala}
@@ -460,38 +518,74 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
             )}
           </Card>
 
-          <Card titulo="ou colar de outro calendário" eyebrow="útil pra google · apple" order={3}>
-            <textarea
-              value={icsTexto}
-              onChange={(e) => setIcsTexto(e.target.value)}
-              placeholder="cole aqui o conteúdo que veio de outro calendário"
-              rows={5}
-              style={{
-                ...inputStyle,
-                width: '100%',
-                fontFamily: 'var(--font-mono)',
-                fontSize: 12,
-                resize: 'vertical',
-              }}
-            />
-            <button
-              type="button"
-              onClick={importarICSColado}
-              disabled={!icsTexto.trim() || !hospitalId}
-              style={{
-                marginTop: 12,
-                font: '600 13px/1 var(--font-body)',
-                padding: '11px 18px',
-                borderRadius: 999,
-                border: 'none',
-                background: 'var(--ink)',
-                color: 'var(--bg)',
-                cursor: 'pointer',
-                opacity: !icsTexto.trim() || !hospitalId ? 0.5 : 1,
-              }}
-            >
-              importar
-            </button>
+          <Card titulo="ou puxar do google calendar" eyebrow="usa o gcal conectado" order={3}>
+            {gcalCalendars === null ? (
+              <Hand color="var(--ink-2)" size={16} style={{ display: 'block' }}>
+                conecta o google calendar lá em "você" primeiro · depois volta aqui pra puxar
+                eventos como plantões.
+              </Hand>
+            ) : gcalCalendars.length === 0 ? (
+              <Mono style={{ display: 'block', color: 'var(--coral-ink)' }}>
+                {gcalErro ?? 'nenhum calendário acessível'}
+              </Mono>
+            ) : (
+              <>
+                <Hand color="var(--ink-2)" size={16} style={{ display: 'block', marginBottom: 14 }}>
+                  escolhe um calendário · eventos com horário do período viram plantões em{' '}
+                  <strong>{hospitais[hospitalId]?.abrev ?? '—'}</strong>.
+                </Hand>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
+                  <Field label="calendário">
+                    <select
+                      value={gcalSelectedId}
+                      onChange={(e) => setGcalSelectedId(e.target.value)}
+                      style={{ ...inputStyle, minWidth: isMobile ? 0 : 240, width: isMobile ? '100%' : undefined }}
+                    >
+                      {gcalCalendars.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.summary}
+                          {c.primary ? ' (principal)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field label="período">
+                    <select
+                      value={gcalMeses}
+                      onChange={(e) => setGcalMeses(Number(e.target.value))}
+                      style={{ ...inputStyle, minWidth: isMobile ? 0 : 160, width: isMobile ? '100%' : undefined }}
+                    >
+                      <option value={1}>próximo mês</option>
+                      <option value={3}>próximos 3 meses</option>
+                      <option value={6}>próximos 6 meses</option>
+                      <option value={12}>próximos 12 meses</option>
+                    </select>
+                  </Field>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void buscarDoGoogle()}
+                  disabled={!hospitalId || !gcalSelectedId || gcalBuscando}
+                  style={{
+                    font: '600 13px/1 var(--font-body)',
+                    padding: '11px 18px',
+                    borderRadius: 999,
+                    border: 'none',
+                    background: 'var(--ink)',
+                    color: 'var(--bg)',
+                    cursor: gcalBuscando ? 'wait' : 'pointer',
+                    opacity: !hospitalId || gcalBuscando ? 0.55 : 1,
+                  }}
+                >
+                  {gcalBuscando ? 'buscando…' : 'buscar eventos'}
+                </button>
+                {gcalErro && (
+                  <Mono style={{ display: 'block', marginTop: 10, color: 'var(--coral-ink)' }}>
+                    {gcalErro}
+                  </Mono>
+                )}
+              </>
+            )}
           </Card>
 
           {resultado && (

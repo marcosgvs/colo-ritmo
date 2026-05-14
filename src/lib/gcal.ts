@@ -1,5 +1,41 @@
 import type { Bloco, BlocoPlantao, Hospital, CorFamilia } from '@/types';
 
+/**
+ * Tenta converter um evento do Google Calendar em BlocoPlantao. Retorna
+ * null se o evento é all-day (sem dateTime), tem range inválido, ou
+ * dura mais que 24h (não é plantão razoável).
+ */
+export function eventoParaPlantao(
+  evento: EventoGcal,
+  hospitalId: string,
+): BlocoPlantao | null {
+  const startISO = evento.start?.dateTime;
+  const endISO = evento.end?.dateTime;
+  if (!startISO || !endISO) return null;
+  const inicio = new Date(startISO);
+  const fim = new Date(endISO);
+  if (isNaN(inicio.getTime()) || isNaN(fim.getTime())) return null;
+  const horasMs = (fim.getTime() - inicio.getTime()) / 1000 / 60 / 60;
+  if (horasMs <= 0 || horasMs > 24) return null;
+  const data = toISOLocal(inicio);
+  const horaInicio = inicio.getHours() + inicio.getMinutes() / 60;
+  return {
+    id: `gcal-${evento.id}`,
+    tipo: 'plantao',
+    hospitalId,
+    data,
+    horaInicio,
+    duracao: horasMs,
+  };
+}
+
+function toISOLocal(d: Date): string {
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 const API = 'https://www.googleapis.com/calendar/v3';
 const CALENDARIO_NOME = 'Plantões Colo Ritmo';
 const TIMEZONE = 'America/Sao_Paulo';
@@ -68,12 +104,26 @@ async function chamada<T>(
   }
 }
 
-interface CalendarListItem {
+export interface CalendarListItem {
   id: string;
   summary: string;
+  primary?: boolean;
+  accessRole?: string;
+  backgroundColor?: string;
 }
 interface CalendarListResponse {
   items?: CalendarListItem[];
+}
+
+export interface EventoGcal {
+  id: string;
+  summary?: string;
+  start?: { dateTime?: string; date?: string };
+  end?: { dateTime?: string; date?: string };
+}
+interface EventosListResponse {
+  items?: EventoGcal[];
+  nextPageToken?: string;
 }
 
 /**
@@ -105,6 +155,48 @@ export async function garantirCalendarioDedicado(
   });
   if (!criado.ok) return criado;
   return { ok: true, valor: { calendarId: criado.valor.id, criado: true } };
+}
+
+/**
+ * Lista calendários acessíveis pela conta. Usado pelo Sync pra deixar
+ * o user escolher de qual calendário importar eventos como plantões.
+ */
+export async function listarCalendarios(
+  token: string,
+): Promise<RespostaGcal<CalendarListItem[]>> {
+  const r = await chamada<CalendarListResponse>(
+    token,
+    '/users/me/calendarList?fields=items(id,summary,primary,accessRole,backgroundColor)&maxResults=50',
+  );
+  if (!r.ok) return r;
+  return { ok: true, valor: r.valor.items ?? [] };
+}
+
+/**
+ * Lista eventos de um calendário num intervalo. Faz expansão automática
+ * de eventos recorrentes (`singleEvents=true`) · cada ocorrência vira
+ * um item separado.
+ */
+export async function listarEventos(
+  token: string,
+  calendarId: string,
+  timeMinISO: string,
+  timeMaxISO: string,
+): Promise<RespostaGcal<EventoGcal[]>> {
+  const params = new URLSearchParams({
+    timeMin: timeMinISO,
+    timeMax: timeMaxISO,
+    singleEvents: 'true',
+    orderBy: 'startTime',
+    maxResults: '500',
+    fields: 'items(id,summary,start,end),nextPageToken',
+  });
+  const r = await chamada<EventosListResponse>(
+    token,
+    `/calendars/${encodeURIComponent(calendarId)}/events?${params.toString()}`,
+  );
+  if (!r.ok) return r;
+  return { ok: true, valor: r.valor.items ?? [] };
 }
 
 /**
