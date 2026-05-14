@@ -26,13 +26,41 @@
         color: var(--ink);
         font: 400 16px/1.6 system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
       }
+      nav.top {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        background: var(--bg);
+        border-bottom: 1px solid var(--line);
+        padding: 0 28px;
+        height: 60px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      nav.top .brand {
+        display: inline-flex;
+        align-items: center;
+        text-decoration: none;
+      }
+      nav.top .brand img { height: 22px; width: auto; display: block; }
+      nav.top a.back {
+        font: 600 12px/1 system-ui, -apple-system, sans-serif;
+        color: var(--ink-2);
+        text-decoration: none;
+        padding: 9px 16px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: var(--bg-alt);
+      }
+      nav.top a.back:hover { color: var(--ink); }
       main {
         max-width: 720px;
         margin: 0 auto;
         padding: 56px 24px 96px;
       }
-      header { margin-bottom: 32px; }
-      header .eyebrow {
+      header.page-head { margin-bottom: 32px; }
+      header.page-head .eyebrow {
         font-size: 11px;
         letter-spacing: 0.08em;
         text-transform: uppercase;
@@ -79,8 +107,14 @@
     </style>
   </head>
   <body>
+    <nav class="top">
+      <a href="/ritmo/" class="brand" aria-label="Colo Ritmo">
+        <img src="/ritmo/colo-ritmo-mark.svg" alt="Colo Ritmo" />
+      </a>
+      <a href="/ritmo/" class="back">← voltar pro app</a>
+    </nav>
     <main>
-      <header>
+      <header class="page-head">
         <span class="eyebrow">Colo Ritmo</span>
         <h1>Política de Privacidade</h1>
       </header>
