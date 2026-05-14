@@ -236,7 +236,7 @@ function HospitalForm({ inicial, coresUsadas, onSalvar, onPersistir, onCancelar,
     setDraft((d) => ({
       ...d,
       nome: s.nome,
-      // Se ela já digitou uma abreviação custom, respeita; senão usa a sugerida
+      // Se o user já digitou uma abreviação custom, respeita; senão usa a sugerida
       abrev: d.abrev.trim() ? d.abrev : s.abrev,
       tipo: s.tipo,
       endereco: {

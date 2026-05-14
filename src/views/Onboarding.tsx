@@ -177,8 +177,8 @@ export function Onboarding({ onConcluir, onPular }: OnboardingProps) {
               {nome ? `${nome}, ` : ''}o app é seu.
             </h2>
             <p style={{ font: '400 16px/1.55 var(--font-body)', color: 'var(--ink-2)', margin: 0 }}>
-              agenda da médica é o uso principal. parceiros e admins têm visões próprias, mas o
-              centro é você.
+              a agenda de quem faz plantão é o uso principal. parceiros e admins têm visões
+              próprias, mas o centro é você.
             </p>
             <Mono style={{ color: 'var(--ink-3)' }}>
               tudo que você cadastra é privado · só compartilha quando você manda.
@@ -369,7 +369,7 @@ export function Onboarding({ onConcluir, onPular }: OnboardingProps) {
               cursor: 'pointer',
             }}
           >
-            {idx === PASSOS.length - 1 ? 'tô pronta' : 'seguir'}
+            {idx === PASSOS.length - 1 ? 'bora começar' : 'seguir'}
           </button>
         </div>
       </div>

@@ -422,7 +422,7 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
                   type="text"
                   value={apelidoNaEscala}
                   onChange={(e) => setApelidoNaEscala(e.target.value)}
-                  placeholder="ex: Mpinheiro"
+                  placeholder="ex: PSilva"
                   required
                   aria-required="true"
                   style={{

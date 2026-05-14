@@ -189,14 +189,13 @@ export async function baixarPDFMontar(dados: DadosPDF): Promise<void> {
 
   y += 5;
 
-  // Título principal: Escala Dra. Mariana Pinheiro
+  // Título principal: "Escala · Nome" · neutro de gênero. Se o user já
+  // colocou Dr./Dra. no nome de preferência, respeitamos o prefixo dele.
   pdf.setFont('Fraunces', 'bold');
   pdf.setFontSize(26);
   pdf.setTextColor(COR_LAVENDER);
-  const nomeLimpo = (dados.preferencias.nome ?? 'Médica').trim();
-  const tituloPrincipal = nomeLimpo.toLowerCase().startsWith('dra')
-    ? `Escala ${nomeLimpo}`
-    : `Escala Dra. ${nomeLimpo}`;
+  const nomeLimpo = (dados.preferencias.nome ?? '').trim();
+  const tituloPrincipal = nomeLimpo ? `Escala · ${nomeLimpo}` : 'Sugestão de escala';
   pdf.text(tituloPrincipal, margemX, y + 8.5);
 
   y += 13;

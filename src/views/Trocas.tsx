@@ -236,8 +236,8 @@ export function Trocas({ blocos, hospitais: _h, onCriarPedido }: TrocasProps) {
         >
           <Eyebrow>regra principal</Eyebrow>
           <Hand color="var(--ink-2)" size={18} style={{ display: 'block', marginTop: 8 }}>
-            quem aceita assume o plantão · você fica com o que ela tinha (se for troca) ou
-            simplesmente passa (se for cessão).
+            quem aceita assume o plantão · você fica com o que essa pessoa tinha (se for
+            troca) ou simplesmente passa (se for cessão).
           </Hand>
           <Mono style={{ display: 'block', marginTop: 16, color: 'var(--ink-3)' }}>
             o coordenador é avisado · audit log registra tudo.
