@@ -151,7 +151,14 @@ export function App() {
 
   // Atualiza o map runtime de hospitais · permite que getHospital() resolva
   // hospitais customizados (id "H-...") em qualquer view.
-  useEffect(() => {
+  //
+  // Usa useMemo (não useEffect) porque getHospital é chamado *durante o
+  // render* dos blocos (Bloco atom). Se isso fosse useEffect, o primeiro
+  // render após o load do user_state encontraria runtime ainda vazio e
+  // os plantões sumiriam visualmente até o user navegar (forçando outro
+  // ciclo). Render-time setter resolve a race condition de side-effect
+  // global vs ordem de mount.
+  useMemo(() => {
     setHospitaisRuntime(userState.state.hospitais);
   }, [userState.state.hospitais]);
 

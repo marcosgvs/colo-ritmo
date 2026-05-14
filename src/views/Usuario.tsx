@@ -128,7 +128,7 @@ export function Usuario({
           <Card titulo="google calendar" eyebrow="espelha plantões no seu agenda">
             {gcal.status === 'desconectado' && (
               <>
-                <Hand color="var(--ink-2)" size={16}>
+                <Hand color="var(--ink-2)" size={16} style={{ display: 'block' }}>
                   cria um calendário separado "plantões colo ritmo" e manda só os plantões pra lá ·
                   não mexe nos seus outros calendários.
                 </Hand>
@@ -263,13 +263,13 @@ export function Usuario({
                   <Pill kind="ok" style={{ marginBottom: 12 }}>
                     instalado
                   </Pill>
-                  <Hand color="var(--ink-2)" size={16}>
+                  <Hand color="var(--ink-2)" size={16} style={{ display: 'block' }}>
                     abre fullscreen, fica no app drawer · pode arquivar a aba.
                   </Hand>
                 </>
               ) : install.tipo === 'pode-instalar' ? (
                 <>
-                  <Hand color="var(--ink-2)" size={16}>
+                  <Hand color="var(--ink-2)" size={16} style={{ display: 'block' }}>
                     coloca o colo na tela inicial · abre fullscreen, sem barra do
                     navegador.
                   </Hand>
@@ -294,7 +294,7 @@ export function Usuario({
                 </>
               ) : (
                 <>
-                  <Hand color="var(--ink-2)" size={16}>
+                  <Hand color="var(--ink-2)" size={16} style={{ display: 'block' }}>
                     no safari do iPhone: toca em compartilhar (□↑) e escolhe
                     "adicionar à tela de início".
                   </Hand>
@@ -305,7 +305,7 @@ export function Usuario({
 
           <Card titulo="notificações" eyebrow="chega no celular">
             {push.status === 'sem-suporte' ? (
-              <Hand color="var(--ink-3)" size={16}>
+              <Hand color="var(--ink-3)" size={16} style={{ display: 'block' }}>
                 este navegador não suporta push · use o celular ou outro browser.
               </Hand>
             ) : push.status === 'ativo' ? (
@@ -313,7 +313,7 @@ export function Usuario({
                 <Pill kind="ok" style={{ marginBottom: 12 }}>
                   ativas
                 </Pill>
-                <Hand color="var(--ink-2)" size={16}>
+                <Hand color="var(--ink-2)" size={16} style={{ display: 'block' }}>
                   você recebe lembretes 30min antes de cada plantão e o resumo do dia às 9h.
                 </Hand>
                 <button
@@ -335,7 +335,7 @@ export function Usuario({
               </>
             ) : (
               <>
-                <Hand color="var(--ink-2)" size={16}>
+                <Hand color="var(--ink-2)" size={16} style={{ display: 'block' }}>
                   recebe lembretes 30min antes de cada plantão e o resumo do dia às 9h.
                 </Hand>
                 <button
