@@ -60,14 +60,25 @@ export function useAuth(): AuthState {
   return state;
 }
 
+/**
+ * URL pra onde Supabase volta depois do OAuth/magic link. Preserva o
+ * pathname atual quando dá · assim quem clica "conectar Calendar" na
+ * tela Usuario volta pra essa mesma tela em vez de cair na agenda.
+ */
+function urlDeRetorno(): string | undefined {
+  if (typeof window === 'undefined') return undefined;
+  const pathAtual = window.location.pathname;
+  const dentroDoApp = pathAtual.startsWith('/ritmo');
+  const path = dentroDoApp ? pathAtual : '/ritmo/';
+  return `${window.location.origin}${path}`;
+}
+
 export async function enviarMagicLink(email: string): Promise<{ ok: true } | { ok: false; erro: string }> {
   const sb = supabase();
   const { error } = await sb.auth.signInWithOtp({
     email,
     options: {
-      // App vive em /ritmo · magic link precisa voltar pra dentro do scope.
-      emailRedirectTo:
-        typeof window !== 'undefined' ? `${window.location.origin}/ritmo/` : undefined,
+      emailRedirectTo: urlDeRetorno(),
     },
   });
   if (error) return { ok: false, erro: traduzirErroAuth(error.message) };
@@ -97,8 +108,7 @@ export async function entrarComGoogle(): Promise<{ ok: true } | { ok: false; err
   const { error } = await sb.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      redirectTo:
-        typeof window !== 'undefined' ? `${window.location.origin}/ritmo/` : undefined,
+      redirectTo: urlDeRetorno(),
       scopes: ESCOPO_GOOGLE,
       // offline + consent → google devolve refresh_token, permite renovar
       // o access_token sem novo prompt quando ele expira em 1h.

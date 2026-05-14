@@ -17,6 +17,39 @@ import { useNotificacoes } from '@/hooks/useNotificacoes';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { registrarServiceWorker } from '@/lib/push';
 import { identificarUsuario } from '@/lib/monitoring';
+import type { NavKey } from '@/components/shell';
+
+/**
+ * Mapeia `/ritmo/<chave>` ↔ NavKey. Path raiz `/ritmo/` (sem slug) cai em
+ * agenda. Slugs inválidos também caem em agenda (fallback seguro).
+ */
+const NAV_KEYS_VALIDOS: NavKey[] = [
+  'agenda',
+  'mes',
+  'lista',
+  'montar',
+  'hospitais',
+  'financeiro',
+  'sync',
+  'conflitos',
+  'trocas',
+  'usuario',
+  'inbox',
+  'auditoria',
+  'time',
+];
+
+function parsePathToNav(pathname: string): NavKey {
+  // pathname normalmente é "/ritmo/" ou "/ritmo/usuario" etc.
+  const limpo = pathname.replace(/^\/ritmo\/?/, '').replace(/\/+$/, '');
+  if (!limpo) return 'agenda';
+  const candidato = limpo.split('/')[0] as NavKey;
+  return NAV_KEYS_VALIDOS.includes(candidato) ? candidato : 'agenda';
+}
+
+function navToPath(key: NavKey): string {
+  return key === 'agenda' ? '/ritmo/' : `/ritmo/${key}`;
+}
 
 // Telas críticas (Login + Semana = first paint) ficam eager — o resto
 // é code-split via React.lazy. Vite gera chunks separados; o user só
@@ -43,8 +76,6 @@ const Inbox = lazy(() => import('@/views/Inbox').then((m) => ({ default: m.Inbox
 const Auditoria = lazy(() => import('@/views/Auditoria').then((m) => ({ default: m.Auditoria })));
 const Time = lazy(() => import('@/views/Time').then((m) => ({ default: m.Time })));
 
-import type { NavKey } from '@/components/shell';
-
 function ViewLoading() {
   return (
     <div
@@ -68,7 +99,9 @@ export function App() {
   const notif = useNotificacoes(userId);
 
   const [mode, setMode] = useState<Mode>('medica');
-  const [active, setActive] = useState<NavKey>('agenda');
+  const [active, setActive] = useState<NavKey>(() =>
+    typeof window !== 'undefined' ? parsePathToNav(window.location.pathname) : 'agenda',
+  );
   const [selecionado, setSelecionado] = useState<Bloco | null>(null);
   const [detalheBloco, setDetalheBloco] = useState<Bloco | null>(null);
   const [pulouOnboarding, setPulouOnboarding] = useState(false);
@@ -94,6 +127,27 @@ export function App() {
       identificarUsuario(null);
     }
   }, [auth.status, auth.user]);
+
+  // Roteamento real · URL e active state ficam em sincronia.
+  // Quando active muda (click de nav, FAB, etc), atualiza a URL sem reload.
+  // Quando o user usa voltar/avançar do browser, atualiza o active.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const alvo = navToPath(active);
+    if (window.location.pathname !== alvo) {
+      window.history.pushState({}, '', alvo);
+    }
+  }, [active]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    function aoVoltar(): void {
+      setActive(parsePathToNav(window.location.pathname));
+      setDetalheBloco(null);
+    }
+    window.addEventListener('popstate', aoVoltar);
+    return () => window.removeEventListener('popstate', aoVoltar);
+  }, []);
 
   // Atualiza o map runtime de hospitais · permite que getHospital() resolva
   // hospitais customizados (id "H-...") em qualquer view.

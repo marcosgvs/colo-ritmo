@@ -165,7 +165,21 @@ export function Header({
         borderBottom: '1px solid var(--line)',
       }}
     >
-      <ColoMark size={22} />
+      <button
+        type="button"
+        onClick={() => onNav?.('agenda')}
+        aria-label="ir pra agenda"
+        style={{
+          background: 'transparent',
+          border: 'none',
+          padding: 0,
+          cursor: 'pointer',
+          display: 'inline-flex',
+          alignItems: 'center',
+        }}
+      >
+        <ColoMark size={22} />
+      </button>
 
       <nav style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 24 }}>
         {items.map((item) => {
