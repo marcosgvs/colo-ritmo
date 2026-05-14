@@ -208,6 +208,25 @@ export function Login() {
         <Hand size={16} style={{ color: 'var(--ink-3)' }}>
           colo é colo · respira fundo
         </Hand>
+        <div
+          style={{
+            marginTop: 14,
+            display: 'flex',
+            gap: 14,
+            justifyContent: 'center',
+            font: '400 11px/1 var(--font-body)',
+            color: 'var(--ink-3)',
+            letterSpacing: '0.02em',
+          }}
+        >
+          <a href="/privacy" style={{ color: 'inherit', textDecoration: 'none' }}>
+            privacidade
+          </a>
+          <span>·</span>
+          <a href="/terms" style={{ color: 'inherit', textDecoration: 'none' }}>
+            termos
+          </a>
+        </div>
       </footer>
     </div>
   );
