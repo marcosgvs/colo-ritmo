@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Colo Ritmo · Agenda para médicos plantonistas</title>
+    <meta
+      name="description"
+      content="Colo Ritmo é um aplicativo de organização pessoal para médicos plantonistas. Calcula descanso real entre turnos e ajuda a montar escalas que respeitam seu ritmo."
+    />
+    <meta name="application-name" content="Colo Ritmo" />
+    <meta property="og:site_name" content="Colo Ritmo" />
+    <meta property="og:title" content="Colo Ritmo · Agenda para médicos plantonistas" />
+    <meta
+      property="og:description"
+      content="Aplicativo de organização pessoal para médicos plantonistas. Calcula descanso real entre turnos."
+    />
+    <meta property="og:url" content="https://colopediatria.com.br/sobre" />
+    <meta property="og:type" content="website" />
+    <link rel="icon" type="image/svg+xml" href="/ritmo/pwa-icon.svg" />
+    <style>
+      :root {
+        --bg: #FFFAF3;
+        --ink: #3A2E2A;
+        --ink-2: #5A4A44;
+        --ink-3: #8A766F;
+        --line: rgba(58, 46, 42, 0.12);
+        --accent: #6257a5;
+        --accent-2: #A299CB;
+        --bg-alt: rgba(58, 46, 42, 0.04);
+      }
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0;
+        padding: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font: 400 16px/1.6 system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+      }
+      nav.top {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        background: var(--bg);
+        border-bottom: 1px solid var(--line);
+        padding: 0 28px;
+        height: 60px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      nav.top .brand {
+        display: inline-flex;
+        align-items: center;
+        text-decoration: none;
+      }
+      nav.top .brand img { height: 22px; width: auto; display: block; }
+      nav.top a.cta {
+        font: 600 12px/1 system-ui, -apple-system, sans-serif;
+        color: var(--bg);
+        text-decoration: none;
+        padding: 10px 18px;
+        border-radius: 999px;
+        background: var(--ink);
+      }
+      main {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 72px 24px 96px;
+      }
+      .eyebrow {
+        font-size: 11px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--accent);
+        font-weight: 700;
+        display: block;
+        margin-bottom: 14px;
+      }
+      h1 {
+        font-family: Georgia, "Times New Roman", serif;
+        font-weight: 500;
+        font-size: clamp(36px, 6vw, 56px);
+        letter-spacing: -0.02em;
+        line-height: 1.05;
+        margin: 0 0 18px;
+        color: var(--ink);
+      }
+      .subtitle {
+        font-family: Georgia, "Times New Roman", serif;
+        font-style: italic;
+        font-size: clamp(18px, 2.5vw, 22px);
+        line-height: 1.4;
+        color: var(--ink-2);
+        margin: 0 0 32px;
+        max-width: 560px;
+      }
+      h2 {
+        font-family: Georgia, "Times New Roman", serif;
+        font-weight: 500;
+        font-size: 24px;
+        margin: 56px 0 16px;
+        letter-spacing: -0.01em;
+        color: var(--ink);
+      }
+      p { color: var(--ink-2); }
+      .lead {
+        font-size: 17px;
+        line-height: 1.65;
+        margin: 0 0 28px;
+      }
+      .features {
+        list-style: none;
+        padding: 0;
+        margin: 24px 0 40px;
+        display: grid;
+        gap: 14px;
+      }
+      .features li {
+        display: flex;
+        align-items: flex-start;
+        gap: 14px;
+        padding: 18px 20px;
+        background: var(--bg-alt);
+        border-radius: 14px;
+        border: 1px solid var(--line);
+      }
+      .features li::before {
+        content: '';
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: var(--accent-2);
+        margin-top: 9px;
+        flex: 0 0 8px;
+      }
+      .features strong {
+        color: var(--ink);
+        display: block;
+        margin-bottom: 4px;
+        font-weight: 600;
+      }
+      .features span { color: var(--ink-2); font-size: 15px; }
+      .cta-block {
+        margin: 56px 0 24px;
+        padding: 36px 28px;
+        background: linear-gradient(135deg, rgba(98, 87, 165, 0.08), rgba(162, 153, 203, 0.04));
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        text-align: center;
+      }
+      .cta-block h3 {
+        font-family: Georgia, "Times New Roman", serif;
+        font-weight: 500;
+        font-size: 22px;
+        margin: 0 0 10px;
+        color: var(--ink);
+      }
+      .cta-block p {
+        margin: 0 0 22px;
+        color: var(--ink-2);
+      }
+      .cta-block a {
+        display: inline-block;
+        padding: 14px 28px;
+        background: var(--ink);
+        color: var(--bg);
+        text-decoration: none;
+        font: 600 14px/1 system-ui, -apple-system, sans-serif;
+        border-radius: 999px;
+      }
+      hr {
+        border: 0;
+        border-top: 1px solid var(--line);
+        margin: 48px 0;
+      }
+      footer.bottom {
+        font-size: 13px;
+        color: var(--ink-3);
+        display: flex;
+        gap: 14px;
+        flex-wrap: wrap;
+      }
+      footer.bottom a { color: var(--ink-3); text-decoration: none; }
+      footer.bottom a:hover { color: var(--ink-2); }
+    </style>
+  </head>
+  <body>
+    <nav class="top">
+      <a href="/sobre" class="brand" aria-label="Colo Ritmo">
+        <img src="/ritmo/colo-ritmo-mark.svg" alt="Colo Ritmo" />
+      </a>
+      <a href="/ritmo/" class="cta">entrar no app</a>
+    </nav>
+
+    <main>
+      <span class="eyebrow">Colo Ritmo</span>
+      <h1>Colo Ritmo</h1>
+      <p class="subtitle">
+        A agenda que respira no seu ritmo, não no do plantão.
+      </p>
+
+      <p class="lead">
+        O Colo Ritmo é um aplicativo de organização pessoal feito sob medida para médicos
+        plantonistas. Não é só mais uma agenda: calcula descanso real entre turnos, alerta
+        acúmulos perigosos, e ajuda você a montar uma escala que cabe na sua vida — não o
+        contrário.
+      </p>
+
+      <h2>Para quem</h2>
+      <p>
+        Médicos plantonistas autônomos que dividem o tempo entre múltiplos hospitais e
+        precisam enxergar a semana inteira antes de aceitar mais um plantão. Especialmente
+        útil para quem cruza madrugadas, faz trocas frequentes, ou precisa coordenar com a
+        família.
+      </p>
+
+      <h2>O que ele faz</h2>
+      <ul class="features">
+        <li>
+          <div>
+            <strong>Visualização real da semana</strong>
+            <span>
+              Plantões mostrados em uma timeline contínua de 24 horas, com janelas de
+              recuperação destacadas para que você nunca confunda "vazio na agenda" com
+              "descanso real".
+            </span>
+          </div>
+        </li>
+        <li>
+          <div>
+            <strong>Importação automática da escala oficial</strong>
+            <span>
+              Faça upload do PDF de escala que seu hospital divulga. O Colo Ritmo lê,
+              identifica seu nome, separa seus plantões e adiciona à sua agenda
+              automaticamente.
+            </span>
+          </div>
+        </li>
+        <li>
+          <div>
+            <strong>Sincronização com Google Calendar</strong>
+            <span>
+              Espelha seus plantões em um calendário separado, dedicado, dentro da sua
+              conta Google. Não mexe em nenhum outro calendário seu. Você pode desconectar
+              a qualquer momento.
+            </span>
+          </div>
+        </li>
+        <li>
+          <div>
+            <strong>Cálculo de descanso e carga</strong>
+            <span>
+              Veja horas de descanso contínuo, dias consecutivos trabalhados e
+              recuperações invadidas. Decida com dados, não no impulso.
+            </span>
+          </div>
+        </li>
+      </ul>
+
+      <h2>Privacidade</h2>
+      <p>
+        Seus dados (plantões, hospitais, horários) ficam apenas na sua conta. Não vendemos,
+        não compartilhamos com anunciantes, não usamos para treinar modelos. Veja a
+        <a href="/privacy" style="color: var(--accent);">política de privacidade</a> para
+        detalhes.
+      </p>
+
+      <div class="cta-block">
+        <h3>Pronto para experimentar?</h3>
+        <p>Entrar com Google ou link mágico no email · sem senha, sem complicação.</p>
+        <a href="/ritmo/">entrar no app</a>
+      </div>
+
+      <hr />
+      <footer class="bottom">
+        Colo Ritmo · <a href="/privacy">privacidade</a> ·
+        <a href="/terms">termos</a> ·
+        contato: <a href="mailto:marcosgarcia.vs@gmail.com">marcosgarcia.vs@gmail.com</a>
+      </footer>
+    </main>
+  </body>
+</html>

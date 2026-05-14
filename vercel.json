@@ -7,6 +7,8 @@
     { "source": "/", "destination": "/ritmo/", "permanent": false }
   ],
   "rewrites": [
+    { "source": "/sobre", "destination": "/ritmo/sobre.html" },
+    { "source": "/sobre.html", "destination": "/ritmo/sobre.html" },
     { "source": "/privacy", "destination": "/ritmo/privacy.html" },
     { "source": "/privacy.html", "destination": "/ritmo/privacy.html" },
     { "source": "/terms", "destination": "/ritmo/terms.html" },
