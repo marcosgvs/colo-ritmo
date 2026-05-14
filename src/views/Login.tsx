@@ -70,6 +70,25 @@ export function Login() {
           <ColoMark size={28} />
         </div>
 
+        {/* Nome do app no DOM pra Google verification reconhecer · invisível
+            visualmente porque a logo gráfica já mostra o nome. Screen
+            readers e bots leem normalmente. */}
+        <h1
+          style={{
+            position: 'absolute',
+            width: 1,
+            height: 1,
+            padding: 0,
+            margin: -1,
+            overflow: 'hidden',
+            clip: 'rect(0, 0, 0, 0)',
+            whiteSpace: 'nowrap',
+            border: 0,
+          }}
+        >
+          Colo Ritmo
+        </h1>
+
         <p
           style={{
             fontFamily: 'var(--font-display)',
