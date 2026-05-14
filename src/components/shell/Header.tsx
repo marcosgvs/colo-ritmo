@@ -53,7 +53,6 @@ interface HeaderProps {
   active: NavKey;
   mode: Mode;
   carga: number;
-  onCmdK?: () => void;
   onNav?: (k: NavKey) => void;
   conflitos?: number;
   notificacoes?: Notificacao[];
@@ -64,7 +63,6 @@ export function Header({
   active,
   mode,
   carga,
-  onCmdK,
   onNav,
   conflitos = 0,
   notificacoes,
@@ -215,37 +213,6 @@ export function Header({
 
       <CargaBadge horas={carga} />
 
-      <button
-        type="button"
-        onClick={onCmdK}
-        style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 8,
-          background: 'var(--bg-alt)',
-          border: '1px solid var(--line)',
-          borderRadius: 999,
-          padding: '7px 8px 7px 14px',
-          font: '400 12px/1 var(--font-body)',
-          color: 'var(--ink-3)',
-          cursor: 'pointer',
-        }}
-      >
-        buscar
-        <kbd
-          style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: 10,
-            background: 'var(--bg)',
-            padding: '3px 7px',
-            borderRadius: 5,
-            border: '1px solid var(--line)',
-            color: 'var(--ink-2)',
-          }}
-        >
-          ⌘K
-        </kbd>
-      </button>
 
       {notificacoes && onMarcarLida && (
         <NotifSino

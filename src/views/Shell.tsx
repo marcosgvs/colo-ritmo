@@ -72,12 +72,33 @@ export function Shell({
         style={{
           maxWidth: 1640,
           margin: '0 auto',
-          padding: '32px 28px 120px',
+          padding: '32px 28px 24px',
         }}
       >
         <RoleBanner mode={mode} />
         {children}
       </main>
+
+      <footer
+        style={{
+          maxWidth: 1640,
+          margin: '0 auto',
+          padding: '24px 28px 96px',
+          display: 'flex',
+          gap: 14,
+          font: '400 11px/1 var(--font-body)',
+          color: 'var(--ink-3)',
+          letterSpacing: '0.02em',
+        }}
+      >
+        <a href="/privacy" style={{ color: 'inherit', textDecoration: 'none' }}>
+          privacidade
+        </a>
+        <span>·</span>
+        <a href="/terms" style={{ color: 'inherit', textDecoration: 'none' }}>
+          termos
+        </a>
+      </footer>
 
       <FAB mode={mode} onAdd={onAdd ?? (() => {})} />
 
