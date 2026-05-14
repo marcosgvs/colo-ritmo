@@ -7,6 +7,10 @@
     { "source": "/", "destination": "/ritmo/", "permanent": false }
   ],
   "rewrites": [
+    { "source": "/privacy", "destination": "/ritmo/privacy.html" },
+    { "source": "/privacy.html", "destination": "/ritmo/privacy.html" },
+    { "source": "/terms", "destination": "/ritmo/terms.html" },
+    { "source": "/terms.html", "destination": "/ritmo/terms.html" },
     { "source": "/ritmo", "destination": "/ritmo/index.html" },
     { "source": "/ritmo/(.*)", "destination": "/ritmo/index.html" }
   ]

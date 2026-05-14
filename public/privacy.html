@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Política de Privacidade · Colo Ritmo</title>
+    <meta
+      name="description"
+      content="Política de privacidade do Colo Ritmo · como tratamos dados pessoais conforme a LGPD."
+    />
+    <style>
+      :root {
+        --bg: #FFFAF3;
+        --ink: #3A2E2A;
+        --ink-2: #5A4A44;
+        --ink-3: #8A766F;
+        --line: rgba(58, 46, 42, 0.12);
+        --accent: #6257a5;
+        --bg-alt: rgba(58, 46, 42, 0.04);
+      }
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0;
+        padding: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font: 400 16px/1.6 system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+      }
+      main {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 56px 24px 96px;
+      }
+      header { margin-bottom: 32px; }
+      header .eyebrow {
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+        font-weight: 700;
+      }
+      h1 {
+        font-family: Georgia, "Times New Roman", serif;
+        font-weight: 500;
+        font-size: clamp(28px, 5vw, 40px);
+        letter-spacing: -0.015em;
+        margin: 8px 0 12px;
+        line-height: 1.15;
+      }
+      h2 {
+        font-family: Georgia, "Times New Roman", serif;
+        font-weight: 500;
+        font-size: 22px;
+        margin: 40px 0 12px;
+        letter-spacing: -0.01em;
+      }
+      p, li { color: var(--ink-2); }
+      a { color: var(--accent); text-decoration: underline; }
+      ul { padding-left: 22px; }
+      li { margin-bottom: 6px; }
+      .meta {
+        font-size: 13px;
+        color: var(--ink-3);
+        padding: 12px 14px;
+        background: var(--bg-alt);
+        border-radius: 10px;
+        margin-bottom: 24px;
+      }
+      hr {
+        border: 0;
+        border-top: 1px solid var(--line);
+        margin: 48px 0;
+      }
+      footer {
+        font-size: 13px;
+        color: var(--ink-3);
+      }
+      footer a { color: var(--ink-3); }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <span class="eyebrow">Colo Ritmo</span>
+        <h1>Política de Privacidade</h1>
+      </header>
+
+      <p class="meta">
+        Última atualização: 14 de maio de 2026 · Lei aplicável: Lei nº 13.709/2018 (LGPD).
+      </p>
+
+      <h2>1. Quem somos</h2>
+      <p>
+        O Colo Ritmo é um aplicativo de organização pessoal de plantões médicos, mantido por
+        Marcos Garcia de Vasconcellos Silva ("nós"), pessoa física, com contato em
+        <a href="mailto:marcosgarcia.vs@gmail.com">marcosgarcia.vs@gmail.com</a>. Atuamos como
+        controlador dos dados pessoais tratados por este serviço.
+      </p>
+
+      <h2>2. Dados que coletamos</h2>
+      <p>Coletamos apenas o necessário pra o aplicativo funcionar:</p>
+      <ul>
+        <li>
+          <strong>Identificação:</strong> nome, e-mail e telefone que você informa no cadastro.
+        </li>
+        <li>
+          <strong>Conteúdo da sua agenda:</strong> hospitais, plantões, horários, valores, trocas,
+          regras institucionais e demais blocos que você adicionar.
+        </li>
+        <li>
+          <strong>Autenticação:</strong> tokens de sessão fornecidos pelo provedor de identidade
+          escolhido (Google) ou pelo Supabase (em caso de login por link mágico).
+        </li>
+        <li>
+          <strong>Diagnóstico:</strong> erros e falhas do aplicativo (mensagem, pilha de chamadas,
+          identificador da sessão), enviados de forma anonimizada para nosso serviço de
+          monitoramento.
+        </li>
+        <li>
+          <strong>Notificações:</strong> caso você ative push, armazenamos o endpoint de
+          notificação fornecido pelo navegador (não conseguimos derivar identidade a partir dele).
+        </li>
+      </ul>
+      <p>
+        Não coletamos dados de localização, contatos do dispositivo, microfone, câmera ou histórico
+        de navegação.
+      </p>
+
+      <h2>3. Para que usamos seus dados</h2>
+      <ul>
+        <li>Operar o aplicativo e oferecer o serviço solicitado por você.</li>
+        <li>Permitir login seguro e manter sua sessão.</li>
+        <li>Sincronizar plantões com o Google Calendar, quando você ativar essa função.</li>
+        <li>Enviar notificações que você tenha explicitamente habilitado.</li>
+        <li>Identificar e corrigir falhas do aplicativo (telemetria de erros).</li>
+        <li>Cumprir obrigações legais aplicáveis.</li>
+      </ul>
+
+      <h2>4. Base legal</h2>
+      <p>O tratamento dos seus dados pessoais se baseia, conforme o caso, em:</p>
+      <ul>
+        <li>
+          <strong>Execução de contrato</strong> (art. 7º, V, LGPD): tratamento necessário para
+          fornecer o serviço que você contratou ao criar uma conta.
+        </li>
+        <li>
+          <strong>Consentimento</strong> (art. 7º, I): para funcionalidades opcionais como push e
+          integração com Google Calendar.
+        </li>
+        <li>
+          <strong>Legítimo interesse</strong> (art. 7º, IX): para telemetria de erros, com escopo
+          mínimo necessário para diagnosticar falhas técnicas.
+        </li>
+      </ul>
+
+      <h2>5. Integração com o Google Calendar</h2>
+      <p>
+        Se você habilitar a sincronização com Google Calendar, o aplicativo cria um calendário
+        separado chamado <em>"Plantões Colo Ritmo"</em> na sua conta Google e copia para lá apenas
+        os plantões que você cadastrou. <strong>Não lemos, alteramos ou apagamos eventos de
+        nenhum outro calendário seu.</strong>
+      </p>
+      <p>
+        Para isso, solicitamos o escopo
+        <code>https://www.googleapis.com/auth/calendar</code> via OAuth. O token de acesso é
+        armazenado pelo Supabase e usado exclusivamente nesse contexto. Você pode revogar essa
+        autorização a qualquer momento pela sua
+        <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer"
+          >conta Google</a
+        >, ou desconectar dentro do próprio aplicativo.
+      </p>
+
+      <h2>6. Operadores e subprocessadores</h2>
+      <p>
+        Compartilhamos dados, exclusivamente para a operação do serviço, com os seguintes
+        fornecedores:
+      </p>
+      <ul>
+        <li>
+          <strong>Supabase</strong> (banco de dados e autenticação) — armazenamento da sua agenda e
+          gestão de sessão.
+          <a href="https://supabase.com/privacy" target="_blank" rel="noopener noreferrer"
+            >Política do Supabase</a
+          >.
+        </li>
+        <li>
+          <strong>Vercel</strong> (hospedagem) — entrega do aplicativo no navegador.
+          <a href="https://vercel.com/legal/privacy-policy" target="_blank" rel="noopener noreferrer"
+            >Política da Vercel</a
+          >.
+        </li>
+        <li>
+          <strong>Sentry</strong> (monitoramento de erros) — recebe somente registros técnicos de
+          falhas.
+          <a href="https://sentry.io/privacy/" target="_blank" rel="noopener noreferrer"
+            >Política do Sentry</a
+          >.
+        </li>
+        <li>
+          <strong>Google</strong> (apenas se você optar pelo login Google ou pela sincronização
+          de Calendar).
+          <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer"
+            >Política da Google</a
+          >.
+        </li>
+        <li>
+          <strong>Anthropic</strong> (assistência de IA para sugestão de escalas, sob sua
+          solicitação explícita) — recebe somente os dados da agenda necessários para gerar a
+          sugestão.
+          <a href="https://www.anthropic.com/legal/privacy" target="_blank" rel="noopener noreferrer"
+            >Política da Anthropic</a
+          >.
+        </li>
+      </ul>
+
+      <h2>7. Transferência internacional</h2>
+      <p>
+        Alguns fornecedores acima processam dados em servidores fora do Brasil (geralmente nos
+        Estados Unidos). A transferência ocorre com base em cláusulas contratuais e medidas
+        técnicas adotadas por esses fornecedores, em conformidade com o art. 33 da LGPD.
+      </p>
+
+      <h2>8. Retenção</h2>
+      <p>
+        Mantemos seus dados enquanto sua conta estiver ativa. Você pode solicitar a exclusão a
+        qualquer momento pelo e-mail
+        <a href="mailto:marcosgarcia.vs@gmail.com">marcosgarcia.vs@gmail.com</a> e os dados serão
+        apagados em até 15 dias úteis, ressalvadas hipóteses legais de retenção.
+      </p>
+      <p>
+        Snapshots automáticos de backup são retidos por 30 dias e depois descartados.
+      </p>
+
+      <h2>9. Seus direitos como titular</h2>
+      <p>Você pode, a qualquer momento (art. 18 da LGPD):</p>
+      <ul>
+        <li>Confirmar se tratamos seus dados.</li>
+        <li>Acessar seus dados.</li>
+        <li>Corrigir dados incompletos, inexatos ou desatualizados.</li>
+        <li>Solicitar anonimização, bloqueio ou eliminação de dados desnecessários.</li>
+        <li>Pedir a portabilidade dos dados.</li>
+        <li>Eliminar dados tratados com base no consentimento.</li>
+        <li>Saber com quais entidades compartilhamos seus dados.</li>
+        <li>Revogar o consentimento dado.</li>
+      </ul>
+      <p>
+        Para exercer qualquer desses direitos, escreva para
+        <a href="mailto:marcosgarcia.vs@gmail.com">marcosgarcia.vs@gmail.com</a>.
+      </p>
+
+      <h2>10. Cookies e armazenamento local</h2>
+      <p>
+        O aplicativo utiliza armazenamento local do navegador (localStorage e cookies de sessão do
+        Supabase) apenas para manter você autenticado e guardar preferências de interface. Não
+        utilizamos cookies de rastreamento publicitário nem ferramentas de analytics que perfilem
+        comportamento.
+      </p>
+
+      <h2>11. Crianças e adolescentes</h2>
+      <p>
+        O serviço é destinado a profissionais de saúde maiores de 18 anos. Não direcionamos o
+        aplicativo a crianças ou adolescentes e não tratamos dados dessas categorias de forma
+        deliberada.
+      </p>
+
+      <h2>12. Segurança</h2>
+      <p>
+        Adotamos medidas técnicas e organizacionais para proteger seus dados, incluindo TLS em
+        todas as conexões, autenticação por provedores reconhecidos (Google, Supabase) e controles
+        de acesso granular no banco de dados. Apesar disso, nenhum sistema é absolutamente seguro,
+        e incidentes que afetem seus dados serão comunicados conforme o art. 48 da LGPD.
+      </p>
+
+      <h2>13. Mudanças nesta política</h2>
+      <p>
+        Esta política pode ser atualizada quando houver alterações relevantes no serviço, na
+        legislação aplicável ou nas práticas de tratamento. A versão mais recente estará sempre
+        disponível neste mesmo endereço, com a data de atualização indicada acima.
+      </p>
+
+      <h2>14. Contato</h2>
+      <p>
+        Dúvidas, pedidos ou reclamações sobre privacidade:
+        <a href="mailto:marcosgarcia.vs@gmail.com">marcosgarcia.vs@gmail.com</a>.
+      </p>
+
+      <hr />
+      <footer>
+        Colo Ritmo · <a href="/ritmo/">aplicativo</a> ·
+        <a href="/terms">termos de uso</a>
+      </footer>
+    </main>
+  </body>
+</html>
