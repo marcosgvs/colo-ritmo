@@ -185,7 +185,7 @@ function HeaderSemana({
           {titulo}
         </h2>
       </div>
-      <div style={{ display: 'flex', gap: 4 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
         <button
           type="button"
           aria-label="semana anterior"
@@ -193,14 +193,6 @@ function HeaderSemana({
           style={navBtn}
         >
           ‹
-        </button>
-        <button
-          type="button"
-          aria-label="semana próxima"
-          onClick={() => setRefIso(adicionaDiaISO(inicio, 7))}
-          style={navBtn}
-        >
-          ›
         </button>
         {!ehAtual && (
           <button
@@ -220,6 +212,14 @@ function HeaderSemana({
             hoje
           </button>
         )}
+        <button
+          type="button"
+          aria-label="semana próxima"
+          onClick={() => setRefIso(adicionaDiaISO(inicio, 7))}
+          style={navBtn}
+        >
+          ›
+        </button>
       </div>
     </div>
   );
