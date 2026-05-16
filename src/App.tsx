@@ -478,7 +478,38 @@ export function App() {
           )}
         </>
       )}
+
+      {userState.espelhandoDe && <EspelhoBadge email={userState.espelhandoDe} />}
     </HandVariantContext.Provider>
+  );
+}
+
+/**
+ * Chip fixed bottom-right · aviso permanente de que o app está mostrando
+ * a conta de outro user (modo dev/QA). `pointer-events: none` pra não
+ * bloquear cliques no que está embaixo.
+ */
+function EspelhoBadge({ email }: { email: string }) {
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        bottom: 10,
+        left: 10,
+        background: 'var(--lavender-surface)',
+        color: 'var(--lavender-ink)',
+        padding: '4px 10px',
+        borderRadius: 999,
+        border: '1px solid var(--lavender)',
+        font: '400 11px/1.2 var(--font-body)',
+        letterSpacing: '0.01em',
+        zIndex: 9999,
+        pointerEvents: 'none',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+      }}
+    >
+      espelho · {email}
+    </div>
   );
 }
 

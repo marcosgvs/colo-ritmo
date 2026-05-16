@@ -13,6 +13,18 @@ import { marcarConflitos } from '@/lib/data';
 const MAX_PROPOSTAS_HISTORICO = 10;
 
 /**
+ * Modo espelho · Marcos (dev) vê o state da Mariana (usuária real) ao vivo
+ * pra debugar/observar uso. Realtime mantém em sincronia. Saves do Marcos
+ * são ignorados pra não sobrescrever o que ela está fazendo.
+ */
+const ESPELHOS: Record<string, { userId: string; email: string }> = {
+  '911a0e2b-4eec-4634-9ede-469805cc4a0e': {
+    userId: '70c443bc-1657-4528-ad62-c1ae9352cb66',
+    email: 'araujo.mpb@gmail.com',
+  },
+};
+
+/**
  * Mapping persistente bloco↔event do Google Calendar. v1 (push-only)
  * já guarda etag pra sessão 2 (2-way) detectar conflitos via If-Match.
  */
@@ -57,6 +69,8 @@ export interface UserStateAPI {
   setState: (next: Partial<UserStateValor>) => void;
   /** Save imediato (sem esperar debounce) · pra ações irreversíveis. */
   flushSave: () => Promise<void>;
+  /** Email da conta sendo espelhada (modo dev/QA · só Marcos). null = sessão normal. */
+  espelhandoDe: string | null;
 }
 
 const SAVE_DEBOUNCE_MS = 800;
@@ -80,7 +94,10 @@ const STATE_VAZIO: UserStateValor = {
  *   pronto · escutando realtime + acumulando saves debounced
  */
 export function useUserState(userId: string | null): UserStateAPI {
-  const [status, setStatus] = useState<LoadStatus>(userId ? 'carregando' : 'inativo');
+  const espelho = userId ? ESPELHOS[userId] ?? null : null;
+  const targetUserId = espelho?.userId ?? userId;
+
+  const [status, setStatus] = useState<LoadStatus>(targetUserId ? 'carregando' : 'inativo');
   const [erro, setErro] = useState<string | null>(null);
   const [state, setStateInternal] = useState<UserStateValor>(STATE_VAZIO);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -90,6 +107,8 @@ export function useUserState(userId: string | null): UserStateAPI {
   const persistir = useCallback(
     async (valor: UserStateValor): Promise<void> => {
       if (!userId) return;
+      // Em modo espelho, não persistir · evita sobrescrever a conta espelhada.
+      if (espelho) return;
       const blob: UserStateBlob = {
         blocos: valor.blocos,
         hospitais: valor.hospitais,
@@ -104,7 +123,7 @@ export function useUserState(userId: string | null): UserStateAPI {
         .upsert({ user_id: userId, state: blob }, { onConflict: 'user_id' });
       if (error) setErro(error.message);
     },
-    [userId],
+    [userId, espelho],
   );
 
   const flushSave = useCallback(async (): Promise<void> => {
@@ -146,7 +165,7 @@ export function useUserState(userId: string | null): UserStateAPI {
   );
 
   useEffect(() => {
-    if (!userId) {
+    if (!targetUserId) {
       setStatus('inativo');
       setStateInternal(STATE_VAZIO);
       return;
@@ -159,7 +178,7 @@ export function useUserState(userId: string | null): UserStateAPI {
     const sb = supabase();
     sb.from('user_state')
       .select('state')
-      .eq('user_id', userId)
+      .eq('user_id', targetUserId)
       .maybeSingle()
       .then(({ data, error }) => {
         if (!mounted) return;
@@ -181,21 +200,24 @@ export function useUserState(userId: string | null): UserStateAPI {
         } else {
           // Primeiro acesso · começa vazio · App detecta hospitais={} e
           // dispara onboarding. NÃO persiste seed da Mariana pra outros users.
+          // Em modo espelho, não persiste row do dono (Marcos): a conta
+          // espelhada já tem state, então esse branch só dispararia se o
+          // alvo não existisse · improvável.
           setStateInternal(STATE_VAZIO);
-          void persistir(STATE_VAZIO);
+          if (!espelho) void persistir(STATE_VAZIO);
         }
         setStatus('pronto');
       });
 
     const channel = sb
-      .channel(`user_state:${userId}`)
+      .channel(`user_state:${targetUserId}`)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
           table: 'user_state',
-          filter: `user_id=eq.${userId}`,
+          filter: `user_id=eq.${targetUserId}`,
         },
         (payload) => {
           const novoState = (payload.new as { state?: UserStateBlob } | null)?.state;
@@ -222,7 +244,7 @@ export function useUserState(userId: string | null): UserStateAPI {
         debounceRef.current = null;
       }
       // flush pendente sem await — útil pra fechar aba
-      if (pendingRef.current) {
+      if (pendingRef.current && !espelho) {
         void persistir(pendingRef.current);
         pendingRef.current = null;
       }
@@ -231,7 +253,7 @@ export function useUserState(userId: string | null): UserStateAPI {
         channelRef.current = null;
       }
     };
-  }, [userId, persistir]);
+  }, [targetUserId, espelho, persistir]);
 
   // Marca `conflito: true` nos plantões em sobreposição/sem-descanso pra
   // UI pintar vermelho. Plantão cujo hospitalId não está no map atual
@@ -244,5 +266,12 @@ export function useUserState(userId: string | null): UserStateAPI {
     };
   }, [state]);
 
-  return { status, erro, state: stateEnriquecido, setState, flushSave };
+  return {
+    status,
+    erro,
+    state: stateEnriquecido,
+    setState,
+    flushSave,
+    espelhandoDe: espelho?.email ?? null,
+  };
 }
