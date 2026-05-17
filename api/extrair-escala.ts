@@ -5,26 +5,19 @@ import { fuzzyMatch, normalizarNome } from '../src/lib/fuzzyMatch.js';
 /**
  * /api/extrair-escala · OCR + extração estruturada via Claude Vision (tool use).
  *
- * Estratégia · "modelo só transcreve, código filtra":
- *   1. O modelo recebe o PDF e devolve, via tool use, a transcrição
- *      completa da tabela — uma entrada por (dia, turno) com a lista de
- *      todos os nomes que aparecem na célula.
- *   2. O servidor faz fuzzyMatch (acento, case, typo, sufixo) em código
- *      pra encontrar a médica e produzir os plantões.
- *   3. A transcrição inteira volta pro frontend pra ser guardada — vai
- *      alimentar futuramente o "padrão do chefe" no Montar.
- *
- * Por que assim · pedir pro modelo "filtrar pelo nome" se mostrou frágil:
- * tabela densa do HCB faz ele perder nomes ou alucinar. Transcrever é
- * tarefa simples (visão pura) e o filtro fica determinístico no código.
+ * Aceita PDF nativo (Anthropic document API) OU imagem (JPG/PNG/WebP) tirada
+ * de escala impressa. O modelo só transcreve · servidor filtra por nome via
+ * fuzzyMatch · a transcrição completa volta pro frontend (alimenta Montar).
  *
  * Body:
  *   {
- *     pdfBase64: string,
+ *     arquivoBase64: string,       // base64 puro (sem data: prefix)
+ *     mediaType?: string,          // application/pdf | image/jpeg | image/png | image/webp · default pdf
+ *     pdfBase64?: string,          // alias legacy (= arquivoBase64 com mediaType pdf)
  *     hospitalId: string,
  *     hospitalAbrev: string,
- *     nome: string,                // nome completo do usuário (fallback)
- *     apelidoNaEscala?: string,    // como aparece no PDF (ex: Mpinheiro)
+ *     nome: string,
+ *     apelidoNaEscala?: string,
  *     ano: number, mes: number,
  *   }
  *
@@ -38,7 +31,19 @@ import { fuzzyMatch, normalizarNome } from '../src/lib/fuzzyMatch.js';
  *   }
  */
 
+type MediaType = 'application/pdf' | 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
+
+const MEDIA_TYPES_VALIDOS: MediaType[] = [
+  'application/pdf',
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+];
+
 interface ExtractBody {
+  arquivoBase64?: string;
+  mediaType?: string;
   pdfBase64?: string;
   hospitalId?: string;
   hospitalAbrev?: string;
@@ -62,14 +67,14 @@ const MAX_TOKENS = 16384;
 const FERRAMENTA = {
   name: 'transcrever_escala',
   description:
-    'Transcreve a tabela completa da escala oficial do PDF, listando todos os médicos por (dia, turno). Não filtra nada — a filtragem é feita no servidor.',
+    'Transcreve a tabela completa da escala oficial, listando todos os médicos por (dia, turno). Não filtra nada — a filtragem é feita no servidor.',
   input_schema: {
     type: 'object',
     properties: {
       janelas: {
         type: 'array',
         description:
-          'Turnos identificados no cabeçalho do PDF (manhã, tarde, tarde 1, tarde 2, noitinha, noite) com horários inferidos.',
+          'Turnos identificados no cabeçalho da escala (manhã, tarde, tarde 1, tarde 2, noitinha, noite) com horários inferidos.',
         items: {
           type: 'object',
           properties: {
@@ -101,7 +106,7 @@ const FERRAMENTA = {
             nomes: {
               type: 'array',
               items: { type: 'string' },
-              description: 'Nomes EXATAMENTE como aparecem no PDF, na ordem em que aparecem na célula. Inclua sufixos (BHP, CRO, BHN, CEP, CP, Pr) e marcadores (* ²) se estiverem junto do nome. Não normalize. Liste TODOS os nomes da célula — não pare na metade.',
+              description: 'Nomes EXATAMENTE como aparecem na escala, na ordem em que aparecem na célula. Inclua sufixos (BHP, CRO, BHN, CEP, CP, Pr) e marcadores (* ²) se estiverem junto do nome. Não normalize. Liste TODOS os nomes da célula — não pare na metade.',
             },
           },
           required: ['data', 'turno', 'nomes'],
@@ -124,11 +129,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   }
 
   const body = (req.body ?? {}) as ExtractBody;
-  const { pdfBase64, hospitalId, hospitalAbrev, nome, apelidoNaEscala, ano, mes } = body;
+  const { hospitalId, hospitalAbrev, nome, apelidoNaEscala, ano, mes } = body;
 
-  if (!pdfBase64 || !hospitalId || !nome || !ano || !mes) {
+  // Backward compat: pdfBase64 ainda é aceito. mediaType default pdf.
+  const arquivoBase64 = body.arquivoBase64 ?? body.pdfBase64;
+  const mediaTypeRaw = (body.mediaType ?? 'application/pdf').toLowerCase();
+  const mediaType = MEDIA_TYPES_VALIDOS.includes(mediaTypeRaw as MediaType)
+    ? (mediaTypeRaw as MediaType)
+    : null;
+
+  if (!arquivoBase64 || !hospitalId || !nome || !ano || !mes) {
     res.status(400).json({
-      erro: 'payload incompleto · pdfBase64, hospitalId, nome, ano, mes obrigatórios',
+      erro: 'payload incompleto · arquivoBase64, hospitalId, nome, ano, mes obrigatórios',
+    });
+    return;
+  }
+
+  if (!mediaType) {
+    res.status(400).json({
+      erro: `mediaType não suportado · use ${MEDIA_TYPES_VALIDOS.join(' | ')}`,
     });
     return;
   }
@@ -140,6 +159,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     ano,
     mes,
   });
+
+  // Anthropic API · PDF usa `document`, imagem usa `image`. Schema do source
+  // é o mesmo (base64 + media_type), só muda o tipo do bloco.
+  const bloco =
+    mediaType === 'application/pdf'
+      ? {
+          type: 'document' as const,
+          source: { type: 'base64' as const, media_type: mediaType, data: arquivoBase64 },
+        }
+      : {
+          type: 'image' as const,
+          source: { type: 'base64' as const, media_type: mediaType, data: arquivoBase64 },
+        };
 
   try {
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
@@ -157,13 +189,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         messages: [
           {
             role: 'user',
-            content: [
-              {
-                type: 'document',
-                source: { type: 'base64', media_type: 'application/pdf', data: pdfBase64 },
-              },
-              { type: 'text', text: prompt },
-            ],
+            content: [bloco, { type: 'text', text: prompt }],
           },
         ],
       }),
@@ -197,7 +223,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     res.status(200).json(parsed);
   } catch (err) {
     console.error('extrair-escala: exceção', err);
-    res.status(500).json({ erro: 'algo travou aqui ao ler o PDF · tenta de novo' });
+    res.status(500).json({ erro: 'algo travou aqui ao ler o arquivo · tenta de novo' });
   }
 }
 
@@ -211,7 +237,7 @@ interface BlocoImport {
 }
 
 interface Variante {
-  /** Grafia canônica (a primeira ocorrência que apareceu no PDF). */
+  /** Grafia canônica (a primeira ocorrência que apareceu na escala). */
   nome: string;
   /** Quantos plantões foram detectados com essa grafia. */
   count: number;
@@ -309,8 +335,10 @@ function montarPrompt(opts: { hospitalAbrev: string; ano: number; mes: number })
 
   return `Você está lendo a escala mensal de plantões do hospital "${opts.hospitalAbrev}" referente a ${mesPad}/${opts.ano}.
 
+O arquivo pode ser um PDF ou uma foto/imagem de uma escala impressa (às vezes manuscrita). Use o mesmo critério em ambos os casos: transcrever, não filtrar.
+
 SUA TAREFA · TRANSCREVER A TABELA COMPLETA
-Você NÃO precisa filtrar por nenhum nome. Sua única tarefa é TRANSCREVER fielmente a tabela do PDF na ferramenta \`transcrever_escala\`. O servidor faz a filtragem depois.
+Você NÃO precisa filtrar por nenhum nome. Sua única tarefa é TRANSCREVER fielmente a tabela na ferramenta \`transcrever_escala\`. O servidor faz a filtragem depois.
 
 CONTEXTO PRA ÂNCORA DE DATAS
 - Mês de referência: ${mesPad}/${opts.ano}.
@@ -334,11 +362,11 @@ Pra CADA célula da tabela (combinação de um dia × uma coluna de turno), prod
 REGRAS RÍGIDAS DE TRANSCRIÇÃO:
 1. **Não pule células.** Se um turno tem coluna no cabeçalho, gere uma entrada por dia, mesmo que a célula esteja vazia (nomes: []).
 2. **Não pule nomes em células densas.** Se uma célula tem 15-17 nomes empilhados, liste TODOS os 15-17. Não pare no 5º.
-3. **Mantenha a grafia exata.** Não normalize "MPinheiro" pra "Mpinheiro" · não tire sufixos (BHP, BHN, CRO, CEP, CP, Pr) · não tire marcadores (* ² (pg)). Esses fazem parte do nome no PDF.
+3. **Mantenha a grafia exata.** Não normalize "MPinheiro" pra "Mpinheiro" · não tire sufixos (BHP, BHN, CRO, CEP, CP, Pr) · não tire marcadores (* ² (pg)). Esses fazem parte do nome na escala.
 4. **Nome com "+" ou "," é uma célula com múltiplos nomes:** "Bruna + Mariana" → nomes: ["Bruna", "Mariana"]. Quebre eles separadamente.
 5. **Não invente nomes.** Se não tem certeza do nome, melhor adicionar um aviso do que arriscar.
 6. **Não filtre por nenhum nome específico.** Liste TUDO. O servidor filtra depois.
-7. **Inclua a "seção compactada"** que alguns PDFs trazem no fim com os últimos dias do mês — não pare na primeira parte.
+7. **Inclua a "seção compactada"** que algumas escalas trazem no fim com os últimos dias do mês — não pare na primeira parte.
 
 Avisos só pra linha ilegível, célula ambígua, ou casos onde a estrutura da tabela não dava pra entender. Não avise sobre marcadores de extra/troca.`;
 }

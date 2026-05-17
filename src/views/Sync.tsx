@@ -24,6 +24,14 @@ const FRASES_PDF = [
   'validando os plantões encontrados',
   'quase lá',
 ] as const;
+
+const MIMES_VALIDOS = new Set([
+  'application/pdf',
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+]);
 import { EmptyState } from '@/components/empty';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { PageHead } from './_PageHead';
@@ -77,10 +85,12 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
   const [resultado, setResultado] = useState<Resultado | null>(null);
   const [variantesSelecionadas, setVariantesSelecionadas] = useState<Set<string>>(new Set());
   const [erro, setErro] = useState<string | null>(null);
-  // Guarda o PDF em memória pra permitir "rodar de novo" caso o user
-  // tenha errado o mês (sem precisar fazer upload de novo).
-  const [pdfBase64, setPdfBase64] = useState<string | null>(null);
-  const [pdfNome, setPdfNome] = useState<string | null>(null);
+  // Guarda o arquivo em memória pra permitir "rodar de novo" caso o user
+  // tenha errado o mês (sem precisar fazer upload de novo). Aceita PDF ou
+  // imagem (foto da escala impressa).
+  const [arquivoBase64, setArquivoBase64] = useState<string | null>(null);
+  const [arquivoNome, setArquivoNome] = useState<string | null>(null);
+  const [arquivoMime, setArquivoMime] = useState<string>('application/pdf');
   const [qtdImportada, setQtdImportada] = useState(0);
 
   // Estado da importação via Google Calendar.
@@ -122,7 +132,7 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
 
   const linkICS = icsToken ? `${origin()}/api/ics/${icsToken}.ics` : null;
 
-  async function processarPdf(base64: string) {
+  async function processarArquivo(base64: string, mime: string) {
     if (!hospitalId || !apelidoOk) return;
     if (!nomeUser) {
       setErro('cadastre seu nome em "usuário" antes · preciso pra achar você na escala');
@@ -138,7 +148,8 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          pdfBase64: base64,
+          arquivoBase64: base64,
+          mediaType: mime,
           hospitalId,
           hospitalAbrev: hospital?.abrev ?? hospitalId,
           ano,
@@ -182,16 +193,23 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
     }
   }
 
-  async function onPdf(e: ChangeEvent<HTMLInputElement>) {
+  async function onArquivo(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file || !hospitalId) return;
+    const mime = file.type || inferirMime(file.name);
+    if (!MIMES_VALIDOS.has(mime)) {
+      setErro('formato não suportado · use pdf, jpg, png ou webp');
+      setEstado('erro');
+      e.target.value = '';
+      return;
+    }
     if (file.size > 20 * 1024 * 1024) {
       setErro('arquivo > 20mb · pode ser uma escala muito grande?');
       setEstado('erro');
       return;
     }
     if (!apelidoOk) {
-      setErro('precisa preencher "seu nome na escala" antes · é como o chefe te chama no pdf');
+      setErro('precisa preencher "seu nome na escala" antes · é como o chefe te chama na escala');
       setEstado('erro');
       e.target.value = '';
       return;
@@ -200,9 +218,10 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
     setErro(null);
     try {
       const base64 = await fileToBase64(file);
-      setPdfBase64(base64);
-      setPdfNome(file.name);
-      await processarPdf(base64);
+      setArquivoBase64(base64);
+      setArquivoNome(file.name);
+      setArquivoMime(mime);
+      await processarArquivo(base64, mime);
     } catch (err) {
       setErro((err as Error).message);
       setEstado('erro');
@@ -212,8 +231,8 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
   }
 
   async function rodarDeNovo() {
-    if (!pdfBase64) return;
-    await processarPdf(pdfBase64);
+    if (!arquivoBase64) return;
+    await processarArquivo(arquivoBase64, arquivoMime);
   }
 
   /**
@@ -307,8 +326,8 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
     }
     setResultado(null);
     setVariantesSelecionadas(new Set());
-    setPdfBase64(null);
-    setPdfNome(null);
+    setArquivoBase64(null);
+    setArquivoNome(null);
     setQtdImportada(qtd);
     setEstado('completou');
     setTimeout(() => {
@@ -333,7 +352,7 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
       <PageHead
         eyebrow="sincronizar agenda"
         titulo="trazer e levar plantões."
-        hand="solta o pdf da escala ou cola de outro calendário — eu organizo."
+        hand="solta o pdf ou foto da escala, ou puxa de outro calendário — eu organizo."
       />
 
       {estado === 'completou' && (
@@ -389,7 +408,7 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
         }}
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <Card titulo="importar pdf da escala" order={1}>
+          <Card titulo="importar escala (pdf ou foto)" order={1}>
             <p style={{ font: '400 14px/1.5 var(--font-body)', color: 'var(--ink-2)', margin: '0 0 14px' }}>
               passo linha por linha pra encontrar seus plantões · se algo ficar duvidoso,
               marco como aviso pra você revisar antes de salvar.
@@ -457,8 +476,8 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
             >
               <input
                 type="file"
-                accept="application/pdf"
-                onChange={onPdf}
+                accept="application/pdf,image/jpeg,image/png,image/webp"
+                onChange={onArquivo}
                 disabled={
                   estado === 'lendo' || estado === 'enviando' || !hospitalId || !apelidoOk
                 }
@@ -476,10 +495,10 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
                 </p>
               )}
               <Mono style={{ display: 'block', marginTop: 6, color: 'var(--ink-3)' }}>
-                {estado === 'enviando' ? 'isso pode levar alguns segundos' : 'pdf · até 20mb'}
+                {estado === 'enviando' ? 'isso pode levar alguns segundos' : 'pdf, jpg, png ou webp · até 20mb'}
               </Mono>
             </label>
-            {pdfBase64 && estado !== 'enviando' && estado !== 'lendo' && (
+            {arquivoBase64 && estado !== 'enviando' && estado !== 'lendo' && (
               <div
                 style={{
                   marginTop: 12,
@@ -490,7 +509,7 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
                 }}
               >
                 <Mono style={{ color: 'var(--ink-3)' }}>
-                  {pdfNome ?? 'pdf carregado'} · pronto pra reprocessar
+                  {arquivoNome ?? 'arquivo carregado'} · pronto pra reprocessar
                 </Mono>
                 <button
                   type="button"
@@ -703,7 +722,7 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
               {resultado.blocos.length === 0 ? (
                 <EmptyState
                   titulo="nada extraído."
-                  recado="às vezes o pdf é uma imagem escaneada ruim · vale tentar outro mês."
+                  recado="às vezes a escala tá borrada, com pouca luz ou letra difícil · vale tirar outra foto ou tentar outro mês."
                 />
               ) : (
                 <>
@@ -887,6 +906,17 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
       </div>
     </>
   );
+}
+
+/** Safari/PWA às vezes entrega File.type vazio · cai pra extensão. */
+function inferirMime(nome: string): string {
+  const ext = nome.toLowerCase().split('.').pop() ?? '';
+  if (ext === 'pdf') return 'application/pdf';
+  if (ext === 'jpg' || ext === 'jpeg') return 'image/jpeg';
+  if (ext === 'png') return 'image/png';
+  if (ext === 'webp') return 'image/webp';
+  if (ext === 'gif') return 'image/gif';
+  return '';
 }
 
 function fileToBase64(file: File): Promise<string> {
