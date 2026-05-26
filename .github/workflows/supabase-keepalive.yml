@@ -25,12 +25,11 @@ jobs:
         run: |
           set -e
 
-          # Hit /rest/v1/ root — query suficiente para contar como atividade
-          # no banco e impedir o auto-pause do Supabase free tier.
+          # Hit /auth/v1/settings — endpoint público com apikey que retorna
+          # 200 e conta como atividade no Supabase, impedindo o auto-pause.
           response=$(curl -sS -o /tmp/body -w "%{http_code}" \
             -H "apikey: $SUPABASE_ANON_KEY" \
-            -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
-            "$SUPABASE_URL/rest/v1/" \
+            "$SUPABASE_URL/auth/v1/settings" \
             -m 30)
 
           echo "HTTP $response"
