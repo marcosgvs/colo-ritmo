@@ -1,0 +1,46 @@
+name: Supabase Keep-Alive
+
+# Mantém o projeto Supabase ativo no plano free (pausa após 7 dias sem
+# atividade no banco). Roda 2x por semana — se uma falhar, a outra cobre.
+#
+# URL e publishable key são públicos por design (espelham os fallbacks
+# em src/lib/supabase.ts). RLS no banco é quem garante a segurança.
+
+on:
+  schedule:
+    # Toda segunda e quinta às 06:00 UTC (03:00 Brasília)
+    - cron: "0 6 * * 1,4"
+  # Permite disparar manualmente em Actions → Run workflow
+  workflow_dispatch:
+
+env:
+  SUPABASE_URL: https://xlefxpcmruhuyexdvzru.supabase.co
+  SUPABASE_ANON_KEY: sb_publishable_lrEzOdS4RnrwsDmCUsXEuQ_ElUajQ3W
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Query Supabase REST API
+        run: |
+          set -e
+
+          # Hit /rest/v1/ root — query suficiente para contar como atividade
+          # no banco e impedir o auto-pause do Supabase free tier.
+          response=$(curl -sS -o /tmp/body -w "%{http_code}" \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+            "$SUPABASE_URL/rest/v1/" \
+            -m 30)
+
+          echo "HTTP $response"
+          echo "Body: $(cat /tmp/body | head -c 500)"
+
+          # 200/401/403 = servidor respondendo (projeto vivo)
+          if [ "$response" -ge 200 ] && [ "$response" -lt 500 ]; then
+            echo "Supabase respondeu — projeto ativo."
+            exit 0
+          else
+            echo "::error::Supabase retornou HTTP $response — projeto pode estar pausado/fora."
+            exit 1
+          fi
