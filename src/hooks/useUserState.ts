@@ -48,6 +48,9 @@ export interface UserStateBlob {
   propostasMontar?: PropostaHistorico[];
   gcalConfig?: GcalConfig;
   updatedAt?: string;
+  /** Id da aba que gravou · o Realtime usa pra distinguir echo do próprio save
+   * de mudança vinda de outra aba/dispositivo (ou da conta espelhada). */
+  clientId?: string;
 }
 
 export type LoadStatus = 'inativo' | 'carregando' | 'pronto' | 'erro';
@@ -74,6 +77,16 @@ export interface UserStateAPI {
 }
 
 const SAVE_DEBOUNCE_MS = 800;
+const SAVE_RETRY_MS = 3000;
+
+/** Id desta aba · marca os saves pro handler do Realtime ignorar o echo. */
+function gerarClientId(): string {
+  try {
+    return crypto.randomUUID();
+  } catch {
+    return `c-${Math.random().toString(36).slice(2)}`;
+  }
+}
 
 /** State vazio · usado pro render inicial (antes do select retornar) e
  * pra users novos (força onboarding · hospitais={} dispara o fluxo). */
@@ -103,25 +116,52 @@ export function useUserState(userId: string | null): UserStateAPI {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingRef = useRef<UserStateValor | null>(null);
   const channelRef = useRef<RealtimeChannel | null>(null);
+  const clientIdRef = useRef<string>(gerarClientId());
+  // Saves em série · sem isso, um upsert lento pode aterrissar DEPOIS de um
+  // mais novo e o banco fica com dado antigo (last-write-wins fora de ordem).
+  const saveChainRef = useRef<Promise<void>>(Promise.resolve());
 
   const persistir = useCallback(
-    async (valor: UserStateValor): Promise<void> => {
-      if (!userId) return;
+    (valor: UserStateValor): Promise<void> => {
+      if (!userId) return Promise.resolve();
       // Em modo espelho, não persistir · evita sobrescrever a conta espelhada.
-      if (espelho) return;
-      const blob: UserStateBlob = {
-        blocos: valor.blocos,
-        hospitais: valor.hospitais,
-        preferencias: valor.preferencias,
-        escalasImportadas: valor.escalasImportadas,
-        propostasMontar: valor.propostasMontar.slice(0, MAX_PROPOSTAS_HISTORICO),
-        ...(valor.gcalConfig ? { gcalConfig: valor.gcalConfig } : {}),
-        updatedAt: new Date().toISOString(),
+      if (espelho) return Promise.resolve();
+      const salvar = async (): Promise<void> => {
+        const blob: UserStateBlob = {
+          blocos: valor.blocos,
+          hospitais: valor.hospitais,
+          preferencias: valor.preferencias,
+          escalasImportadas: valor.escalasImportadas,
+          propostasMontar: valor.propostasMontar.slice(0, MAX_PROPOSTAS_HISTORICO),
+          ...(valor.gcalConfig ? { gcalConfig: valor.gcalConfig } : {}),
+          updatedAt: new Date().toISOString(),
+          clientId: clientIdRef.current,
+        };
+        const { error } = await supabase()
+          .from('user_state')
+          .upsert({ user_id: userId, state: blob }, { onConflict: 'user_id' });
+        if (error) {
+          setErro(error.message);
+          // Não descarta a edição · re-enfileira pra retry, a menos que uma
+          // edição mais nova já esteja na fila (ela cobre esta).
+          if (!pendingRef.current) {
+            pendingRef.current = valor;
+            if (!debounceRef.current) {
+              debounceRef.current = setTimeout(() => {
+                debounceRef.current = null;
+                const v = pendingRef.current;
+                pendingRef.current = null;
+                if (v) void persistir(v);
+              }, SAVE_RETRY_MS);
+            }
+          }
+        } else {
+          setErro(null);
+        }
       };
-      const { error } = await supabase()
-        .from('user_state')
-        .upsert({ user_id: userId, state: blob }, { onConflict: 'user_id' });
-      if (error) setErro(error.message);
+      const next = saveChainRef.current.then(salvar, salvar);
+      saveChainRef.current = next;
+      return next;
     },
     [userId, espelho],
   );
@@ -222,7 +262,11 @@ export function useUserState(userId: string | null): UserStateAPI {
         (payload) => {
           const novoState = (payload.new as { state?: UserStateBlob } | null)?.state;
           if (!novoState || !mounted) return;
-          // Só aplica se o updatedAt for mais novo que o nosso local (ignora echo do próprio save).
+          // Echo do save desta própria aba: aplicar de volta reverteria edições
+          // feitas enquanto o upsert viajava (o user continua digitando). Só
+          // aplica mudança vinda de OUTRA origem (outra aba, outro device,
+          // ou a conta espelhada no modo dev).
+          if (novoState.clientId && novoState.clientId === clientIdRef.current) return;
           setStateInternal((prev) => ({
             blocos: novoState.blocos ?? prev.blocos,
             hospitais: novoState.hospitais ?? prev.hospitais,
