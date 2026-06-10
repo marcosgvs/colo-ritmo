@@ -25,6 +25,7 @@ import {
 } from '@/lib/data';
 import { Eyebrow, LoadingFrases, MonthPicker, Mono } from '@/components/atoms';
 import { rotuloTurno } from '@/lib/turno';
+import { authHeader } from '@/lib/supabase';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { PageHead } from './_PageHead';
 
@@ -152,7 +153,7 @@ export function MontarEscala({
 
       const resp = await fetch('/api/montar-escala', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
         body: JSON.stringify({
           ano,
           mes: mesNum,

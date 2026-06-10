@@ -12,7 +12,7 @@ import {
   listarEventos,
   type CalendarListItem,
 } from '@/lib/gcal';
-import { supabase } from '@/lib/supabase';
+import { authHeader, supabase } from '@/lib/supabase';
 import { Eyebrow, Hand, LoadingFrases, MonthPicker, Mono, Pill } from '@/components/atoms';
 
 const FRASES_PDF = [
@@ -148,7 +148,7 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
       const hospital = hospitais[hospitalId];
       const resp = await fetch('/api/extrair-escala', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
         body: JSON.stringify({
           arquivoBase64: base64,
           mediaType: mime,

@@ -1,6 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { envObrigatorio } from './_shared/env.js';
 import { msgErroAnthropic } from './_shared/anthropic.js';
+import { userIdDoJwt } from './_shared/auth.js';
+import { supabaseAdmin } from './_shared/supabaseAdmin.js';
 
 /**
  * /api/regras-parse · conversa iterativa pra estruturar regras de plantão
@@ -178,6 +180,13 @@ function montarSystem(opts: {
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   if (req.method !== 'POST') {
     res.status(405).json({ erro: 'use POST' });
+    return;
+  }
+
+  // Endpoint consome créditos da Anthropic · só user logado pode chamar.
+  const userId = await userIdDoJwt(req, supabaseAdmin());
+  if (!userId) {
+    res.status(401).json({ erro: 'sessão expirada · entra de novo e tenta outra vez' });
     return;
   }
 

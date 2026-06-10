@@ -32,3 +32,13 @@ export function supabase(): SupabaseClient {
   }
   return _cliente;
 }
+
+/**
+ * Header Authorization pros endpoints /api que validam JWT.
+ * Vazio se não há session · o endpoint responde 401 e a UI pede login.
+ */
+export async function authHeader(): Promise<Record<string, string>> {
+  const { data } = await supabase().auth.getSession();
+  const token = data.session?.access_token;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}

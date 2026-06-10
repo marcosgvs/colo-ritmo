@@ -8,6 +8,7 @@ import type {
   TipoHospital,
 } from '@/types';
 import { buscarCep, geocodificar } from '@/lib/geo';
+import { authHeader } from '@/lib/supabase';
 import {
   buscarSugestoesHospitais,
   type SugestaoHospital,
@@ -700,7 +701,7 @@ function RegrasChat({
     try {
       const r = await fetch('/api/regras-parse', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
         body: JSON.stringify({
           hospitalNome: nomeHospital,
           hospitalTipo: tipoHospital,
