@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Bloco, Hospital, Preferencias } from '@/types';
 import { sair } from '@/hooks/useAuth';
+import { toISO } from '@/lib/data';
 import { usePush } from '@/hooks/usePush';
 import { useInstallPrompt } from '@/hooks/useInstallPrompt';
 import { useSnapshotsShares } from '@/hooks/useSnapshotsShares';
@@ -44,7 +45,9 @@ export function Usuario({
   const [draft, setDraft] = useState(preferencias);
   const sujo = JSON.stringify(draft) !== JSON.stringify(preferencias);
   const [criandoShare, setCriandoShare] = useState(false);
-  const [shareMes, setShareMes] = useState(() => new Date().toISOString().slice(0, 7));
+  // toISO usa data LOCAL · toISOString (UTC) pularia pro mês seguinte
+  // depois das 21h no último dia do mês (Brasília = UTC-3).
+  const [shareMes, setShareMes] = useState(() => toISO(new Date()).slice(0, 7));
   const [shareLabel, setShareLabel] = useState('');
   const [shareDias, setShareDias] = useState(30);
 

@@ -28,7 +28,9 @@ import type { BlocoPlantao, Hospital, Preferencias } from '@/types';
 import {
   DOWS_LONG,
   MESES,
+  capitalize,
   fimDoMes,
+  fmtHora,
   fromISO,
   inicioDaSemana,
   inicioDoMes,
@@ -362,7 +364,7 @@ function desenharCalendario(
     const visiveis = lista.slice(0, blocosMax);
     for (const p of visiveis) {
       const rotulo = rotuloTurno(p.horaInicio, p.duracao, dados.hospital);
-      const labelTurno = rotulo ?? `${formatarHora(p.horaInicio)} · ${p.duracao}h`;
+      const labelTurno = rotulo ?? `${fmtHora(p.horaInicio)} · ${p.duracao}h`;
 
       // Background pill
       pdf.setFillColor(corHosp.surface);
@@ -455,8 +457,8 @@ function desenharDetalhamento(
     const dowIdx = d.getDay() === 0 ? 6 : d.getDay() - 1;
     const dow = capitalize(DOWS_LONG[dowIdx] ?? '');
     const fim = (p.horaInicio + p.duracao) % 24;
-    const horaIni = formatarHora(p.horaInicio);
-    const horaFim = formatarHora(fim);
+    const horaIni = fmtHora(p.horaInicio);
+    const horaFim = fmtHora(fim);
     const rotulo = rotuloTurno(p.horaInicio, p.duracao, dados.hospital);
     const prefixoTurno = rotulo ? `${rotulo} · ` : '';
 
@@ -493,16 +495,6 @@ function desenharDetalhamento(
 }
 
 // --- Helpers -----------------------------------------------------------------
-
-function formatarHora(h: number): string {
-  const inteiro = Math.floor(h);
-  const min = Math.round((h - inteiro) * 60);
-  return `${String(inteiro).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
-}
-
-function capitalize(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1);
-}
 
 function trataChefe(nome: string): string {
   const limpo = nome.trim();

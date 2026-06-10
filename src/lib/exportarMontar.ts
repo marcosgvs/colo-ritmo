@@ -10,7 +10,7 @@
  */
 
 import type { BlocoPlantao, Hospital, Preferencias } from '@/types';
-import { DOWS_LONG, MESES, fromISO } from './dates.js';
+import { DOWS_LONG, MESES, capitalize, fmtHora, fromISO } from './dates.js';
 import { rotuloTurno } from './turno.js';
 
 interface DadosExport {
@@ -31,8 +31,8 @@ export function montarMensagem(dados: DadosExport): string {
     (a, b) => a.data.localeCompare(b.data) || a.horaInicio - b.horaInicio,
   );
   const mesNome = MESES[dados.mes - 1] ?? '';
-  const trat = dados.chefe ? trataChefe(dados.chefe) : 'Dr(a).';
-  const cabecalho = `Olá, Prezado(a) ${trat},\n\nSegue minha proposta de plantões para ${capitalize(mesNome)} de ${dados.ano} no ${dados.hospital.nome}, conforme minha disponibilidade:\n\n`;
+  const trat = dados.chefe ? trataChefe(dados.chefe) : 'Doutor(a)';
+  const cabecalho = `Prezado(a) ${trat},\n\nSegue minha proposta de plantões para ${capitalize(mesNome)} de ${dados.ano} no ${dados.hospital.nome}, conforme minha disponibilidade:\n\n`;
 
   const linhas = ordenados.map((p) => {
     const d = fromISO(p.data);
@@ -41,15 +41,18 @@ export function montarMensagem(dados: DadosExport): string {
     const dowIdx = d.getDay() === 0 ? 6 : d.getDay() - 1;
     const dow = capitalize(DOWS_LONG[dowIdx] ?? '');
     const fim = (p.horaInicio + p.duracao) % 24;
-    const ini = formatarHora(p.horaInicio);
-    const fimStr = formatarHora(fim);
+    const ini = fmtHora(p.horaInicio);
+    const fimStr = fmtHora(fim);
     const rotulo = rotuloTurno(p.horaInicio, p.duracao, dados.hospital);
     const rotuloPart = rotulo ? `${rotulo} · ` : '';
     return `- ${dow} ${dia}/${mesPad} · ${rotuloPart}das ${ini} às ${fimStr} (${p.duracao}h)`;
   });
 
   const horas = ordenados.reduce((s, p) => s + p.duracao, 0);
-  const rodape = `\n\nTotal: ${ordenados.length} plantões, ${horas} horas.\n\nFico à disposição para os ajustes que forem necessários.\n\nAtenciosamente,\n${dados.preferencias.nome ?? 'Médica'}`;
+  // Sem nome cadastrado, assina só "Atenciosamente," · nada de fallback
+  // com gênero (o produto é neutro).
+  const nome = (dados.preferencias.nome ?? '').trim();
+  const rodape = `\n\nTotal: ${ordenados.length} plantões, ${horas} horas.\n\nFico à disposição para os ajustes que forem necessários.\n\nAtenciosamente,${nome ? `\n${nome}` : ''}`;
 
   return cabecalho + linhas.join('\n') + rodape;
 }
@@ -75,8 +78,8 @@ export async function baixarExcelMontar(dados: DadosExport): Promise<void> {
       Data: `${dia}/${mesPad}/${dados.ano}`,
       'Dia da semana': capitalize(DOWS_LONG[dowIdx] ?? ''),
       Turno: rotulo ? capitalize(rotulo) : '',
-      Início: formatarHora(p.horaInicio),
-      Fim: formatarHora(fim),
+      Início: fmtHora(p.horaInicio),
+      Fim: fmtHora(fim),
       'Duração (h)': p.duracao,
       Hospital: dados.hospital.nome,
     };
@@ -120,16 +123,6 @@ export async function baixarPDFMontar(dados: DadosExport): Promise<void> {
 }
 
 // --- Helpers -----------------------------------------------------------------
-
-function formatarHora(h: number): string {
-  const inteiro = Math.floor(h);
-  const min = Math.round((h - inteiro) * 60);
-  return `${String(inteiro).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
-}
-
-function capitalize(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1);
-}
 
 function trataChefe(nome: string): string {
   const limpo = nome.trim();

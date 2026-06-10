@@ -111,3 +111,13 @@ export function semanaDe(iso: string): string[] {
   const seg = inicioDaSemana(iso);
   return Array.from({ length: 7 }, (_, i) => adicionaDia(seg, i));
 }
+
+/** "segunda" | "terça" | ... · nome longo do dia da semana de `iso`. */
+export function diaSemanaBRLong(iso: string): string {
+  return DOWS_LONG[diaSemanaBR(iso)]!;
+}
+
+/** Primeira letra maiúscula · usado nos exports formais (chefe). */
+export function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}

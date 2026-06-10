@@ -42,6 +42,8 @@ export {
   fmtHora,
   fmtRange,
   semanaDe,
+  diaSemanaBRLong,
+  capitalize,
 } from './dates.js';
 
 export { calcCadeias } from './cadeias.js';
