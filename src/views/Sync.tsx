@@ -80,7 +80,9 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
   const isMobile = useIsMobile();
   const [hospitalId, setHospitalId] = useState<string>(() => Object.keys(hospitais)[0] ?? '');
   const [apelidoNaEscala, setApelidoNaEscala] = useState('');
-  const [mes, setMes] = useState<string>(() => new Date().toISOString().slice(0, 7));
+  // toISO usa data LOCAL · toISOString (UTC) pularia pro mês seguinte
+  // depois das 21h no último dia do mês (Brasília = UTC-3).
+  const [mes, setMes] = useState<string>(() => toISO(new Date()).slice(0, 7));
   const [estado, setEstado] = useState<Estado>('parado');
   const [resultado, setResultado] = useState<Resultado | null>(null);
   const [variantesSelecionadas, setVariantesSelecionadas] = useState<Set<string>>(new Set());
@@ -160,7 +162,14 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
       });
       if (!resp.ok) {
         const txt = await resp.text();
-        setErro(`servidor não respondeu bem · ${resp.status}`);
+        let msg = `servidor não respondeu bem · ${resp.status}`;
+        try {
+          const j = JSON.parse(txt) as { erro?: string };
+          if (j.erro) msg = j.erro;
+        } catch {
+          /* corpo não-json · mantém a genérica */
+        }
+        setErro(msg);
         setEstado('erro');
         console.error('extrair-escala:', txt);
         return;

@@ -13,9 +13,12 @@ import {
   DOWS,
   MESES,
   adicionaDia,
+  capitalize,
   diaSemanaBR,
+  diaSemanaBRLong,
   fimDoMes,
   fmtDate,
+  fmtHora,
   fromISO,
   inicioDaSemana,
   inicioDoMes,
@@ -164,7 +167,14 @@ export function MontarEscala({
       });
 
       if (!resp.ok) {
-        setErro(`servidor não respondeu bem · ${resp.status}`);
+        let msg = `servidor não respondeu bem · ${resp.status}`;
+        try {
+          const j = (await resp.json()) as { erro?: string };
+          if (j.erro) msg = j.erro;
+        } catch {
+          /* corpo não-json · mantém a genérica */
+        }
+        setErro(msg);
         setEtapa('setup');
         return;
       }
@@ -1693,21 +1703,6 @@ function listarDiasDoMes(mes: string): string[] {
     if (out.length > 42) break;
   }
   return out;
-}
-
-function fmtHora(h: number): string {
-  const inteiro = Math.floor(h);
-  const min = Math.round((h - inteiro) * 60);
-  return `${String(inteiro).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
-}
-
-function diaSemanaBRLong(iso: string): string {
-  const d = fromISO(iso);
-  return ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'][d.getDay()]!;
-}
-
-function capitalize(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 function Modal({ children, onFechar }: { children: React.ReactNode; onFechar: () => void }) {

@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { envObrigatorio } from './_shared/env.js';
+import { msgErroAnthropic } from './_shared/anthropic.js';
 
 /**
  * /api/regras-parse · conversa iterativa pra estruturar regras de plantão
@@ -220,7 +221,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     if (!resp.ok) {
       const txt = await resp.text();
       console.error('regras-parse: anthropic falhou', resp.status, txt);
-      res.status(502).json({ erro: `anthropic ${resp.status}`, detalhe: txt.slice(0, 400) });
+      res.status(502).json({ erro: msgErroAnthropic(resp.status, txt), detalhe: txt.slice(0, 400) });
       return;
     }
 
