@@ -49,7 +49,7 @@ export function usePush(userId: string | null): PushAPI {
       return;
     }
     setStatus('pedindo-permissao');
-    const sub = await assinarPush(userId);
+    const sub = await assinarPush();
     setStatus(sub ? 'ativo' : 'erro');
   }, [userId]);
 

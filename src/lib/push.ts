@@ -4,13 +4,15 @@
  * Fluxo:
  *   1. registrarServiceWorker() — chamado uma vez no boot. Limpa SW antigo
  *      do scope raiz (quando o app vivia em `/`) e registra o novo em `/ritmo/`.
- *   2. assinarPush(userId) — pede permissão, gera PushSubscription,
- *      manda pra /api/push/subscribe
+ *   2. assinarPush() — pede permissão, gera PushSubscription,
+ *      manda pra /api/push/subscribe com o JWT da session
  *   3. cancelarPush(userId) — desassina e tira do banco
  *
  * Os helpers são tolerantes a navegadores sem suporte (Safari < 16.4
  * iOS, etc) — retornam `false` ou `null` sem throw.
  */
+
+import { supabase } from './supabase.js';
 
 const SW_PATH = '/ritmo/service-worker.js';
 const SW_SCOPE = '/ritmo/';
@@ -78,7 +80,7 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return out;
 }
 
-export async function assinarPush(userId: string): Promise<PushSubscription | null> {
+export async function assinarPush(): Promise<PushSubscription | null> {
   if (!suportaPush()) return null;
   const reg = await navigator.serviceWorker.ready;
 
@@ -88,6 +90,11 @@ export async function assinarPush(userId: string): Promise<PushSubscription | nu
   const vapid = await buscarVapidPublic();
   if (!vapid) return null;
 
+  // O endpoint resolve o user_id pelo JWT · sem session não tem como assinar.
+  const { data: sessData } = await supabase().auth.getSession();
+  const accessToken = sessData.session?.access_token;
+  if (!accessToken) return null;
+
   let sub = await reg.pushManager.getSubscription();
   if (!sub) {
     sub = await reg.pushManager.subscribe({
@@ -96,15 +103,21 @@ export async function assinarPush(userId: string): Promise<PushSubscription | nu
     });
   }
 
-  await fetch('/api/push/subscribe', {
+  const resp = await fetch('/api/push/subscribe', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
     body: JSON.stringify({
-      userId,
       subscription: sub.toJSON(),
       userAgent: navigator.userAgent,
     }),
   });
+  if (!resp.ok) {
+    console.warn('push: subscribe falhou', resp.status);
+    return null;
+  }
 
   return sub;
 }
