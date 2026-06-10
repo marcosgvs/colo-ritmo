@@ -49,6 +49,8 @@ async function pegarTokenGoogle(): Promise<string | null> {
   return data.session?.provider_token ?? null;
 }
 
+const esperar = (ms: number) => new Promise<void>((res) => setTimeout(res, ms));
+
 export function useGcalSync({ blocos, hospitais, config, onConfig }: ParamsHook): GcalSyncAPI {
   const [trabalhando, setTrabalhando] = useState<'conectando' | 'sincronizando' | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -154,25 +156,61 @@ export function useGcalSync({ blocos, hospitais, config, onConfig }: ParamsHook)
         return;
       }
       const mappingNovo = { ...config.mapping };
-      for (const plantao of plantoes) {
+      const fila = plantoes.filter((p) => !mappingNovo[String(p.id)]);
+      const total = fila.length;
+      let criados = 0;
+      let falhas = 0;
+      let primeiraFalha: string | null = null;
+      let pediuReautorizar = false;
+      let primeiro = true;
+
+      for (const plantao of fila) {
         const chave = String(plantao.id);
-        if (mappingNovo[chave]) continue;
         const hospital = hospitais[plantao.hospitalId];
         const body = eventoDoBloco(plantao, hospital);
         if (!body) continue;
-        const r = await criarEvento(token, config.calendarId, body);
+        // espaça as criações pra não estourar o rate limit do Google
+        if (!primeiro) await esperar(120);
+        primeiro = false;
+        let r = await criarEvento(token, config.calendarId, body);
+        if (!r.ok && !r.reautorizar) {
+          const s = r.status ?? 0;
+          // falha transitória (rate limit / instabilidade) · respira e
+          // tenta uma vez de novo antes de desistir desse evento
+          if (s === 429 || s === 403 || s >= 500) {
+            await esperar(1200);
+            r = await criarEvento(token, config.calendarId, body);
+          }
+        }
         if (!r.ok) {
-          setErro(r.erro);
-          if (r.reautorizar) break;
+          falhas += 1;
+          if (!primeiraFalha) primeiraFalha = r.erro;
+          if (r.reautorizar) {
+            // sem auth não adianta insistir · o erro já diz o que fazer
+            pediuReautorizar = true;
+            setErro(r.erro);
+            break;
+          }
           continue;
         }
         mappingNovo[chave] = { eventId: r.valor.id, etag: r.valor.etag };
+        criados += 1;
       }
+      // sempre persiste o mapping (sucessos não se perdem · retry futuro
+      // só pega os que faltam) · mas lastSyncedAt só avança se algo de
+      // fato sincronizou, senão "última sync" mentiria
       onConfig({
         calendarId: config.calendarId,
         mapping: mappingNovo,
-        lastSyncedAt: new Date().toISOString(),
+        lastSyncedAt:
+          criados > 0 || total === 0 ? new Date().toISOString() : config.lastSyncedAt,
       });
+      if (falhas > 0 && !pediuReautorizar) {
+        const motivo = (primeiraFalha ?? 'erro desconhecido').slice(0, 80);
+        setErro(
+          `sincronizou ${criados} de ${total} · ${falhas} não foram (${motivo}) · tenta de novo pra completar`,
+        );
+      }
     } finally {
       setTrabalhando(null);
     }

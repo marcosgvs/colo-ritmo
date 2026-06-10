@@ -84,11 +84,30 @@ async function chamada<T>(
         'Content-Type': 'application/json',
       },
     });
-    if (r.status === 401 || r.status === 403) {
+    if (r.status === 401) {
       return {
         ok: false,
         erro: 'sua sessão do google expirou ou perdeu acesso ao calendar · clica em conectar de novo',
-        status: r.status,
+        status: 401,
+        reautorizar: true,
+      };
+    }
+    if (r.status === 403) {
+      // 403 nem sempre é auth · criação em lote bate no rate limit do
+      // Google, que também responde 403. Lê o corpo (uma vez só) pra
+      // distinguir · rate limit não pede reconectar, só esperar.
+      const corpo = await r.text();
+      if (/rateLimitExceeded|userRateLimitExceeded|quotaExceeded|dailyLimitExceeded/.test(corpo)) {
+        return {
+          ok: false,
+          erro: 'google limitou o ritmo de envio · espera um pouco e tenta de novo',
+          status: 403,
+        };
+      }
+      return {
+        ok: false,
+        erro: 'sua sessão do google expirou ou perdeu acesso ao calendar · clica em conectar de novo',
+        status: 403,
         reautorizar: true,
       };
     }
