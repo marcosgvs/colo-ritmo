@@ -1,0 +1,34 @@
+@import "tailwindcss";
+
+/* Paleta calma, japandi: papel quente, traços finos, dois lados de família. */
+@theme {
+  --color-paper: #faf9f6;
+  --color-ink: #3f3d39;
+  --color-muted: #8c8881;
+  --color-line: #e6e2d9;
+
+  /* lado 1 — verde-azulado */
+  --color-lado1-bg: #e8f1ee;
+  --color-lado1-line: #a9c9c0;
+  --color-lado1-ink: #336357;
+
+  /* lado 2 — roxo */
+  --color-lado2-bg: #efe9f5;
+  --color-lado2-line: #c5b1dd;
+  --color-lado2-ink: #66498a;
+
+  --font-serif: ui-serif, Georgia, "Times New Roman", serif;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background-color: var(--color-paper);
+  color: var(--color-ink);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
