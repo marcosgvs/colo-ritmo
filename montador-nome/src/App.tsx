@@ -118,25 +118,6 @@ export default function App() {
           onCopiar={copiar}
         />
 
-        <Dicas
-          temPrimeiroNome={state.primeiroNome.trim().length > 0}
-          totalSobrenomes={total}
-          lado1={lado1}
-          lado2={lado2}
-        />
-
-        <PrimeiroNome
-          valor={state.primeiroNome}
-          nomeSelecionadoId={state.nomeSelecionadoId}
-          onSelecionar={(nome) => dispatch({ type: 'selecionarNome', nome })}
-          onDigitar={(texto) => dispatch({ type: 'digitarNome', texto })}
-        />
-
-        <Sobrenomes
-          ordem={state.ordem}
-          onToggle={(nome) => dispatch({ type: 'toggleSobrenome', nome })}
-        />
-
         {total > 0 && (
           <section aria-labelledby="ordem-titulo" className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -162,6 +143,25 @@ export default function App() {
             <Contadores total={total} lado1={lado1} lado2={lado2} />
           </section>
         )}
+
+        <Dicas
+          temPrimeiroNome={state.primeiroNome.trim().length > 0}
+          totalSobrenomes={total}
+          lado1={lado1}
+          lado2={lado2}
+        />
+
+        <PrimeiroNome
+          valor={state.primeiroNome}
+          nomeSelecionadoId={state.nomeSelecionadoId}
+          onSelecionar={(nome) => dispatch({ type: 'selecionarNome', nome })}
+          onDigitar={(texto) => dispatch({ type: 'digitarNome', texto })}
+        />
+
+        <Sobrenomes
+          ordem={state.ordem}
+          onToggle={(nome) => dispatch({ type: 'toggleSobrenome', nome })}
+        />
 
         <footer className="border-t border-line pt-6">
           <button
