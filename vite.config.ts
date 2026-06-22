@@ -16,6 +16,14 @@ export default defineConfig({
     // Source maps públicos · Sentry consegue desminificar stack traces
     // sem precisar de auth token. App não tem segredos no client.
     sourcemap: true,
+    rollupOptions: {
+      input: {
+        // app principal (Colo Ritmo) + a ferramentinha /babymarley, que é um
+        // mini-app isolado (sem auth/Supabase) servido em /babymarley.
+        main: path.resolve(__dirname, 'index.html'),
+        babymarley: path.resolve(__dirname, 'babymarley.html'),
+      },
+    },
   },
   resolve: {
     alias: {
