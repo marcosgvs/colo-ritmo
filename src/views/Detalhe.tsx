@@ -29,8 +29,8 @@ export function Detalhe({ bloco, hospitais: _h, voltar, onTrocar, onCeder }: Det
   const noturno = bloco.tipo === 'plantao' ? ehNoturno(bloco) : false;
 
   const titulo =
-    bloco.tipo === 'plantao' && hosp
-      ? hosp.abrev
+    bloco.tipo === 'plantao'
+      ? (hosp?.abrev ?? 'plantão')
       : bloco.tipo === 'cedido' && hosp
         ? `cedido · ${bloco.cedidoPara}`
         : bloco.tipo;
@@ -171,9 +171,7 @@ export function Detalhe({ bloco, hospitais: _h, voltar, onTrocar, onCeder }: Det
                 'crachá e estetoscópio',
                 'lanche pra atravessar a virada',
                 'protetor pra o sono depois',
-                bloco.tipo === 'plantao' && noturno ? 'avisa o Marcos antes de sair' : null,
               ]
-                .filter((x): x is string => Boolean(x))
                 .map((item) => (
                   <li
                     key={item}

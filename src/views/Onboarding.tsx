@@ -69,7 +69,8 @@ export function Onboarding({ onConcluir, onPular }: OnboardingProps) {
               valorPlantao: 0,
               valorFixo: hospitalTipo === 'publico' ? valorFixo : 0,
               valorHora: hospitalTipo === 'privado' ? valorHora : 0,
-              adicionalNoite: 200,
+              // sem default silencioso · quem tem adicional noturno cadastra
+              adicionalNoite: 0,
               regras: {},
             },
           ]
@@ -77,7 +78,8 @@ export function Onboarding({ onConcluir, onPular }: OnboardingProps) {
     onConcluir({
       hospitais,
       preferencias: {
-        nome: nome || 'Médica',
+        // fallback neutro · nome é validado no passo 1, isto é só rede de segurança
+        nome: nome.trim() || 'você',
       },
     });
   }

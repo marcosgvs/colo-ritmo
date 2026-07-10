@@ -72,6 +72,11 @@ interface HospitaisProps {
 
 const CORES: CorFamilia[] = ['sand', 'blue', 'coral', 'aqua', 'sage', 'olive', 'lavender', 'pink'];
 
+const TIPO_LABEL: Record<TipoHospital, string> = {
+  publico: 'público',
+  privado: 'privado',
+};
+
 export function Hospitais({ hospitais, onSalvar, onRemover }: HospitaisProps) {
   const [editando, setEditando] = useState<Hospital | null>(null);
   const [criando, setCriando] = useState(false);
@@ -147,8 +152,8 @@ export function Hospitais({ hospitais, onSalvar, onRemover }: HospitaisProps) {
               onClick={() => setEditando(h)}
               style={{
                 background: `var(--${h.cor}-surface)`,
-                borderLeft: `4px solid var(--${h.cor})`,
                 border: '1px solid var(--line)',
+                borderLeft: `4px solid var(--${h.cor})`,
                 borderRadius: 14,
                 padding: '18px 20px',
                 cursor: 'pointer',
@@ -160,7 +165,7 @@ export function Hospitais({ hospitais, onSalvar, onRemover }: HospitaisProps) {
             >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Eyebrow color={`var(--${h.cor}-ink)`}>{h.abrev}</Eyebrow>
-                <Pill kind={h.tipo === 'publico' ? 'info' : 'neutral'}>{h.tipo}</Pill>
+                <Pill kind={h.tipo === 'publico' ? 'info' : 'neutral'}>{TIPO_LABEL[h.tipo]}</Pill>
               </div>
               <p
                 style={{
@@ -200,14 +205,15 @@ function HospitalForm({ inicial, coresUsadas, onSalvar, onPersistir, onCancelar,
   const isMobile = useIsMobile();
   const [draft, setDraft] = useState<Hospital>(
     inicial ?? {
-      id: `H-${Date.now()}`.slice(0, 12),
+      id: `H-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
       nome: '',
       abrev: '',
       cor: CORES.find((c) => !coresUsadas.includes(c)) ?? 'lavender',
       tipo: 'publico',
       valorPlantao: 0,
       valorFixo: 0,
-      adicionalNoite: 200,
+      // sem default silencioso · quem tem adicional noturno cadastra
+      adicionalNoite: 0,
       regras: {},
       janelas: JANELAS_DEFAULT,
     },
@@ -337,14 +343,17 @@ function HospitalForm({ inicial, coresUsadas, onSalvar, onPersistir, onCancelar,
             nomeHospital={draft.nome || 'esse hospital'}
             tipoHospital={draft.tipo}
             regrasAtuais={draft.regras}
-            onAplicarRegras={(novas) =>
-              setDraft((d) => {
-                const novoDraft = { ...d, regras: { ...d.regras, ...novas } };
-                // Aplicar = salvar imediato · não exige clicar "salvar" depois.
+            onAplicarRegras={(novas) => {
+              const novoDraft = { ...draft, regras: { ...draft.regras, ...novas } };
+              setDraft(novoDraft);
+              // Aplicar = salvar imediato · mas só se o básico (nome +
+              // abreviação) existe · senão fica no rascunho local.
+              if (valido) {
                 onPersistir?.(novoDraft);
-                return novoDraft;
-              })
-            }
+                return true;
+              }
+              return false;
+            }}
           />
         </div>
       )}
@@ -675,7 +684,8 @@ interface RegrasChatProps {
   nomeHospital: string;
   tipoHospital: TipoHospital;
   regrasAtuais: import('@/types').RegrasHospital;
-  onAplicarRegras: (parciais: Partial<import('@/types').RegrasHospital>) => void;
+  /** Aplica as regras ao draft · retorna true se persistiu de verdade. */
+  onAplicarRegras: (parciais: Partial<import('@/types').RegrasHospital>) => boolean;
 }
 
 function RegrasChat({
@@ -711,7 +721,11 @@ function RegrasChat({
       });
       if (!r.ok) {
         const err = await r.json().catch(() => ({}));
-        setErro(err?.erro ?? `${r.status}`);
+        setErro(
+          typeof err?.erro === 'string' && err.erro
+            ? err.erro
+            : `não consegui falar com o servidor · tenta de novo (erro ${r.status})`,
+        );
         setEstado('erro');
         return;
       }
@@ -722,18 +736,23 @@ function RegrasChat({
       setMensagens((m) => [...m, { role: 'assistant', content: json.resposta }]);
       if (json.regrasPropostas) setPropostas(json.regrasPropostas);
       setEstado('parado');
-    } catch (e) {
-      setErro((e as Error).message);
+    } catch {
+      setErro('não consegui falar com o servidor · confere a internet e tenta de novo');
       setEstado('erro');
     }
   }
 
   function aplicar() {
     if (!propostas) return;
-    onAplicarRegras(propostas);
+    const persistiu = onAplicarRegras(propostas);
     setMensagens((m) => [
       ...m,
-      { role: 'assistant', content: 'beleza · regras aplicadas. quer ajustar mais alguma coisa?' },
+      {
+        role: 'assistant',
+        content: persistiu
+          ? 'beleza · regras aplicadas. quer ajustar mais alguma coisa?'
+          : 'regras anotadas por aqui · falta o nome e a abreviação na aba "dados" pra eu conseguir salvar o hospital.',
+      },
     ]);
     setPropostas(null);
   }
@@ -1183,7 +1202,8 @@ function BlocoJanelas({
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: '1fr 90px 90px 36px',
+          // mesmas larguras das linhas abaixo · senão cabeçalho desalinha
+          gridTemplateColumns: '1fr 64px 64px 28px',
           gap: 8,
           marginBottom: 4,
           paddingLeft: 4,
@@ -1277,6 +1297,7 @@ interface BlocoEnderecoProps {
 }
 
 function BlocoEndereco({ endereco, onChange, nomeHospital }: BlocoEnderecoProps) {
+  const isMobile = useIsMobile();
   const [estado, setEstado] = useState<'parado' | 'buscando-cep' | 'erro'>('parado');
   const [erro, setErro] = useState<string | null>(null);
   void nomeHospital;
@@ -1331,7 +1352,15 @@ function BlocoEndereco({ endereco, onChange, nomeHospital }: BlocoEnderecoProps)
         </Mono>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 12, marginTop: 10 }}>
+      <div
+        style={{
+          display: 'grid',
+          // mobile · '1fr 2fr' espreme o cep · empilha tudo
+          gridTemplateColumns: isMobile ? '1fr' : '1fr 2fr',
+          gap: 12,
+          marginTop: 10,
+        }}
+      >
         <Field label="cep">
           <div style={{ display: 'flex', gap: 6 }}>
             <input

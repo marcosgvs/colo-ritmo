@@ -50,6 +50,24 @@ describe('ehNoturno', () => {
       ehNoturno({ id: 1, tipo: 'plantao', hospitalId: 'HBDF', data: '2026-05-04', horaInicio: 0, duracao: 6, setor: '' }),
     ).toBe(true);
   });
+
+  test('16-23h cruza 22h · é noturno', () => {
+    expect(
+      ehNoturno({ id: 1, tipo: 'plantao', hospitalId: 'HBDF', data: '2026-05-04', horaInicio: 16, duracao: 7, setor: '' }),
+    ).toBe(true);
+  });
+
+  test('19-21h não cruza 22h · é diurno', () => {
+    expect(
+      ehNoturno({ id: 1, tipo: 'plantao', hospitalId: 'HBDF', data: '2026-05-04', horaInicio: 19, duracao: 2, setor: '' }),
+    ).toBe(false);
+  });
+
+  test('14-22h termina exatamente às 22h · é diurno', () => {
+    expect(
+      ehNoturno({ id: 1, tipo: 'plantao', hospitalId: 'HBDF', data: '2026-05-04', horaInicio: 14, duracao: 8, setor: '' }),
+    ).toBe(false);
+  });
 });
 
 describe('calcRemuneracaoBloco', () => {

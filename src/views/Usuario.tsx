@@ -50,6 +50,7 @@ export function Usuario({
   const [shareMes, setShareMes] = useState(() => toISO(new Date()).slice(0, 7));
   const [shareLabel, setShareLabel] = useState('');
   const [shareDias, setShareDias] = useState(30);
+  const [linkCopiado, setLinkCopiado] = useState<string | null>(null);
 
   return (
     <>
@@ -445,14 +446,20 @@ export function Usuario({
                   placeholder="rótulo (ex: pra mãe)"
                   style={input}
                 />
-                <input
-                  type="number"
-                  value={shareDias}
-                  onChange={(e) => setShareDias(Number(e.target.value))}
-                  min={1}
-                  max={365}
-                  style={input}
-                />
+                <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <Eyebrow>validade em dias</Eyebrow>
+                  <input
+                    type="number"
+                    value={shareDias}
+                    onChange={(e) =>
+                      // vazio ou 0 não vale · mínimo 1 dia
+                      setShareDias(Math.min(365, Math.max(1, Math.round(Number(e.target.value)) || 1)))
+                    }
+                    min={1}
+                    max={365}
+                    style={input}
+                  />
+                </label>
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button
                     type="button"
@@ -520,6 +527,8 @@ export function Usuario({
                         onClick={() => {
                           const url = `${window.location.origin}/ritmo/share/${s.token}`;
                           navigator.clipboard?.writeText(url);
+                          setLinkCopiado(s.token);
+                          setTimeout(() => setLinkCopiado((t) => (t === s.token ? null : t)), 2000);
                         }}
                         style={{
                           font: '600 11px/1 var(--font-body)',
@@ -532,7 +541,7 @@ export function Usuario({
                           flex: 1,
                         }}
                       >
-                        copiar link
+                        {linkCopiado === s.token ? 'copiado ✓' : 'copiar link'}
                       </button>
                       <button
                         type="button"

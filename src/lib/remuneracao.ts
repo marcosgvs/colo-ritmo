@@ -32,11 +32,13 @@ export interface ResumoMes {
   porHospital: Record<string, { bruto: number; plantoes: number }>;
 }
 
-/** Considera noturno qualquer bloco que cruze a faixa 22h-06h. */
+/** Considera noturno qualquer bloco que cruze a faixa 22h-06h.
+ * `fim` pode passar de 24 (vira madrugada do dia seguinte): fim > 22 cobre
+ * tanto "entra na janela 22-24h" quanto "cruza a meia-noite". */
 export function ehNoturno(b: BlocoPlantao): boolean {
   const ini = b.horaInicio;
   const fim = ini + b.duracao;
-  return ini >= 19 || fim > 24 || ini < 6;
+  return ini < 6 || fim > 22;
 }
 
 export function calcRemuneracaoBloco(b: BlocoPlantao, hosp: Hospital): ResumoBloco {
