@@ -12,8 +12,10 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 const URL_FALLBACK = 'https://xlefxpcmruhuyexdvzru.supabase.co';
 const ANON_FALLBACK = 'sb_publishable_lrEzOdS4RnrwsDmCUsXEuQ_ElUajQ3W';
 
-export const SUPABASE_URL = import.meta.env['VITE_SUPABASE_URL'] ?? URL_FALLBACK;
-export const SUPABASE_ANON_KEY = import.meta.env['VITE_SUPABASE_ANON_KEY'] ?? ANON_FALLBACK;
+// `||` (não `??`): .env com VITE_SUPABASE_URL="" definia string vazia e
+// derrubava o app inteiro no boot ("supabaseUrl is required").
+export const SUPABASE_URL = import.meta.env['VITE_SUPABASE_URL'] || URL_FALLBACK;
+export const SUPABASE_ANON_KEY = import.meta.env['VITE_SUPABASE_ANON_KEY'] || ANON_FALLBACK;
 
 let _cliente: SupabaseClient | null = null;
 

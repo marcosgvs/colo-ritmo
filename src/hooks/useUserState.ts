@@ -46,7 +46,8 @@ export interface UserStateBlob {
   preferencias?: Preferencias;
   escalasImportadas?: EscalaImportada[];
   propostasMontar?: PropostaHistorico[];
-  gcalConfig?: GcalConfig;
+  /** null explícito = desconectado · chave ausente = blob antigo (preserva). */
+  gcalConfig?: GcalConfig | null;
   updatedAt?: string;
   /** Id da aba que gravou · o Realtime usa pra distinguir echo do próprio save
    * de mudança vinda de outra aba/dispositivo (ou da conta espelhada). */
@@ -98,6 +99,19 @@ const STATE_VAZIO: UserStateValor = {
   propostasMontar: [],
 };
 
+function mergeState(prev: UserStateValor, next: Partial<UserStateValor>): UserStateValor {
+  return {
+    blocos: next.blocos ?? prev.blocos,
+    hospitais: next.hospitais ?? prev.hospitais,
+    preferencias: next.preferencias ?? prev.preferencias,
+    escalasImportadas: next.escalasImportadas ?? prev.escalasImportadas,
+    propostasMontar: next.propostasMontar ?? prev.propostasMontar,
+    gcalConfig:
+      // setar como null/undefined zera (desconectar) · sem chave preserva
+      'gcalConfig' in next ? next.gcalConfig ?? undefined : prev.gcalConfig,
+  };
+}
+
 /**
  * useUserState · só roda quando há `userId` (logado). Antes do login
  * status fica `inativo` e o consumidor decide fallback (sample data).
@@ -120,6 +134,12 @@ export function useUserState(userId: string | null): UserStateAPI {
   // Saves em série · sem isso, um upsert lento pode aterrissar DEPOIS de um
   // mais novo e o banco fica com dado antigo (last-write-wins fora de ordem).
   const saveChainRef = useRef<Promise<void>>(Promise.resolve());
+  // Edições feitas ANTES do select inicial retornar seriam mescladas sobre o
+  // STATE_VAZIO e o upsert apagaria a conta inteira. Até o load terminar,
+  // elas ficam nesta fila (aplicadas localmente, sem persistir) e são
+  // reaplicadas por cima do blob carregado.
+  const loadedRef = useRef(false);
+  const preLoadEditsRef = useRef<Partial<UserStateValor>[]>([]);
 
   const persistir = useCallback(
     (valor: UserStateValor): Promise<void> => {
@@ -133,7 +153,8 @@ export function useUserState(userId: string | null): UserStateAPI {
           preferencias: valor.preferencias,
           escalasImportadas: valor.escalasImportadas,
           propostasMontar: valor.propostasMontar.slice(0, MAX_PROPOSTAS_HISTORICO),
-          ...(valor.gcalConfig ? { gcalConfig: valor.gcalConfig } : {}),
+          // null explícito propaga "desconectado" pros outros devices via realtime
+          gcalConfig: valor.gcalConfig ?? null,
           updatedAt: new Date().toISOString(),
           clientId: clientIdRef.current,
         };
@@ -180,17 +201,15 @@ export function useUserState(userId: string | null): UserStateAPI {
 
   const setState = useCallback(
     (next: Partial<UserStateValor>) => {
+      // Load inicial ainda em voo: aplica localmente e enfileira · persistir
+      // agora gravaria um blob quase-vazio por cima da conta.
+      if (!loadedRef.current) {
+        preLoadEditsRef.current.push(next);
+        setStateInternal((prev) => mergeState(prev, next));
+        return;
+      }
       setStateInternal((prev) => {
-        const merged: UserStateValor = {
-          blocos: next.blocos ?? prev.blocos,
-          hospitais: next.hospitais ?? prev.hospitais,
-          preferencias: next.preferencias ?? prev.preferencias,
-          escalasImportadas: next.escalasImportadas ?? prev.escalasImportadas,
-          propostasMontar: next.propostasMontar ?? prev.propostasMontar,
-          gcalConfig:
-            // setar como null/undefined zera (desconectar) · sem chave preserva
-            'gcalConfig' in next ? next.gcalConfig : prev.gcalConfig,
-        };
+        const merged = mergeState(prev, next);
         pendingRef.current = merged;
         if (debounceRef.current) clearTimeout(debounceRef.current);
         debounceRef.current = setTimeout(() => {
@@ -212,6 +231,8 @@ export function useUserState(userId: string | null): UserStateAPI {
     }
 
     let mounted = true;
+    loadedRef.current = false;
+    preLoadEditsRef.current = [];
     setStatus('carregando');
     setErro(null);
 
@@ -228,24 +249,27 @@ export function useUserState(userId: string | null): UserStateAPI {
           return;
         }
         const blob = (data?.state ?? null) as UserStateBlob | null;
-        if (blob) {
-          setStateInternal({
-            blocos: blob.blocos ?? STATE_VAZIO.blocos,
-            hospitais: blob.hospitais ?? STATE_VAZIO.hospitais,
-            preferencias: blob.preferencias ?? STATE_VAZIO.preferencias,
-            escalasImportadas: blob.escalasImportadas ?? [],
-            propostasMontar: blob.propostasMontar ?? [],
-            gcalConfig: blob.gcalConfig,
-          });
-        } else {
-          // Primeiro acesso · começa vazio · App detecta hospitais={} e
-          // dispara onboarding. NÃO persiste seed da Mariana pra outros users.
-          // Em modo espelho, não persiste row do dono (Marcos): a conta
-          // espelhada já tem state, então esse branch só dispararia se o
-          // alvo não existisse · improvável.
-          setStateInternal(STATE_VAZIO);
-          if (!espelho) void persistir(STATE_VAZIO);
-        }
+        const base: UserStateValor = blob
+          ? {
+              blocos: blob.blocos ?? STATE_VAZIO.blocos,
+              hospitais: blob.hospitais ?? STATE_VAZIO.hospitais,
+              preferencias: blob.preferencias ?? STATE_VAZIO.preferencias,
+              escalasImportadas: blob.escalasImportadas ?? [],
+              propostasMontar: blob.propostasMontar ?? [],
+              gcalConfig: blob.gcalConfig ?? undefined,
+            }
+          : // Primeiro acesso · começa vazio · App detecta hospitais={} e
+            // dispara onboarding. NÃO persiste seed da Mariana pra outros users.
+            STATE_VAZIO;
+        // Edições feitas durante o load entram por cima do blob (não o contrário).
+        const edits = preLoadEditsRef.current;
+        preLoadEditsRef.current = [];
+        const comEdits = edits.reduce(mergeState, base);
+        loadedRef.current = true;
+        setStateInternal(comEdits);
+        // Persiste se houve edição durante o load, ou pra criar a row no
+        // primeiro acesso. Em modo espelho nunca persiste (read-only).
+        if (!espelho && (edits.length > 0 || !blob)) void persistir(comEdits);
         setStatus('pronto');
       });
 
@@ -273,7 +297,10 @@ export function useUserState(userId: string | null): UserStateAPI {
             preferencias: novoState.preferencias ?? prev.preferencias,
             escalasImportadas: novoState.escalasImportadas ?? prev.escalasImportadas,
             propostasMontar: novoState.propostasMontar ?? prev.propostasMontar,
-            gcalConfig: novoState.gcalConfig ?? prev.gcalConfig,
+            gcalConfig:
+              // null explícito = desconectou em outro device · chave ausente =
+              // blob antigo, preserva o local
+              'gcalConfig' in novoState ? novoState.gcalConfig ?? undefined : prev.gcalConfig,
           }));
         },
       )
