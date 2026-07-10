@@ -133,12 +133,14 @@ function rowParaNotif(r: NotifRow): Notificacao {
     tipo: r.tipo,
     titulo: r.titulo,
     detalhe: r.detalhe,
-    recebidaEm: fmtRelativo(r.criada_em),
+    // ISO cru · o componente formata na hora do render (formatar aqui
+    // congelava o "agora" até o próximo refetch)
+    recebidaEm: r.criada_em,
     lida: r.lida,
   };
 }
 
-function fmtRelativo(iso: string): string {
+export function fmtRelativo(iso: string): string {
   const data = new Date(iso);
   const agora = Date.now();
   const diff = (agora - data.getTime()) / 1000;

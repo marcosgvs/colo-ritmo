@@ -201,7 +201,7 @@ export function Mes({ blocos, hospitais, onSelectBloco }: MesProps) {
                         borderRight: '1px solid var(--line)',
                         background: isHoje
                           ? 'var(--lavender-surface)'
-                          : `rgba(199,114,100,${opacidadeBg})`,
+                          : `color-mix(in srgb, var(--coral) ${Math.round(opacidadeBg * 100)}%, transparent)`,
                         opacity: noMes ? 1 : 0.45,
                         display: 'flex',
                         flexDirection: 'column',
@@ -237,10 +237,12 @@ export function Mes({ blocos, hospitais, onSelectBloco }: MesProps) {
                             style={{
                               textAlign: 'left',
                               background: `var(--${hosp.cor}-surface)`,
+                              // border zerado ANTES do borderLeft · shorthand
+                              // depois sobrescreveria a borda colorida
+                              border: 'none',
                               borderLeft: `3px solid var(--${hosp.cor})`,
                               borderRadius: 6,
                               padding: '4px 6px',
-                              border: 'none',
                               cursor: 'pointer',
                               font: '600 10px/1.2 var(--font-body)',
                               color: `var(--${hosp.cor}-ink)`,
@@ -469,7 +471,7 @@ function ResumoMes({ blocos, hospitais, mesISO, mesAno }: ResumoMesProps) {
       {plantoesFuturos[0] && (
         <Hand color="var(--ink-2)" size={16} style={{ display: 'block', marginTop: 14 }}>
           próximo: {fmtDate(plantoesFuturos[0].data)}
-          {dayOfWeek(plantoesFuturos[0].data) === 6 ? ' · final de semana' : ''}
+          {dayOfWeek(plantoesFuturos[0].data) >= 5 ? ' · final de semana' : ''}
         </Hand>
       )}
     </div>

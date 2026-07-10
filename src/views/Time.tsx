@@ -119,7 +119,8 @@ export function Time() {
                   borderRadius: 12,
                   padding: '14px 18px',
                   display: 'grid',
-                  gridTemplateColumns: '40px 1fr auto auto',
+                  // minmax(0,1fr) deixa o nome truncar em vez de estourar 375px
+                  gridTemplateColumns: '40px minmax(0, 1fr) auto auto',
                   gap: 16,
                   alignItems: 'center',
                 }}
@@ -153,6 +154,9 @@ export function Time() {
                       fontSize: 18,
                       letterSpacing: '-0.005em',
                       margin: 0,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
                     }}
                   >
                     {p.nome ?? 'sem nome'}
@@ -171,7 +175,7 @@ export function Time() {
                     </Pill>
                   )}
                 </div>
-                <div style={{ minWidth: 140, textAlign: 'right' }}>
+                <div style={{ textAlign: 'right' }}>
                   <Eyebrow>cadastrado</Eyebrow>
                   <Mono style={{ display: 'block', marginTop: 4 }}>
                     {new Date(p.created_at).toLocaleDateString('pt-BR')}

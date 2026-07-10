@@ -227,18 +227,6 @@ p, .t-body {
   from { opacity: 0; transform: translateY(6px); }
   to   { opacity: 1; transform: translateY(0); }
 }
-@keyframes colo-fade-in {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-@keyframes colo-fab-in {
-  from { opacity: 0; transform: translateX(8px) scale(0.98); }
-  to   { opacity: 1; transform: translateX(0) scale(1); }
-}
-@keyframes colo-pulse-conflict {
-  0%,100% { box-shadow: 0 0 0 0 rgba(199,114,100,0.32); }
-  50%     { box-shadow: 0 0 0 6px rgba(199,114,100,0); }
-}
 @keyframes colo-skel-shimmer {
   0%   { background-position: -300px 0; }
   100% { background-position: 300px 0; }

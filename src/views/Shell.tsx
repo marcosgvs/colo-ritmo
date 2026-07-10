@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import type { Bloco, HospitaisMap, Mode } from '@/types';
-import { detectarConflitos } from '@/lib/data';
+import { adicionaDia, detectarConflitos, HOJE } from '@/lib/data';
 import { useMemo } from 'react';
 import { RoleBanner } from '@/components/atoms';
 import { BlockDrawer } from '@/components/drawer';
@@ -51,10 +51,16 @@ export function Shell({
   onMarcarLida,
   children,
 }: ShellProps) {
-  const conflitos = useMemo(
-    () => detectarConflitos(blocos, hospitais).length,
-    [blocos, hospitais],
-  );
+  // Só conflitos acionáveis: de ontem (noturno que cruza a meia-noite)
+  // pra frente. Sobreposição em plantão de anos atrás não tem o que
+  // resolver — e mantê-los deixava o sino aceso pra sempre.
+  const conflitos = useMemo(() => {
+    const desde = adicionaDia(HOJE, -1);
+    return detectarConflitos(
+      blocos.filter((b) => b.data >= desde),
+      hospitais,
+    ).length;
+  }, [blocos, hospitais]);
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>

@@ -8,7 +8,7 @@ import type {
   Mode,
   Preferencias,
 } from '@/types';
-import { cargaSemanal, HOJE, semanaDe, setHospitaisRuntime } from '@/lib/data';
+import { atualizarHoje, cargaSemanal, HOJE, semanaDe, setHospitaisRuntime } from '@/lib/data';
 import { HandVariantContext } from '@/components/atoms';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserState } from '@/hooks/useUserState';
@@ -70,7 +70,6 @@ const Sync = lazy(() => import('@/views/Sync').then((m) => ({ default: m.Sync })
 const Hospitais = lazy(() => import('@/views/Hospitais').then((m) => ({ default: m.Hospitais })));
 const Trocas = lazy(() => import('@/views/Trocas').then((m) => ({ default: m.Trocas })));
 const MontarEscala = lazy(() => import('@/views/MontarEscala').then((m) => ({ default: m.MontarEscala })));
-const Detalhe = lazy(() => import('@/views/Detalhe').then((m) => ({ default: m.Detalhe })));
 const Usuario = lazy(() => import('@/views/Usuario').then((m) => ({ default: m.Usuario })));
 const Inbox = lazy(() => import('@/views/Inbox').then((m) => ({ default: m.Inbox })));
 const Auditoria = lazy(() => import('@/views/Auditoria').then((m) => ({ default: m.Auditoria })));
@@ -103,7 +102,6 @@ export function App() {
     typeof window !== 'undefined' ? parsePathToNav(window.location.pathname) : 'agenda',
   );
   const [selecionado, setSelecionado] = useState<Bloco | null>(null);
-  const [detalheBloco, setDetalheBloco] = useState<Bloco | null>(null);
   const [pulouOnboarding, setPulouOnboarding] = useState(false);
   const [adicionando, setAdicionando] = useState<AddTipo | null>(null);
   const [editandoBloco, setEditandoBloco] = useState<Bloco | null>(null);
@@ -135,18 +133,45 @@ export function App() {
     if (typeof window === 'undefined') return;
     const alvo = navToPath(active);
     if (window.location.pathname !== alvo) {
-      window.history.pushState({}, '', alvo);
+      // Mesma view com path fora do canônico (/ritmo sem barra, slug inválido):
+      // corrige sem empilhar entrada — senão o primeiro "voltar" parece morto.
+      if (parsePathToNav(window.location.pathname) === active) {
+        window.history.replaceState({}, '', alvo);
+      } else {
+        window.history.pushState({}, '', alvo);
+      }
     }
+    // Trocar de view sempre aterrissa no topo (senão o scroll da view
+    // anterior persiste e a nova abre no meio).
+    window.scrollTo(0, 0);
   }, [active]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
     function aoVoltar(): void {
       setActive(parsePathToNav(window.location.pathname));
-      setDetalheBloco(null);
     }
     window.addEventListener('popstate', aoVoltar);
     return () => window.removeEventListener('popstate', aoVoltar);
+  }, []);
+
+  // Virada do dia · PWA instalada não recarrega sozinha, então "hoje"
+  // congelaria no dia em que a aba abriu. Checa ao voltar o foco e a cada
+  // minuto; quando o dia muda, atualiza o módulo e remonta as views (key).
+  const [hoje, setHoje] = useState<string>(HOJE);
+  useEffect(() => {
+    function checarDia(): void {
+      const novo = atualizarHoje();
+      setHoje((atual) => (atual === novo ? atual : novo));
+    }
+    const timer = setInterval(checarDia, 60_000);
+    document.addEventListener('visibilitychange', checarDia);
+    window.addEventListener('focus', checarDia);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', checarDia);
+      window.removeEventListener('focus', checarDia);
+    };
   }, []);
 
   // Atualiza o map runtime de hospitais · permite que getHospital() resolva
@@ -166,9 +191,9 @@ export function App() {
   // soma o array que recebe (não filtra), então filtramos antes pra
   // não somar a vida toda.
   const carga = useMemo(() => {
-    const dias = new Set(semanaDe(HOJE));
+    const dias = new Set(semanaDe(hoje));
     return cargaSemanal(userState.state.blocos.filter((b) => dias.has(b.data)));
-  }, [userState.state.blocos]);
+  }, [userState.state.blocos, hoje]);
 
   const precisaOnboarding =
     auth.status === 'logado' &&
@@ -361,40 +386,8 @@ export function App() {
 
       {(auth.status === 'logado' || preview.ativo) && !precisaOnboarding && (
         <>
-          {detalheBloco ? (
             <Shell
-              active="agenda"
-              setActive={(k) => {
-                setActive(k);
-                setDetalheBloco(null);
-              }}
-              mode={mode}
-              carga={carga}
-              blocos={userState.state.blocos}
-              hospitais={userState.state.hospitais}
-              selecionado={null}
-              setSelecionado={() => {}}
-              notificacoes={notif.notificacoes}
-              onMarcarLida={notif.marcarLida}
-            >
-              <Suspense fallback={<ViewLoading />}>
-                <Detalhe
-                  bloco={detalheBloco}
-                  hospitais={userState.state.hospitais}
-                  voltar={() => setDetalheBloco(null)}
-                  onTrocar={() => {
-                    setDetalheBloco(null);
-                    setActive('trocas');
-                  }}
-                  onCeder={() => {
-                    setDetalheBloco(null);
-                    setActive('trocas');
-                  }}
-                />
-              </Suspense>
-            </Shell>
-          ) : (
-            <Shell
+              key={hoje}
               active={active}
               setActive={setActive}
               mode={mode}
@@ -442,7 +435,6 @@ export function App() {
                 />
               </Suspense>
             </Shell>
-          )}
 
           {adicionando && (
             <AdicionarBloco
@@ -549,6 +541,17 @@ function ViewSwitch({
   const { state, status, erro } = userState;
   const isMobile = useIsMobile();
 
+  // Agenda vazia e agenda-ainda-carregando são coisas MUITO diferentes aqui:
+  // "vazio" lê como "estou livre". A Semana desktop tem skeleton próprio;
+  // todas as outras views recebem o gate genérico.
+  const semanaDesktop = active === 'agenda' && !isMobile;
+  if (!semanaDesktop && status === 'carregando') {
+    return <EstadoCarregando />;
+  }
+  if (!semanaDesktop && status === 'erro') {
+    return <EstadoErro erro={erro} />;
+  }
+
   switch (active) {
     case 'agenda':
       // Em mobile a grade semanal é inviável (7 dias × 24h) · cai pra Lista.
@@ -644,8 +647,13 @@ function ViewSwitch({
             userState.setState({ blocos: [...userState.state.blocos, b] })
           }
           onSalvarProposta={(p) =>
+            // Upsert por id · re-salvar uma proposta editada substitui a
+            // versão antiga em vez de duplicar e comer slots do cap de 10.
             userState.setState({
-              propostasMontar: [p, ...userState.state.propostasMontar].slice(0, 10),
+              propostasMontar: [
+                p,
+                ...userState.state.propostasMontar.filter((x) => x.id !== p.id),
+              ].slice(0, 10),
             })
           }
         />
@@ -677,6 +685,59 @@ function ViewSwitch({
     default:
       return null;
   }
+}
+
+function EstadoCarregando() {
+  return (
+    <div
+      style={{
+        padding: '64px 24px',
+        textAlign: 'center',
+        color: 'var(--ink-3)',
+        font: '400 14px/1.6 var(--font-body)',
+      }}
+    >
+      carregando sua agenda…
+    </div>
+  );
+}
+
+function EstadoErro({ erro }: { erro: string | null }) {
+  return (
+    <div
+      style={{
+        padding: '64px 24px',
+        textAlign: 'center',
+        color: 'var(--ink-2)',
+        font: '400 14px/1.6 var(--font-body)',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 12,
+      }}
+    >
+      <span>não consegui carregar sua agenda · seus plantões continuam salvos</span>
+      {erro && (
+        <span style={{ color: 'var(--ink-3)', fontSize: 12 }}>{erro}</span>
+      )}
+      <button
+        type="button"
+        onClick={() => window.location.reload()}
+        style={{
+          marginTop: 4,
+          padding: '10px 22px',
+          borderRadius: 999,
+          border: '1px solid var(--line)',
+          background: 'var(--bg-alt)',
+          color: 'var(--ink)',
+          font: '500 13px/1 var(--font-body)',
+          cursor: 'pointer',
+        }}
+      >
+        tentar de novo
+      </button>
+    </div>
+  );
 }
 
 function Boot() {

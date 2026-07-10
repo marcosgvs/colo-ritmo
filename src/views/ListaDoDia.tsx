@@ -80,15 +80,17 @@ export function ListaDoDia({ blocos, hospitais: _h, onSelectBloco }: ListaDaSema
     scrollRef.current.scrollTo({ top: i * DAY_PX - 8, behavior: 'smooth' });
   }
 
-  const items = useMemo(
-    () =>
-      blocos.filter((b) => {
-        if (b.tipo === 'deslocamento') return false;
-        // Inclui blocos cujo dia de início está na semana visível
-        return semana.includes(b.data);
-      }),
-    [blocos, semana],
-  );
+  const items = useMemo(() => {
+    const vespera = adicionaDiaISO(semana[0]!, -1);
+    return blocos.filter((b) => {
+      if (b.tipo === 'deslocamento') return false;
+      // Inclui blocos cujo dia de início está na semana visível
+      if (semana.includes(b.data)) return true;
+      // Noturno da véspera que cruza a meia-noite: a madrugada do primeiro
+      // dia está ocupada — sem isso ela aparece livre.
+      return b.data === vespera && b.horaInicio + b.duracao > 24;
+    });
+  }, [blocos, semana]);
 
   const inicioSemana = semana[0]!;
   const fimSemana = semana[6]!;
@@ -747,7 +749,13 @@ function BlocoLinear({
   onClick: () => void;
 }) {
   const dIdx = semana.indexOf(b.data);
-  if (dIdx < 0) return null;
+  if (dIdx < 0) {
+    // Noturno da véspera da semana · renderiza só o pedaço da madrugada.
+    const vemDeOntem =
+      b.data === adicionaDiaISO(semana[0]!, -1) && b.horaInicio + b.duracao > 24;
+    if (!vemDeOntem) return null;
+    return <BlocoVemDeOntem b={b} onClick={onClick} />;
+  }
   const top = (dIdx * 24 + b.horaInicio) * HOUR_PX;
   const height = b.duracao * HOUR_PX;
   const cruza = b.horaInicio + b.duracao > 24;
@@ -1085,6 +1093,50 @@ function BlocoLinear({
   }
 
   return null;
+}
+
+/** Pedaço pós-meia-noite de um bloco que começou no domingo anterior à
+ * semana visível · ancorado no topo da timeline (00h do primeiro dia). */
+function BlocoVemDeOntem({ b, onClick }: { b: Bloco; onClick: () => void }) {
+  const fimMadrugada = b.horaInicio + b.duracao - 24;
+  const height = fimMadrugada * HOUR_PX;
+  const ehPlantao = b.tipo === 'plantao' || b.tipo === 'cedido';
+  const hosp = ehPlantao ? getHospital(b.hospitalId) : undefined;
+  const cor = hosp?.cor ?? 'sand';
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        position: 'absolute',
+        left: RAIL_W + 14,
+        right: 14,
+        top: 0,
+        height,
+        boxSizing: 'border-box',
+        cursor: 'pointer',
+        overflow: 'hidden',
+        background: ehPlantao ? `var(--${cor}-surface)` : 'var(--bg-alt)',
+        borderLeft: ehPlantao ? `4px solid var(--${cor})` : '4px solid var(--line-2)',
+        borderRadius: '0 0 14px 14px',
+        borderTop: `2px dashed ${ehPlantao ? `var(--${cor}-ink)` : 'var(--line-2)'}`,
+        padding: '8px 12px',
+        textAlign: 'left',
+        color: 'var(--ink)',
+        zIndex: 3,
+        opacity: b.tipo === 'cedido' ? 0.75 : 1,
+      }}
+    >
+      <Eyebrow color={hosp ? `var(--${cor}-ink)` : undefined}>
+        {hosp ? `${hosp.abrev} · ` : ''}⌃ começou ontem
+      </Eyebrow>
+      {height > 50 && (
+        <Mono style={{ color: 'var(--ink-2)', marginTop: 4 }}>
+          até {String(Math.floor(fimMadrugada)).padStart(2, '0')}h
+        </Mono>
+      )}
+    </button>
+  );
 }
 
 function horaDecimalAgora(): number {

@@ -8,6 +8,12 @@ html, body, #root {
   min-height: 100%;
 }
 
+/* Tema é só claro · sem isso, dark mode do SO pinta controles nativos
+ * de formulário (selects, inputs) de escuro sobre o creme. */
+:root {
+  color-scheme: light;
+}
+
 *, *::before, *::after {
   box-sizing: border-box;
 }

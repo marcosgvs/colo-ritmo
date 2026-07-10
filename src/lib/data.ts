@@ -94,11 +94,17 @@ export const SEMANA: readonly string[] = [
 ];
 
 /**
- * Data de hoje em ISO (YYYY-MM-DD). Avaliada uma vez no carregamento do
- * módulo · refresh recalcula. Suficiente pra UX (a página recarrega ao
- * acordar/atualizar).
+ * Data de hoje em ISO (YYYY-MM-DD). Live binding: `atualizarHoje()` recalcula
+ * e os importadores veem o valor novo no próximo render. PWA instalada não
+ * recarrega sozinha, então o App detecta a virada do dia (foco/visibilidade/
+ * timer) e força re-render — sem isso "hoje" fica sendo ontem.
  */
-export const HOJE: string = toISO(new Date());
+export let HOJE: string = toISO(new Date());
+
+export function atualizarHoje(): string {
+  HOJE = toISO(new Date());
+  return HOJE;
+}
 
 /**
  * Map de hospitais do usuário em runtime · setado pelo App.tsx quando o

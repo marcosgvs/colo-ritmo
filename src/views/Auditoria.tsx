@@ -99,8 +99,10 @@ export function Auditoria() {
                   borderRadius: 12,
                   padding: '12px 16px',
                   display: 'grid',
-                  gridTemplateColumns: '160px 140px 1fr auto',
-                  gap: 14,
+                  // em telas estreitas as colunas quebram de linha em vez de
+                  // estourar os 375px (as larguras fixas somavam ~340px)
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+                  gap: 10,
                   alignItems: 'center',
                 }}
               >

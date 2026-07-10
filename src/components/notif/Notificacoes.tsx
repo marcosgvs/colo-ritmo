@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import { Eyebrow, Hand, Mono, Pill } from '@/components/atoms';
 import { useIsMobile } from '@/hooks/useIsMobile';
+import { fmtRelativo } from '@/hooks/useNotificacoes';
+import { useScrollLock } from '@/hooks/useScrollLock';
 
 export interface Notificacao {
   id: string;
   tipo: 'troca' | 'conflito' | 'sugestao' | 'aprovacao' | 'limite';
   titulo: string;
   detalhe: string;
+  /** ISO de criação · formatado com fmtRelativo na hora do render. */
   recebidaEm: string;
   lida?: boolean;
 }
@@ -28,6 +31,9 @@ interface NotificacoesProps {
 export function NotifSino({ notificacoes, onMarcarLida, conflitos = 0, onAbrirConflitos }: NotificacoesProps) {
   const isMobile = useIsMobile();
   const [aberto, setAberto] = useState(false);
+  // dropdown desktop convive com scroll · em mobile o painel é quase
+  // full-screen e o fundo rolando por baixo confunde
+  useScrollLock(aberto && isMobile);
   const naoLidas = notificacoes.filter((n) => !n.lida);
   const totalAtencao = naoLidas.length + conflitos;
   const vazio = notificacoes.length === 0 && conflitos === 0;
@@ -256,7 +262,7 @@ function Item({ n, onMarcarLida }: { n: Notificacao; onMarcarLida: (id: string) 
         <p style={{ font: '400 12px/1.4 var(--font-body)', color: 'var(--ink-2)', margin: '4px 0 0' }}>
           {n.detalhe}
         </p>
-        <Mono style={{ color: 'var(--ink-3)', display: 'block', marginTop: 6 }}>{n.recebidaEm}</Mono>
+        <Mono style={{ color: 'var(--ink-3)', display: 'block', marginTop: 6 }}>{fmtRelativo(n.recebidaEm)}</Mono>
       </div>
     </button>
   );

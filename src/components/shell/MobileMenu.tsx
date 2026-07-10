@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import type { Mode } from '@/types';
+import { useScrollLock } from '@/hooks/useScrollLock';
 import { NAV_ITEMS, type NavKey } from './Header';
 import { NavIcon } from './NavIcon';
 
@@ -17,6 +18,7 @@ interface MobileMenuProps {
  * em um ponto só de atenção). ESC e tap-out fecham.
  */
 export function MobileMenu({ active, mode, onNav, onClose }: MobileMenuProps) {
+  useScrollLock();
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -53,7 +55,7 @@ export function MobileMenu({ active, mode, onNav, onClose }: MobileMenuProps) {
           borderTopLeftRadius: 20,
           borderTopRightRadius: 20,
           boxShadow: 'var(--shadow-lg)',
-          padding: '14px 16px 24px',
+          padding: '14px 16px calc(24px + env(safe-area-inset-bottom, 0px))',
           maxHeight: 'calc(100vh - 40px)',
           overflowY: 'auto',
           animation: 'colo-sheet-up 240ms cubic-bezier(.2,.7,.2,1)',

@@ -65,23 +65,25 @@ export function JanelaPreview({ blocos, hospitais: _h, novoBloco, raioDias = 1 }
     [blocos, novoBloco, dias],
   );
 
+  // Clampa nas duas pontas: bloco que começa antes da janela desconta o
+  // pedaço cortado da largura (senão a barra sai deslocada/larga demais).
+  function clampPct(left: number, width: number) {
+    const ini = Math.max(0, left);
+    const fim = Math.min(left + width, totalHoras);
+    return {
+      left: `${(ini / totalHoras) * 100}%`,
+      width: `${(Math.max(0, fim - ini) / totalHoras) * 100}%`,
+    };
+  }
+
   function offsetPct(b: { data: string; horaInicio: number; duracao: number }) {
     const t = new Date(`${b.data}T00:00:00`).getTime() / MS_HORA;
-    const left = t + b.horaInicio - iniAbs;
-    const width = b.duracao;
-    return {
-      left: `${(Math.max(0, left) / totalHoras) * 100}%`,
-      width: `${(Math.min(width, totalHoras - left) / totalHoras) * 100}%`,
-    };
+    return clampPct(t + b.horaInicio - iniAbs, b.duracao);
   }
 
   function offsetPctFaixa(iniHora: number, dur: number, dia: string) {
     const t = new Date(`${dia}T00:00:00`).getTime() / MS_HORA;
-    const left = t + iniHora - iniAbs;
-    return {
-      left: `${(Math.max(0, left) / totalHoras) * 100}%`,
-      width: `${(dur / totalHoras) * 100}%`,
-    };
+    return clampPct(t + iniHora - iniAbs, dur);
   }
 
   const horasAntes = Math.floor(espelho.antes.maiorDescansoContinuo);

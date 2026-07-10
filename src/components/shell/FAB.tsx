@@ -65,10 +65,22 @@ export function FAB({ mode, onAdd }: FABProps) {
   };
 
   return (
+    <>
+      {open && (
+        // tap fora fecha o leque · sem backdrop ele só fechava escolhendo
+        // um tipo ou clicando de novo no botão
+        <div
+          aria-hidden
+          onClick={() => setOpen(false)}
+          style={{ position: 'fixed', inset: 0, zIndex: 39 }}
+        />
+      )}
     <div
       style={{
         position: 'fixed',
-        bottom: 32,
+        // safe-area: em PWA standalone no iPhone, sem isso o FAB cai na
+        // zona do home indicator e o toque vira gesto de sair do app
+        bottom: 'calc(32px + env(safe-area-inset-bottom, 0px))',
         right: 32,
         zIndex: 40,
         display: 'flex',
@@ -107,6 +119,7 @@ export function FAB({ mode, onAdd }: FABProps) {
           transform: open ? 'rotate(45deg)' : 'none',
         }}
         aria-label="adicionar"
+        aria-expanded={open}
       >
         <svg
           width="18"
@@ -122,5 +135,6 @@ export function FAB({ mode, onAdd }: FABProps) {
         {!open && <span style={{ marginLeft: 2 }}>adicionar</span>}
       </button>
     </div>
+    </>
   );
 }

@@ -178,6 +178,10 @@ export function AdicionarBloco({
         alignItems: 'flex-start',
         justifyContent: 'center',
         padding: '60px 20px',
+        // conteúdo maior que a tela (preview + aviso de conflito em mobile)
+        // rola dentro do overlay · senão os botões ficam inalcançáveis
+        overflowY: 'auto',
+        WebkitOverflowScrolling: 'touch',
         animation: 'colo-fade-in 180ms ease',
       }}
     >

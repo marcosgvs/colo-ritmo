@@ -9,6 +9,7 @@ import {
   type Conflito,
 } from '@/lib/data';
 import { Eyebrow, Hand, IconConflito, Mono, Pill } from '@/components/atoms';
+import { useScrollLock } from '@/hooks/useScrollLock';
 
 interface BlockDrawerProps {
   bloco: Bloco | null;
@@ -46,9 +47,9 @@ const TIPOS_EDITAVEIS = new Set([
 ]);
 
 /**
- * BlockDrawer · overlay lateral à direita (480px desktop · bottom sheet
- * mobile). Mostra os dados essenciais do bloco e ações primárias.
- *   plantão  → trocar, ceder, abrir detalhe
+ * BlockDrawer · modal centralizado com os dados essenciais do bloco e
+ * ações primárias.
+ *   plantão  → trocar, ceder, editar, remover
  *   sono     → editar janela
  *   bloqueio → editar motivo
  *   cedido/trocado/deslocamento → só read
@@ -73,6 +74,8 @@ export function BlockDrawer({
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [bloco, onClose]);
+
+  useScrollLock(!!bloco);
 
   // Quando o bloco está em conflito, busca contrapartes pra mostrar lado a lado
   const conflitosRelacionados = useMemo<Array<{ outro: BlocoPlantao; conflito: Conflito }>>(() => {
@@ -165,7 +168,11 @@ export function BlockDrawer({
               background: 'var(--bg-alt)',
               border: '1px solid var(--line)',
               borderRadius: 999,
-              padding: 8,
+              minWidth: 40,
+              minHeight: 40,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
               cursor: 'pointer',
               color: 'var(--ink-2)',
             }}

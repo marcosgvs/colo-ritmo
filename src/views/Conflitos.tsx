@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import type { Bloco, HospitaisMap } from '@/types';
-import { detectarConflitos, fmtDate, fmtRange, getHospital } from '@/lib/data';
+import { adicionaDia, detectarConflitos, fmtDate, fmtRange, getHospital, HOJE } from '@/lib/data';
 import type { TipoConflito } from '@/lib/conflitos';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { Eyebrow, Mono, Pill } from '@/components/atoms';
@@ -30,7 +30,15 @@ const COPY_TIPO: Record<TipoConflito, { titulo: string; recado: string }> = {
 
 export function Conflitos({ blocos, hospitais, onSelectBloco }: ConflitosProps) {
   const isMobile = useIsMobile();
-  const conflitos = useMemo(() => detectarConflitos(blocos, hospitais), [blocos, hospitais]);
+  // Mesmo recorte do sino do Shell: só de ontem pra frente · conflito no
+  // passado não tem o que resolver.
+  const conflitos = useMemo(() => {
+    const desde = adicionaDia(HOJE, -1);
+    return detectarConflitos(
+      blocos.filter((b) => b.data >= desde),
+      hospitais,
+    );
+  }, [blocos, hospitais]);
 
   return (
     <>
