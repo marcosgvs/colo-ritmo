@@ -120,7 +120,7 @@
       </header>
 
       <p class="meta">
-        Última atualização: 14 de maio de 2026 · Lei aplicável: Lei nº 13.709/2018 (LGPD).
+        Última atualização: 10 de julho de 2026 · Lei aplicável: Lei nº 13.709/2018 (LGPD).
       </p>
 
       <h2>1. Quem somos</h2>
@@ -132,7 +132,7 @@
       </p>
 
       <h2>2. Dados que coletamos</h2>
-      <p>Coletamos apenas o necessário pra o aplicativo funcionar:</p>
+      <p>Coletamos apenas o necessário para o aplicativo funcionar:</p>
       <ul>
         <li>
           <strong>Identificação:</strong> nome, e-mail e telefone que você informa no cadastro.
@@ -140,6 +140,12 @@
         <li>
           <strong>Conteúdo da sua agenda:</strong> hospitais, plantões, horários, valores, trocas,
           regras institucionais e demais blocos que você adicionar.
+        </li>
+        <li>
+          <strong>Arquivos de escala enviados na importação:</strong> o PDF ou a foto da escala
+          oficial que você envia para importar seus plantões. Por se tratar de documento
+          produzido pelo hospital, esse arquivo pode conter dados de terceiros presentes no
+          próprio documento (por exemplo, nomes de outros profissionais escalados).
         </li>
         <li>
           <strong>Autenticação:</strong> tokens de sessão fornecidos pelo provedor de identidade
@@ -238,9 +244,13 @@
           >.
         </li>
         <li>
-          <strong>Anthropic</strong> (assistência de IA para sugestão de escalas, sob sua
-          solicitação explícita) — recebe somente os dados da agenda necessários para gerar a
-          sugestão.
+          <strong>Anthropic</strong> (assistência de IA, acionada somente sob sua solicitação
+          explícita) — recebe dados em dois fluxos: (a) na sugestão de escala, somente os dados
+          da agenda necessários para gerar a sugestão; (b) na importação de escala, o arquivo
+          que você envia (PDF ou foto), na íntegra, para extração dos seus próprios plantões.
+          Conforme a política da API da Anthropic, esse conteúdo não é utilizado para treinar
+          modelos. Nós não armazenamos o arquivo enviado além do processamento necessário para
+          devolver o resultado da importação.
           <a href="https://www.anthropic.com/legal/privacy" target="_blank" rel="noopener noreferrer"
             >Política da Anthropic</a
           >.
