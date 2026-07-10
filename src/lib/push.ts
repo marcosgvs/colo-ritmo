@@ -131,13 +131,21 @@ export async function cancelarPush(): Promise<boolean> {
   const endpoint = sub.endpoint;
   await sub.unsubscribe();
   try {
-    await fetch('/api/push/unsubscribe', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ endpoint }),
-    });
+    // O endpoint exige JWT (deleta só subscriptions do próprio user).
+    const { data: sessData } = await supabase().auth.getSession();
+    const accessToken = sessData.session?.access_token;
+    if (accessToken) {
+      await fetch('/api/push/unsubscribe', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ endpoint }),
+      });
+    }
   } catch {
-    // ignora — local já desassinou
+    // ignora — local já desassinou · cron limpa a row órfã via 404/410
   }
   return true;
 }

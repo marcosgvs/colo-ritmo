@@ -32,6 +32,12 @@ const MIMES_VALIDOS = new Set([
   'image/webp',
   'image/gif',
 ]);
+
+// Function na vercel aceita body de até 4.5mb · base64 infla +33%, então
+// o arquivo real precisa caber em ~3mb. Imagem a gente comprime no client;
+// pdf não tem como, então acima disso é erro.
+const MAX_PDF_BYTES = 3 * 1024 * 1024;
+const MAX_IMG_BASE64_CHARS = 4 * 1024 * 1024; // ~3mb de arquivo em base64
 import { EmptyState } from '@/components/empty';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { PageHead } from './_PageHead';
@@ -105,6 +111,15 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
 
   const apelidoOk = apelidoNaEscala.trim().length > 0;
 
+  // Os hospitais chegam async (load do user_state): se a view montou antes,
+  // o select mostrava a 1ª opção mas o estado ficava '' e o upload travava
+  // desabilitado sem explicação.
+  useEffect(() => {
+    if (!hospitalId && Object.keys(hospitais).length > 0) {
+      setHospitalId(Object.keys(hospitais)[0]!);
+    }
+  }, [hospitais, hospitalId]);
+
   // Quando há ambiguidade (>1 variante), filtra os blocos pelas variantes
   // selecionadas pela usuária. Quando só tem 1 variante (ou ICS), mostra
   // todos os blocos diretamente.
@@ -162,7 +177,11 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
       });
       if (!resp.ok) {
         const txt = await resp.text();
-        let msg = `servidor não respondeu bem · ${resp.status}`;
+        // 413 = corpo estourou o limite da vercel (4.5mb) · não vem json
+        let msg =
+          resp.status === 413
+            ? 'esse arquivo ficou grande demais pro envio · tenta mandar uma foto da escala'
+            : `servidor não respondeu bem · ${resp.status}`;
         try {
           const j = JSON.parse(txt) as { erro?: string };
           if (j.erro) msg = j.erro;
@@ -217,6 +236,14 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
       setEstado('erro');
       return;
     }
+    // pdf não dá pra comprimir no client · o body da function na vercel
+    // aguenta 4.5mb e base64 infla +33%, então o teto real é ~3mb
+    if (mime === 'application/pdf' && file.size > MAX_PDF_BYTES) {
+      setErro('esse pdf é grande demais · exporta de novo mais leve ou manda uma foto da escala');
+      setEstado('erro');
+      e.target.value = '';
+      return;
+    }
     if (!apelidoOk) {
       setErro('precisa preencher "seu nome na escala" antes · é como o chefe te chama na escala');
       setEstado('erro');
@@ -226,11 +253,20 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
     setEstado('lendo');
     setErro(null);
     try {
-      const base64 = await fileToBase64(file);
+      let base64: string;
+      let mimeEnvio = mime;
+      if (mime.startsWith('image/')) {
+        // foto de celular vem em 8–20mb · comprime antes de enviar
+        const comprimida = await comprimirImagem(file);
+        base64 = comprimida.base64;
+        mimeEnvio = comprimida.mime;
+      } else {
+        base64 = await fileToBase64(file);
+      }
       setArquivoBase64(base64);
       setArquivoNome(file.name);
-      setArquivoMime(mime);
-      await processarArquivo(base64, mime);
+      setArquivoMime(mimeEnvio);
+      await processarArquivo(base64, mimeEnvio);
     } catch (err) {
       setErro((err as Error).message);
       setEstado('erro');
@@ -504,7 +540,7 @@ export function Sync({ blocos, hospitais, onAdicionarBlocos, onAplicarEscala, ic
                 </p>
               )}
               <Mono style={{ display: 'block', marginTop: 6, color: 'var(--ink-3)' }}>
-                {estado === 'enviando' ? 'isso pode levar alguns segundos' : 'pdf, jpg, png ou webp · até 20mb'}
+                {estado === 'enviando' ? 'isso pode levar alguns segundos' : 'pdf até 3mb · foto (jpg, png, webp) eu comprimo aqui mesmo'}
               </Mono>
             </label>
             {arquivoBase64 && estado !== 'enviando' && estado !== 'lendo' && (
@@ -926,6 +962,58 @@ function inferirMime(nome: string): string {
   if (ext === 'webp') return 'image/webp';
   if (ext === 'gif') return 'image/gif';
   return '';
+}
+
+/**
+ * Foto de celular chega em 8–20mb e estouraria o body da function (4.5mb).
+ * Redimensiona pra no máx 2200px no maior lado e recomprime como jpeg
+ * qualidade 0.85, baixando a qualidade aos poucos se ainda não couber.
+ * Só roda pra imagem · pdf não tem como comprimir no client.
+ */
+async function comprimirImagem(file: File): Promise<{ base64: string; mime: string }> {
+  const img = await carregarImagem(file);
+  const largura = 'naturalWidth' in img ? img.naturalWidth : img.width;
+  const altura = 'naturalHeight' in img ? img.naturalHeight : img.height;
+  const escala = Math.min(1, 2200 / Math.max(largura, altura));
+  const w = Math.max(1, Math.round(largura * escala));
+  const h = Math.max(1, Math.round(altura * escala));
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('não consegui processar a foto · tenta mandar um pdf');
+  // escala é papel branco · fundo branco evita png transparente virar jpeg preto
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, w, h);
+  ctx.drawImage(img, 0, 0, w, h);
+  if ('close' in img) img.close();
+
+  let qualidade = 0.85;
+  let dataUrl = canvas.toDataURL('image/jpeg', qualidade);
+  while (dataUrl.length > MAX_IMG_BASE64_CHARS && qualidade > 0.4) {
+    qualidade -= 0.1;
+    dataUrl = canvas.toDataURL('image/jpeg', qualidade);
+  }
+  const idx = dataUrl.indexOf(',');
+  return { base64: idx >= 0 ? dataUrl.slice(idx + 1) : dataUrl, mime: 'image/jpeg' };
+}
+
+function carregarImagem(file: File): Promise<HTMLImageElement | ImageBitmap> {
+  if (typeof createImageBitmap === 'function') return createImageBitmap(file);
+  // fallback · safari antigo sem createImageBitmap(File)
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(img);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('não consegui abrir a foto · tenta tirar outra'));
+    };
+    img.src = url;
+  });
 }
 
 function fileToBase64(file: File): Promise<string> {

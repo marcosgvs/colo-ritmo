@@ -11,8 +11,9 @@ import { supabaseAdmin } from '../_shared/supabaseAdmin.js';
  *   2. carrega `user_state.state.blocos` do user
  *   3. renderiza VCALENDAR e devolve com `Content-Type: text/calendar`
  *
- * Tokens são gerados por usuário e podem ser revogados (a v1 já tem RPC).
- * Aqui não validamos expiração — quem rodar `revogar_ics_token` invalida.
+ * Tokens são gerados por usuário. Rotação/revogação ainda NÃO está
+ * implementada — não existe RPC de revogar; invalidar hoje exige trocar
+ * o `ics_token` direto em `user_profiles`. Não validamos expiração.
  */
 
 interface UserStateBlob {
@@ -75,7 +76,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   const ics = gerarICS(blocos, hospitais, { nome });
 
   res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
-  res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=300');
+  // private · o feed é autenticado por token na URL — `public` deixaria
+  // proxies/CDN cachearem e servirem a agenda pra quem não tem o token.
+  res.setHeader('Cache-Control', 'private, max-age=300');
   res.setHeader('Content-Disposition', `inline; filename="colo-ritmo-${token.slice(0, 8)}.ics"`);
   res.status(200).send(ics);
 }

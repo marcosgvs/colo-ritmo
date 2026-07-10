@@ -9,10 +9,14 @@ import { supabaseAdmin } from '../_shared/supabaseAdmin.js';
  *   1. lê o JWT do header Authorization (já vem do client logado)
  *   2. resolve o user atual via Supabase auth
  *   3. lê `parceiro_user_id` em user_profiles (assumido no schema v1)
- *   4. carrega user_state.state da Mariana
- *   5. devolve `{ blocos, hospitais, nome, atualizadoEm }`
+ *   4. exige RECIPROCIDADE: o alvo também precisa apontar de volta pro
+ *      requerente — senão qualquer user poderia se auto-declarar parceiro
+ *      de qualquer UUID e ler a agenda alheia via service role
+ *   5. carrega user_state.state da Mariana
+ *   6. devolve `{ blocos, hospitais, nome, atualizadoEm }`
  *
  * Sem auth, retorna 401. Sem parceiro vinculado, 200 com `vinculado: false`.
+ * Vínculo sem reciprocidade, 403.
  */
 
 interface PerfilParceiro {
@@ -30,6 +34,7 @@ interface UserStateBlob {
 
 interface PerfilDestino {
   user_id: string;
+  parceiro_user_id: string | null;
   nome: string | null;
 }
 
@@ -66,18 +71,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return;
   }
 
-  const [stateResp, parceiroResp] = await Promise.all([
-    adm
-      .from('user_state')
-      .select('state')
-      .eq('user_id', perfil.parceiro_user_id)
-      .maybeSingle<{ state: UserStateBlob | null }>(),
-    adm
-      .from('user_profiles')
-      .select('user_id, nome')
-      .eq('user_id', perfil.parceiro_user_id)
-      .maybeSingle<PerfilDestino>(),
-  ]);
+  // Reciprocidade: o alvo precisa apontar de volta pro requerente.
+  // Sem isso, declarar `parceiro_user_id` no próprio profile bastaria
+  // pra ler a agenda de qualquer pessoa.
+  const parceiroResp = await adm
+    .from('user_profiles')
+    .select('user_id, parceiro_user_id, nome')
+    .eq('user_id', perfil.parceiro_user_id)
+    .maybeSingle<PerfilDestino>();
+
+  if (parceiroResp.error) {
+    res.status(500).json({ erro: parceiroResp.error.message });
+    return;
+  }
+
+  if (parceiroResp.data?.parceiro_user_id !== userId) {
+    res.status(403).json({ erro: 'essa pessoa ainda não te adicionou como parceiro' });
+    return;
+  }
+
+  const stateResp = await adm
+    .from('user_state')
+    .select('state')
+    .eq('user_id', perfil.parceiro_user_id)
+    .maybeSingle<{ state: UserStateBlob | null }>();
 
   if (stateResp.error) {
     res.status(500).json({ erro: stateResp.error.message });

@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'node:crypto';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import webpush, { type PushSubscription as WebPushSubscription } from 'web-push';
 import { supabaseAdmin } from '../_shared/supabaseAdmin.js';
@@ -12,7 +13,8 @@ import { envObrigatorio, envOpcional } from '../_shared/env.js';
  *
  * O Supabase tem RPC `cron_lembretes_payload(secret)` que devolve a
  * lista pronta de notificações a enviar. Esta função só:
- *   1. valida o CRON_SECRET via header `Authorization: Bearer …` ou query
+ *   1. valida o CRON_SECRET via header `Authorization: Bearer …`
+ *      (só header — o pg_cron do v16 manda por header; query vazaria em logs)
  *   2. chama RPC com o secret
  *   3. faz web-push pra cada subscription
  *   4. devolve `{ tentadas, sucesso, falhas }`
@@ -48,22 +50,33 @@ function configurarVapid(): void {
 }
 
 function extrairSecret(req: VercelRequest): string | null {
+  // Só header Authorization — o pg_cron (schemas-legacy/supabase-v16.sql)
+  // manda `Authorization: Bearer <secret>`. Query string vazaria em logs.
   const auth = req.headers['authorization'];
   if (typeof auth === 'string' && auth.startsWith('Bearer ')) return auth.slice(7);
-  const q = req.query['secret'];
-  if (typeof q === 'string') return q;
   return null;
+}
+
+/** Comparação constant-time · não vaza prefixo do secret via timing. */
+function secretConfere(recebido: string | null, esperado: string): boolean {
+  if (!recebido) return false;
+  const a = Buffer.from(recebido);
+  const b = Buffer.from(esperado);
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   const cronSecret = envObrigatorio('CRON_SECRET');
   const recebido = extrairSecret(req);
-  if (recebido !== cronSecret) {
+  if (!secretConfere(recebido, cronSecret)) {
     res.status(401).json({ erro: 'unauthorized' });
     return;
   }
 
-  const modoRaw = req.query['modo'];
+  // Aceita `modo` e `mode` · o pg_cron do v16 manda `?mode=`, o CUTOVER
+  // documenta `?modo=` — sem os dois, o digest diário rodaria como 'lead'.
+  const modoRaw = req.query['modo'] ?? req.query['mode'];
   const modo = modoRaw === 'today' ? 'today' : 'lead';
 
   configurarVapid();

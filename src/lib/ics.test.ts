@@ -150,6 +150,34 @@ describe('gerarICS', () => {
     expect(ics).toContain('UID:colo-ritmo-1@hbdf.colopediatria');
   });
 
+  test('todo VEVENT tem DTSTAMP em UTC (RFC 5545 · Outlook.com rejeita sem)', () => {
+    const blocos: Bloco[] = [
+      {
+        id: 1,
+        tipo: 'plantao',
+        hospitalId: 'HBDF',
+        data: '2026-05-04',
+        horaInicio: 7,
+        duracao: 12,
+      },
+      {
+        id: 2,
+        tipo: 'plantao',
+        hospitalId: 'HBDF',
+        data: '2026-05-06',
+        horaInicio: 19,
+        duracao: 12,
+      },
+    ];
+    const ics = gerarICS(blocos, HOSPITAIS, { nome: 'Mariana' });
+    const stamps = ics.match(/DTSTAMP:\d{8}T\d{6}Z/g) ?? [];
+    expect(stamps).toHaveLength(2);
+    // gerado no momento da serialização · confere que é "agora" (± 1 min)
+    const m = stamps[0]!.match(/DTSTAMP:(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z/)!;
+    const stampMs = Date.UTC(+m[1]!, +m[2]! - 1, +m[3]!, +m[4]!, +m[5]!, +m[6]!);
+    expect(Math.abs(Date.now() - stampMs)).toBeLessThan(60_000);
+  });
+
   test('plantão noturno gera DTEND no dia seguinte', () => {
     const blocos: Bloco[] = [
       {

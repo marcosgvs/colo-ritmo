@@ -3,6 +3,11 @@
   "framework": "vite",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "functions": {
+    "api/extrair-escala.ts": { "maxDuration": 120 },
+    "api/montar-escala.ts": { "maxDuration": 120 },
+    "api/regras-parse.ts": { "maxDuration": 60 }
+  },
   "redirects": [
     { "source": "/", "destination": "/ritmo/", "permanent": false }
   ],

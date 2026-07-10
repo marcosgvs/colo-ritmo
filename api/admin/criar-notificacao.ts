@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'node:crypto';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { envObrigatorio } from '../_shared/env.js';
 import { supabaseAdmin } from '../_shared/supabaseAdmin.js';
@@ -18,6 +19,15 @@ import { supabaseAdmin } from '../_shared/supabaseAdmin.js';
  */
 
 const TIPOS_OK = new Set(['troca', 'conflito', 'sugestao', 'aprovacao', 'limite']);
+
+/** Comparação constant-time · não vaza prefixo do secret via timing. */
+function secretConfere(recebido: unknown, esperado: string): boolean {
+  if (typeof recebido !== 'string') return false;
+  const a = Buffer.from(recebido);
+  const b = Buffer.from(esperado);
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
+}
 
 interface Body {
   user_id?: string;
@@ -41,7 +51,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return;
   }
 
-  if (req.headers['x-seed-secret'] !== secret) {
+  if (!secretConfere(req.headers['x-seed-secret'], secret)) {
     res.status(401).json({ erro: 'unauthorized' });
     return;
   }

@@ -171,6 +171,8 @@ function vevent(b: BlocoPlantao, hosp: Hospital): string[] {
   return [
     'BEGIN:VEVENT',
     `UID:colo-ritmo-${b.id}@${hosp.id.toLowerCase()}.colopediatria`,
+    // DTSTAMP é obrigatório no RFC 5545 · Outlook.com rejeita VEVENT sem.
+    `DTSTAMP:${dtstampUTC()}`,
     `SUMMARY:${escapeICS(summary)}`,
     `DESCRIPTION:${escapeICS(description)}`,
     `LOCATION:${escapeICS(hosp.nome)}`,
@@ -178,6 +180,11 @@ function vevent(b: BlocoPlantao, hosp: Hospital): string[] {
     `DTEND:${fim}`,
     'END:VEVENT',
   ];
+}
+
+/** Agora em UTC no formato YYYYMMDDTHHMMSSZ · gerado na serialização. */
+function dtstampUTC(agora: Date = new Date()): string {
+  return `${agora.toISOString().replace(/[-:]/g, '').slice(0, 15)}Z`;
 }
 
 function formatICSStamp(iso: string, hora: number): string {
