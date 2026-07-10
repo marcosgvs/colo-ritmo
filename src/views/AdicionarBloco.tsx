@@ -18,38 +18,45 @@ interface AdicionarBlocoProps {
   onCancelar: () => void;
 }
 
-const TITULO_CRIAR: Record<AddTipo, string> = {
-  plantao: 'novo plantão',
-  sono: 'janela de sono',
-  bloqueio: 'dia bloqueado',
-  consulta: 'consulta',
-  estudo: 'estudo / curso',
-  pessoal: 'compromisso pessoal',
-  outros: 'outro evento',
-};
+/**
+ * Tudo que não é plantão entra pelo MESMO form ("outro compromisso"):
+ * descrição livre + chip opcional de identificação. O chip mapeia pro
+ * tipo já existente no modelo (sono/bloqueio/consulta/…), então blocos
+ * antigos continuam válidos e a cor/semântica de cada um se mantém —
+ * folga segue bloqueando o Montar, sono segue pintado de sage, etc.
+ */
+interface ChipTipo {
+  tipo: Exclude<AddTipo, 'plantao'>;
+  rotulo: string;
+  cor: string;
+  /** Defaults de janela ao escolher o chip em modo criar. */
+  inicio: number;
+  duracao: number;
+  placeholder: string;
+}
 
-const TITULO_EDITAR: Record<AddTipo, string> = {
-  plantao: 'editar plantão',
-  sono: 'editar janela de sono',
-  bloqueio: 'editar bloqueio',
-  consulta: 'editar consulta',
-  estudo: 'editar estudo',
-  pessoal: 'editar compromisso',
-  outros: 'editar evento',
-};
+const CHIPS_TIPO: ChipTipo[] = [
+  { tipo: 'outros',   rotulo: 'outro',    cor: 'ink-3',     inicio: 19, duracao: 3,  placeholder: 'reunião · jantar · etc' },
+  { tipo: 'consulta', rotulo: 'consulta', cor: 'coral-ink', inicio: 9,  duracao: 4,  placeholder: 'consultório centro' },
+  { tipo: 'estudo',   rotulo: 'estudo',   cor: 'blue-ink',  inicio: 9,  duracao: 8,  placeholder: 'curso de UTI neonatal' },
+  { tipo: 'pessoal',  rotulo: 'pessoal',  cor: 'sand-ink',  inicio: 19, duracao: 3,  placeholder: 'aniversário · família' },
+  { tipo: 'bloqueio', rotulo: 'folga',    cor: 'olive-ink', inicio: 0,  duracao: 24, placeholder: 'viagem · descanso' },
+  { tipo: 'sono',     rotulo: 'sono',     cor: 'sage-ink',  inicio: 22, duracao: 8,  placeholder: '' },
+];
 
-const ROTULO_TIPO: Record<Exclude<AddTipo, 'plantao'>, string> = {
-  sono: 'sono',
-  bloqueio: 'bloqueio',
-  consulta: 'consulta',
-  estudo: 'estudo',
-  pessoal: 'pessoal',
-  outros: 'outros',
-};
+function chipDe(tipo: AddTipo): ChipTipo {
+  return CHIPS_TIPO.find((c) => c.tipo === tipo) ?? CHIPS_TIPO[0]!;
+}
 
 /** Hora-fim a partir de início + duração · cruza meia-noite (mod 24). */
 function horaFimDe(inicio: number, duracao: number): number {
   return (inicio + duracao) % 24;
+}
+
+/** Clampa input numérico de hora · NaN (campo vazio) vira o mínimo. */
+function clampHora(v: number, min: number, max: number): number {
+  if (!Number.isFinite(v)) return min;
+  return Math.min(max, Math.max(min, v));
 }
 
 /** Duração inferida de início + fim · se fim ≤ início, considera overnight. */
@@ -69,12 +76,12 @@ function nomeDoBloco(b: Bloco): string {
 
 const HAND_HINT: Record<AddTipo, string> = {
   plantao: 'um turno',
-  sono: 'janela protegida',
-  bloqueio: 'sem agenda',
+  sono: 'janela protegida de descanso',
+  bloqueio: 'sem agenda nesse período',
   consulta: 'consultório ou ambulatório',
   estudo: 'curso, congresso, aula',
   pessoal: 'fora da medicina',
-  outros: 'qualquer outro evento',
+  outros: 'qualquer coisa que ocupa tempo',
 };
 
 /** Tipos que o AdicionarBloco/Editor cobre. Outros (cedido/trocado/deslocamento)
@@ -115,19 +122,29 @@ export function AdicionarBloco({
   const hojeISO = dataInicial ?? toISO(new Date());
 
   const hospitaisLista = Object.values(hospitais);
-  // Em modo editar não-plantão, tipo é mutável (select). Plantão sempre fixo.
+  // Em não-plantão, tipo é mutável (chips de identificação). Plantão fixo.
   const [tipoAtual, setTipoAtual] = useState<AddTipo>(tipo);
   const [data, setData] = useState(blocoExistente?.data ?? hojeISO);
   const [horaInicio, setHoraInicio] = useState(
-    blocoExistente?.horaInicio ?? (tipo === 'plantao' ? 7 : tipo === 'sono' ? 22 : 19),
+    blocoExistente?.horaInicio ?? (tipo === 'plantao' ? 7 : chipDe(tipo).inicio),
   );
   const [duracao, setDuracao] = useState(
-    blocoExistente?.duracao ?? (tipo === 'sono' ? 8 : tipo === 'bloqueio' ? 24 : 12),
+    blocoExistente?.duracao ?? (tipo === 'plantao' ? 12 : chipDe(tipo).duracao),
   );
   const [hospitalId, setHospitalId] = useState(
     blocoExistente?.tipo === 'plantao' ? blocoExistente.hospitalId : hospitaisLista[0]?.id ?? '',
   );
   const [nome, setNome] = useState(blocoExistente ? nomeDoBloco(blocoExistente) : '');
+
+  // Chip clicado em modo criar aplica os defaults de janela do chip
+  // (folga = dia inteiro, sono = 22→6…) · em editar preserva as horas.
+  function escolherChip(c: ChipTipo): void {
+    setTipoAtual(c.tipo);
+    if (!modoEditar) {
+      setHoraInicio(c.inicio);
+      setDuracao(c.duracao);
+    }
+  }
 
   const novoBloco: Bloco = useMemo(() => {
     const id = blocoExistente?.id ?? `manual-${Date.now()}`;
@@ -155,16 +172,16 @@ export function AdicionarBloco({
   }, [tipoAtual, novoBloco, blocosAtuais, hospitais, blocoExistente]);
 
   const podeSalvar = (tipoAtual !== 'plantao' || hospitalId) && duracao > 0;
-  const mostraNome = tipoAtual !== 'plantao' && tipoAtual !== 'sono';
-  const placeholderNome =
-    tipoAtual === 'bloqueio'
-      ? 'aniversário · viagem · descanso'
-      : tipoAtual === 'consulta'
-      ? 'consultório centro'
-      : tipoAtual === 'estudo'
-      ? 'curso de UTI neonatal'
-      : 'reunião · jantar · etc';
-  const mostraSelectTipo = modoEditar && tipoAtual !== 'plantao';
+  const ehPlantao = tipoAtual === 'plantao';
+  // Sono não tem campo de texto no modelo · o chip já diz tudo.
+  const mostraNome = !ehPlantao && tipoAtual !== 'sono';
+  const titulo = ehPlantao
+    ? modoEditar
+      ? 'editar plantão'
+      : 'novo plantão'
+    : modoEditar
+      ? 'editar compromisso'
+      : 'outro compromisso';
 
   return (
     <div
@@ -198,7 +215,10 @@ export function AdicionarBloco({
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-          <Eyebrow>{modoEditar ? `editar · ${tipoAtual}` : tipoAtual}</Eyebrow>
+          <Eyebrow>
+            {ehPlantao ? 'plantão' : chipDe(tipoAtual).rotulo}
+            {modoEditar ? ' · editar' : ''}
+          </Eyebrow>
           <button
             type="button"
             onClick={onCancelar}
@@ -227,36 +247,62 @@ export function AdicionarBloco({
             margin: '8px 0 6px',
           }}
         >
-          {(modoEditar ? TITULO_EDITAR : TITULO_CRIAR)[tipoAtual]}
+          {titulo}
         </h2>
         <Hand color="var(--ink-2)" size={16} style={{ display: 'block', marginBottom: 18 }}>
           {HAND_HINT[tipoAtual]}
         </Hand>
 
         {mostraNome && (
-          <Field label="nome">
+          <Field label="o que é">
             <input
               value={nome}
               onChange={(e) => setNome(e.target.value)}
-              placeholder={placeholderNome}
+              placeholder={chipDe(tipoAtual).placeholder}
               style={input}
             />
           </Field>
         )}
 
-        {mostraSelectTipo && (
-          <Field label="tipo">
-            <select
-              value={tipoAtual}
-              onChange={(e) => setTipoAtual(e.target.value as AddTipo)}
-              style={input}
-            >
-              {(Object.keys(ROTULO_TIPO) as Array<keyof typeof ROTULO_TIPO>).map((t) => (
-                <option key={t} value={t}>
-                  {ROTULO_TIPO[t]}
-                </option>
-              ))}
-            </select>
+        {!ehPlantao && (
+          <Field label="identificar como">
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {CHIPS_TIPO.map((c) => {
+                const ativo = c.tipo === tipoAtual;
+                return (
+                  <button
+                    key={c.tipo}
+                    type="button"
+                    onClick={() => escolherChip(c)}
+                    aria-pressed={ativo}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 7,
+                      font: '600 13px/1 var(--font-body)',
+                      padding: '10px 14px',
+                      minHeight: 40,
+                      borderRadius: 999,
+                      border: `1px solid ${ativo ? 'var(--ink)' : 'var(--line)'}`,
+                      background: ativo ? 'var(--ink)' : 'var(--bg)',
+                      color: ativo ? 'var(--bg)' : 'var(--ink-2)',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <span
+                      aria-hidden
+                      style={{
+                        width: 7,
+                        height: 7,
+                        borderRadius: 999,
+                        background: `var(--${c.cor})`,
+                      }}
+                    />
+                    {c.rotulo}
+                  </button>
+                );
+              })}
+            </div>
           </Field>
         )}
 
@@ -281,29 +327,16 @@ export function AdicionarBloco({
           <Field label="data">
             <DatePicker value={data} onChange={setData} />
           </Field>
-          {tipoAtual === 'bloqueio' ? (
-            <Field label="duração (h)">
-              <input
-                type="number"
-                step="0.5"
-                min={0.5}
-                max={24}
-                value={duracao}
-                onChange={(e) => setDuracao(Number(e.target.value))}
-                style={input}
-                placeholder="duração"
-              />
-            </Field>
-          ) : tipoAtual === 'plantao' ? (
+          {tipoAtual === 'plantao' ? (
             <Field label="horário · h + duração">
               <div style={{ display: 'flex', gap: 8 }}>
                 <input
                   type="number"
                   step="0.5"
                   min={0}
-                  max={24}
+                  max={23.5}
                   value={horaInicio}
-                  onChange={(e) => setHoraInicio(Number(e.target.value))}
+                  onChange={(e) => setHoraInicio(clampHora(Number(e.target.value), 0, 23.5))}
                   style={{ ...input, flex: 1 }}
                   placeholder="h início"
                 />
@@ -313,7 +346,7 @@ export function AdicionarBloco({
                   min={0.5}
                   max={24}
                   value={duracao}
-                  onChange={(e) => setDuracao(Number(e.target.value))}
+                  onChange={(e) => setDuracao(clampHora(Number(e.target.value), 0.5, 24))}
                   style={{ ...input, flex: 1 }}
                   placeholder="duração"
                 />
@@ -326,9 +359,9 @@ export function AdicionarBloco({
                   type="number"
                   step="0.5"
                   min={0}
-                  max={24}
+                  max={23.5}
                   value={horaInicio}
-                  onChange={(e) => setHoraInicio(Number(e.target.value))}
+                  onChange={(e) => setHoraInicio(clampHora(Number(e.target.value), 0, 23.5))}
                   style={{ ...input, flex: 1 }}
                   placeholder="início"
                 />
@@ -337,10 +370,10 @@ export function AdicionarBloco({
                   type="number"
                   step="0.5"
                   min={0}
-                  max={24}
+                  max={23.5}
                   value={horaFimDe(horaInicio, duracao)}
                   onChange={(e) => {
-                    const fim = Number(e.target.value);
+                    const fim = clampHora(Number(e.target.value), 0, 23.5);
                     setDuracao(duracaoDeInicioFim(horaInicio, fim));
                   }}
                   style={{ ...input, flex: 1 }}

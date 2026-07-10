@@ -90,13 +90,11 @@ export function FAB({ mode, onAdd }: FABProps) {
       }}
     >
       {open && (
+        // Só 2 entradas · o resto (sono, folga, consulta, estudo…) vira
+        // identificação DENTRO do form de "outro" — 7 opções no leque
+        // confundiam mais do que ajudavam.
         <>
-          <FabAction label="outros"   sub="o que mais cabe no dia"   color="ink-2"        onClick={() => handle('outros')} />
-          <FabAction label="pessoal"  sub="médico fora da medicina"   color="sand-ink"     onClick={() => handle('pessoal')} />
-          <FabAction label="estudo"   sub="curso, congresso, aula"    color="blue-ink"     onClick={() => handle('estudo')} />
-          <FabAction label="consulta" sub="consultório, ambulatório"  color="coral-ink"    onClick={() => handle('consulta')} />
-          <FabAction label="bloqueio" sub="dia livre"                 color="ink-3"        onClick={() => handle('bloqueio')} />
-          <FabAction label="sono"     sub="janela protegida"          color="sage-ink"     onClick={() => handle('sono')} />
+          <FabAction label="outro"    sub="consulta, estudo, folga…"  color="ink-2"        onClick={() => handle('outros')} />
           <FabAction label="plantão"  sub="novo turno"                color="lavender-ink" primary onClick={() => handle('plantao')} />
         </>
       )}
