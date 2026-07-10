@@ -23,7 +23,8 @@ import { Card, Modal, Total, btnPrimario, btnSecundario, inputBase } from './ui'
 
 interface PreviewBlockProps {
   mes: string;
-  metaEfetiva: number | null;
+  /** Meta já formatada pra exibição (ex: "R$ 25.000", "~14 plantões (+15%)", "+15%"). */
+  metaEfetiva: string | null;
   resultado: PropostaResultado;
   hospitais: HospitaisMap;
   blocos: Bloco[];
@@ -89,9 +90,7 @@ export function PreviewBlock({
             <Total rotulo="plantões" valor={String(resultado.plantoes.length)} />
             <Total rotulo="horas" valor={`${totalDuracao}h`} />
             <Total rotulo="valor estimado" valor={`R$ ${resultado.valorEstimado.toLocaleString('pt-BR')}`} />
-            {metaEfetiva !== null && (
-              <Total rotulo="meta" valor={`R$ ${metaEfetiva.toLocaleString('pt-BR')}`} />
-            )}
+            {metaEfetiva !== null && <Total rotulo="meta" valor={metaEfetiva} />}
           </div>
         </Card>
 
@@ -226,7 +225,8 @@ function CalendarioProposta({
             <button
               key={iso}
               type="button"
-              onClick={() => setDiaAberto(iso)}
+              onClick={() => dataMes && setDiaAberto(iso)}
+              disabled={!dataMes}
               style={{
                 textAlign: 'left',
                 padding: padCell,
@@ -235,7 +235,7 @@ function CalendarioProposta({
                 border: '1px solid var(--line-2)',
                 background: dataMes ? 'var(--bg)' : 'var(--bg-alt)',
                 opacity: dataMes ? 1 : 0.4,
-                cursor: 'pointer',
+                cursor: dataMes ? 'pointer' : 'default',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: isMobile ? 2 : 4,

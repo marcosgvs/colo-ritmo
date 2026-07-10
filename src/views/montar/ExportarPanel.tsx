@@ -3,6 +3,10 @@
 import { useMemo, useState } from 'react';
 import type { BlocoPlantao, HospitaisMap, PlantaoSugerido, Preferencias } from '@/types';
 import { MESES } from '@/lib/data';
+// import estático de propósito: whatsapp precisa de window.open síncrono no
+// clique (await antes bloqueia popup no Safari/iOS) · xlsx/pdf continuam lazy
+// dentro do módulo.
+import { baixarExcelMontar, baixarPDFMontar, montarMensagem } from '@/lib/exportarMontar';
 import { Mono } from '@/components/atoms';
 import { Card, Field, btnSecundario, inputBase } from './ui';
 
@@ -41,9 +45,23 @@ export function ExportarPanel({
   const ano = parseInt(anoStr ?? '0', 10);
   const mesNum = parseInt(mesStr ?? '0', 10);
 
+  // União: hospitais do setup + hospitais que ganharam plantão na edição
+  // (senão plantão adicionado fora do setup some de todos os exports).
+  const hospitaisExport = useMemo(() => {
+    const ids = Array.from(hospitaisSel);
+    const vistos = new Set(ids);
+    for (const p of plantoes) {
+      if (!vistos.has(p.hospitalId)) {
+        vistos.add(p.hospitalId);
+        ids.push(p.hospitalId);
+      }
+    }
+    return ids;
+  }, [hospitaisSel, plantoes]);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 760 }}>
-      {Array.from(hospitaisSel).map((hid) => {
+      {hospitaisExport.map((hid) => {
         const hospital = hospitais[hid];
         if (!hospital) return null;
         const plantoesH = porHospital.get(hid) ?? [];
@@ -79,7 +97,7 @@ interface ExportarHospitalCardProps {
 }
 
 function ExportarHospitalCard({ hospital, plantoes, ano, mes, preferencias, chefe, setChefe }: ExportarHospitalCardProps) {
-  const [statusTexto, setStatusTexto] = useState<'idle' | 'copiado'>('idle');
+  const [statusTexto, setStatusTexto] = useState<'idle' | 'copiado' | 'erro'>('idle');
   const [exportando, setExportando] = useState<'pdf' | 'xlsx' | null>(null);
 
   const blocosPlantao: BlocoPlantao[] = plantoes.map((p) => ({
@@ -91,9 +109,8 @@ function ExportarHospitalCard({ hospital, plantoes, ano, mes, preferencias, chef
     duracao: p.duracao,
   }));
 
-  async function montarTexto(): Promise<string> {
-    const mod = await import('@/lib/exportarMontar');
-    return mod.montarMensagem({
+  function montarTexto(): string {
+    return montarMensagem({
       hospital,
       plantoes: blocosPlantao,
       ano,
@@ -104,20 +121,25 @@ function ExportarHospitalCard({ hospital, plantoes, ano, mes, preferencias, chef
   }
 
   async function copiarTexto() {
-    const texto = await montarTexto();
-    await navigator.clipboard.writeText(texto);
-    setStatusTexto('copiado');
+    const texto = montarTexto();
+    try {
+      await navigator.clipboard.writeText(texto);
+      setStatusTexto('copiado');
+    } catch {
+      setStatusTexto('erro');
+    }
     setTimeout(() => setStatusTexto('idle'), 2000);
   }
 
-  async function enviarWhatsApp() {
-    const texto = await montarTexto();
+  function enviarWhatsApp() {
+    // síncrono no gesto do clique · await aqui faria o Safari bloquear o popup
+    const texto = montarTexto();
     const url = `https://wa.me/?text=${encodeURIComponent(texto)}`;
     window.open(url, '_blank', 'noopener,noreferrer');
   }
 
-  async function enviarEmail() {
-    const texto = await montarTexto();
+  function enviarEmail() {
+    const texto = montarTexto();
     const nomeMes = MESES[mes - 1] ?? '';
     const subject = `Proposta de escala · ${hospital.abrev} · ${nomeMes} ${ano}`;
     const url = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(texto)}`;
@@ -127,8 +149,7 @@ function ExportarHospitalCard({ hospital, plantoes, ano, mes, preferencias, chef
   async function baixarPdf() {
     setExportando('pdf');
     try {
-      const mod = await import('@/lib/exportarMontar');
-      await mod.baixarPDFMontar({
+      await baixarPDFMontar({
         hospital,
         plantoes: blocosPlantao,
         ano,
@@ -144,8 +165,7 @@ function ExportarHospitalCard({ hospital, plantoes, ano, mes, preferencias, chef
   async function baixarExcel() {
     setExportando('xlsx');
     try {
-      const mod = await import('@/lib/exportarMontar');
-      await mod.baixarExcelMontar({
+      await baixarExcelMontar({
         hospital,
         plantoes: blocosPlantao,
         ano,
@@ -189,7 +209,11 @@ function ExportarHospitalCard({ hospital, plantoes, ano, mes, preferencias, chef
           enviar por email
         </button>
         <button type="button" onClick={copiarTexto} style={btnExport(statusTexto === 'copiado')}>
-          {statusTexto === 'copiado' ? 'texto copiado!' : 'copiar texto'}
+          {statusTexto === 'copiado'
+            ? 'texto copiado!'
+            : statusTexto === 'erro'
+              ? 'não deu · tenta de novo'
+              : 'copiar texto'}
         </button>
         <button type="button" onClick={baixarPdf} disabled={exportando !== null} style={btnExport(false)}>
           {exportando === 'pdf' ? 'gerando…' : 'baixar pdf'}

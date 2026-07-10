@@ -1,15 +1,17 @@
 // Orquestrador do fluxo Montar · estado das etapas + gerar() · as peças moram em ./montar/.
 
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import type {
   Bloco,
   EscalaImportada,
   HospitaisMap,
   Janela,
+  PlantaoSugerido,
   Preferencias,
   PropostaHistorico,
 } from '@/types';
 import { MESES } from '@/lib/data';
+import { calcRemuneracaoMes } from '@/lib/remuneracao';
 import { LoadingFrases, Mono } from '@/components/atoms';
 import { authHeader } from '@/lib/supabase';
 import { PageHead } from './_PageHead';
@@ -62,10 +64,25 @@ export function MontarEscala({
   const [chefes, setChefes] = useState<Record<string, string>>({});
 
   const [resultado, setResultado] = useState<PropostaResultado | null>(null);
+  // Proposta do histórico correspondente ao resultado em edição · edições
+  // no preview re-salvam nela (senão o histórico fica com versão stale).
+  const [propostaAtual, setPropostaAtual] = useState<PropostaHistorico | null>(null);
   const [erro, setErro] = useState<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   const lista = Object.values(hospitais);
   const hospitaisHabilitados = lista.filter((h) => hospitaisSel.has(h.id));
+
+  // onSalvarProposta (App) prepende sempre · re-salvar o mesmo id na edição
+  // cria versões duplicadas, então o histórico mostra só a mais recente.
+  const propostasUnicas = useMemo(() => {
+    const vistos = new Set<string>();
+    return propostasMontar.filter((p) => {
+      if (vistos.has(p.id)) return false;
+      vistos.add(p.id);
+      return true;
+    });
+  }, [propostasMontar]);
 
   const mesNomeExtenso = useMemo(() => {
     const [a, m] = mes.split('-');
@@ -73,11 +90,27 @@ export function MontarEscala({
     return `${MESES[idx] ?? ''} ${a}`;
   }, [mes]);
 
-  const metaEfetiva = useMemo<number | null>(() => {
+  const metaEfetiva = useMemo<string | null>(() => {
     if (lente !== 'acelerar') return null;
-    const o = acelerarValor.trim() ? parseInt(acelerarValor, 10) : NaN;
-    return isFinite(o) && o > 0 ? o : null;
-  }, [lente, acelerarValor]);
+    const valor = acelerarValor.trim() ? parseInt(acelerarValor, 10) : NaN;
+    if (isFinite(valor) && valor > 0) return `R$ ${valor.toLocaleString('pt-BR')}`;
+    const pct = acelerarPercentual.trim() ? parseInt(acelerarPercentual, 10) : NaN;
+    if (!isFinite(pct) || pct <= 0) return null;
+    // só % preenchido · com baseline do histórico dá pra mostrar o alvo em plantões
+    const [aStr, mStr] = mes.split('-');
+    const a = parseInt(aStr ?? '0', 10);
+    const m = parseInt(mStr ?? '0', 10);
+    const dIni = new Date(Date.UTC(a, m - 1 - 6, 1));
+    const iniJanela = `${dIni.getUTCFullYear()}-${String(dIni.getUTCMonth() + 1).padStart(2, '0')}-01`;
+    const iniAlvo = `${mes}-01`;
+    const hist = blocos.filter((b) => b.tipo === 'plantao' && b.data >= iniJanela && b.data < iniAlvo);
+    const mesesAmostra = new Set(hist.map((b) => b.data.slice(0, 7))).size;
+    if (mesesAmostra >= 3) {
+      const alvo = Math.round((hist.length / mesesAmostra) * (1 + pct / 100));
+      return `~${alvo} plantões (+${pct}%)`;
+    }
+    return `+${pct}%`;
+  }, [lente, acelerarValor, acelerarPercentual, mes, blocos]);
 
   function toggleHospital(id: string) {
     setHospitaisSel((prev) => {
@@ -99,6 +132,8 @@ export function MontarEscala({
     }
     setEtapa('gerando');
     setErro(null);
+    const controller = new AbortController();
+    abortRef.current = controller;
     try {
       const [anoStr, mesStr] = mes.split('-');
       const ano = parseInt(anoStr ?? '0', 10);
@@ -114,6 +149,7 @@ export function MontarEscala({
 
       const resp = await fetch('/api/montar-escala', {
         method: 'POST',
+        signal: controller.signal,
         headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
         body: JSON.stringify({
           ano,
@@ -152,7 +188,7 @@ export function MontarEscala({
         plantoes: plantoesNormalizados,
       });
       // Persiste no histórico (auto-limita a 10 entradas no useUserState)
-      onSalvarProposta({
+      const proposta: PropostaHistorico = {
         id: `prop-${baseId}`,
         geradoEm: new Date().toISOString(),
         mes,
@@ -164,12 +200,22 @@ export function MontarEscala({
         justificativa: json.justificativa ?? '',
         valorEstimado: json.valorEstimado ?? 0,
         avisos: json.avisos ?? [],
-      });
+      };
+      onSalvarProposta(proposta);
+      setPropostaAtual(proposta);
       setEtapa('preview');
     } catch (err) {
+      if ((err as Error).name === 'AbortError') return; // cancelado pelo usuário
       setErro((err as Error).message);
       setEtapa('setup');
+    } finally {
+      abortRef.current = null;
     }
+  }
+
+  function cancelarGeracao() {
+    abortRef.current?.abort();
+    setEtapa('setup');
   }
 
   function carregarProposta(p: PropostaHistorico) {
@@ -184,27 +230,53 @@ export function MontarEscala({
       valorEstimado: p.valorEstimado,
       avisos: p.avisos,
     });
+    setPropostaAtual(p);
     setEtapa('preview');
   }
 
   function regerar() {
     setResultado(null);
+    setPropostaAtual(null);
     setEtapa('setup');
   }
 
+  // Edição no preview muda o resultado E re-salva a proposta do histórico
+  // (mesmo caminho do gerar) · senão a versão persistida fica stale.
+  function aplicarEdicao(mut: (plantoes: PlantaoSugerido[]) => PlantaoSugerido[]) {
+    if (!resultado) return;
+    const plantoes = mut(resultado.plantoes);
+    const blocosPlantao = plantoes.map((p) => ({
+      id: p.id,
+      tipo: 'plantao' as const,
+      hospitalId: p.hospitalId,
+      data: p.data,
+      horaInicio: p.horaInicio,
+      duracao: p.duracao,
+    }));
+    const valorEstimado = calcRemuneracaoMes(blocosPlantao, hospitais, mes).total.bruto;
+    setResultado({ ...resultado, plantoes, valorEstimado });
+    if (propostaAtual) {
+      const atualizada = { ...propostaAtual, plantoes, valorEstimado };
+      setPropostaAtual(atualizada);
+      onSalvarProposta(atualizada);
+    }
+  }
+
   function removerPlantao(id: string) {
-    setResultado((r) => (r ? { ...r, plantoes: r.plantoes.filter((p) => p.id !== id) } : r));
+    aplicarEdicao((ps) => ps.filter((p) => p.id !== id));
   }
 
   function adicionarPlantao(data: string, hospitalId: string, janela: Janela) {
-    setResultado((r) => {
-      if (!r) return r;
-      const id = `sug-${Date.now()}-${r.plantoes.length}`;
-      return {
-        ...r,
-        plantoes: [...r.plantoes, { id, hospitalId, data, horaInicio: janela.inicio, duracao: janela.duracao }],
-      };
-    });
+    aplicarEdicao((ps) => [
+      ...ps,
+      {
+        id: `sug-${Date.now()}-${ps.length}`,
+        hospitalId,
+        data,
+        horaInicio: janela.inicio,
+        duracao: janela.duracao,
+      },
+    ]);
   }
 
   return (
@@ -229,9 +301,9 @@ export function MontarEscala({
 
       <StepBar etapa={etapa} />
 
-      {etapa === 'setup' && propostasMontar.length > 0 && (
+      {etapa === 'setup' && propostasUnicas.length > 0 && (
         <HistoricoPropostas
-          propostas={propostasMontar}
+          propostas={propostasUnicas}
           hospitais={hospitais}
           onCarregar={carregarProposta}
         />
@@ -295,6 +367,22 @@ export function MontarEscala({
           <Mono style={{ color: 'var(--ink-3)', fontSize: 11 }}>
             isso pode levar até uns 30 segundos
           </Mono>
+          <button
+            type="button"
+            onClick={cancelarGeracao}
+            style={{
+              font: '500 12px/1 var(--font-body)',
+              padding: '10px 16px',
+              borderRadius: 999,
+              border: '1px solid var(--line)',
+              background: 'transparent',
+              color: 'var(--ink-3)',
+              cursor: 'pointer',
+              marginTop: 4,
+            }}
+          >
+            cancelar
+          </button>
         </div>
       )}
 

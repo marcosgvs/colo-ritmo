@@ -15,7 +15,7 @@ import { calcRemuneracaoMes } from '../src/lib/remuneracao.js';
  *   - 5 insumos: regras contratuais · preferências · padrão do chefe
  *     (das escalas importadas) · histórico real dela (dos blocos
  *     passados) · bloqueios do mês alvo.
- *   - 3 lentes: descansar / equilibrar / ganhar · cada uma é um trecho
+ *   - 3 lentes: descansar / equilibrar / acelerar · cada uma é um trecho
  *     de prompt diferente.
  *
  * Body:
@@ -279,13 +279,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       razao: p.razao ? String(p.razao) : undefined,
     }));
 
+    const mesAlvoISO = `${ano}-${String(mes).padStart(2, '0')}`;
+
+    // Validação estrutural: descarta plantão com data inválida/fora do mês
+    // alvo, hospitalId desconhecido ou horas não-numéricas ANTES de qualquer
+    // recálculo · resposta da IA não é confiável estruturalmente.
+    const idsValidos = new Set(hospitais.map((h) => h.id));
+    const descartados: string[] = [];
+    const plantoesEstruturados = todosPlantoes.filter((p) => {
+      const dt = /^\d{4}-\d{2}-\d{2}$/.test(p.data) ? new Date(`${p.data}T00:00:00Z`) : null;
+      const dataOk =
+        dt != null && dt.toISOString().slice(0, 10) === p.data && p.data.startsWith(`${mesAlvoISO}-`);
+      const hospitalOk = idsValidos.has(p.hospitalId);
+      const horasOk = Number.isFinite(p.horaInicio) && Number.isFinite(p.duracao) && p.duracao > 0;
+      if (dataOk && hospitalOk && horasOk) return true;
+      const motivo = !hospitalOk
+        ? `hospital desconhecido "${p.hospitalId}"`
+        : !dataOk
+          ? `data inválida ou fora do mês alvo "${p.data}"`
+          : 'horário inválido';
+      descartados.push(`plantão descartado · ${motivo} (resposta do modelo fora do esperado)`);
+      return false;
+    });
+
     // Validação server-side: remove plantões que sobrepõem bloqueios (modelo
     // às vezes "racionaliza" certo na razão mas mantém o plantão mesmo assim).
     const bloqueiosCheck = (blocos ?? []).filter(
       (b) => b.tipo !== 'plantao' && b.tipo !== 'cedido',
     );
     const removidos: string[] = [];
-    const plantoesValidos = todosPlantoes.filter((p) => {
+    const plantoesValidos = plantoesEstruturados.filter((p) => {
       const conflito = bloqueiosCheck.find((b) =>
         intervalosSobrepoem(b.data, b.horaInicio, b.duracao, p.data, p.horaInicio, p.duracao),
       );
@@ -321,11 +344,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       horaInicio: p.horaInicio,
       duracao: p.duracao,
     }));
-    const mesAlvoISO = `${ano}-${String(mes).padStart(2, '0')}`;
     const resumo = calcRemuneracaoMes(blocosPlantao, hospitaisMap as never, mesAlvoISO);
     const valorEstimadoReal = resumo.total.bruto;
 
-    const avisosFinais = [...(inp.avisos ?? []), ...removidos, ...validacaoLinhas];
+    const avisosFinais = [...(inp.avisos ?? []), ...descartados, ...removidos, ...validacaoLinhas];
 
     res.status(200).json({
       plantoes: plantoesValidos,
@@ -425,8 +447,12 @@ function montarPrompt(opts: {
     if (opts.acelerarPercentual && baseline.suficiente) {
       const alvo = Math.round(baseline.avgPlantoesMes * (1 + opts.acelerarPercentual / 100));
       motivos.push(`+${opts.acelerarPercentual}% sobre baseline · mire em ~${alvo} plantões esse mês`);
-    } else if (opts.acelerarPercentual) {
+    } else if (opts.acelerarPercentual && opts.acelerarValor) {
       motivos.push(`+${opts.acelerarPercentual}% sobre baseline · MAS baseline insuficiente · use o valor R$ como alvo principal`);
+    } else if (opts.acelerarPercentual) {
+      motivos.push(
+        `+${opts.acelerarPercentual}% de carga · baseline insuficiente e sem alvo em R$ · aumente proporcionalmente o volume de plantões/horas (~${opts.acelerarPercentual}% acima do que seria um mês equilibrado típico), sempre dentro das regras contratuais`,
+      );
     }
     if (opts.acelerarValor) {
       motivos.push(`chegar até R$ ${opts.acelerarValor.toLocaleString('pt-BR')} estimado no mês`);
@@ -623,7 +649,7 @@ function montarPrompt(opts: {
     '3. Em algum dia tem turnos combinados que somam mais que `duracaoMaximaDia`?',
     '4. Para cada `regrasLivres` em texto, leia e confira se a sua proposta atende.',
     '5. Para cada bloqueio listado · seu plantão proposto NÃO sobrepõe o horário do bloqueio?',
-    'Se algum item NÃO bater, AJUSTE a proposta antes de chamar o tool. Regras contratuais (CLT) são OBRIGATÓRIAS, mesmo na lente "ganhar". Se a meta financeira só for batida violando uma regra, fica abaixo da meta E menciona no `avisos`.',
+    'Se algum item NÃO bater, AJUSTE a proposta antes de chamar o tool. Regras contratuais (CLT) são OBRIGATÓRIAS, mesmo na lente "acelerar". Se a meta financeira só for batida violando uma regra, fica abaixo da meta E menciona no `avisos`.',
     '',
     '## INSTRUÇÕES DE SAÍDA',
     '1. Chame a ferramenta `propor_escala` com a lista completa de plantões propostos.',
@@ -862,21 +888,28 @@ function validarPorHospital(
     const horasFDS = fdsPlantoes.reduce((s, p) => s + p.duracao, 0);
     const diasFDSUnicos = new Set(fdsPlantoes.map((p) => p.data)).size;
 
-    const linhas: string[] = [];
+    const violacoes: string[] = [];
     const r = h.regras ?? {};
 
-    linhas.push(`${h.abrev ?? h.nome}: ${totalN} plantões · ${totalH}h · ${horasFDS}h em FDS (${diasFDSUnicos} dias)`);
-
     if (r.minHorasPorMes != null && totalH < r.minHorasPorMes)
-      linhas.push(`  ⚠ ${totalH}h abaixo de minHorasPorMes=${r.minHorasPorMes}`);
+      violacoes.push(`  ⚠ ${totalH}h abaixo de minHorasPorMes=${r.minHorasPorMes}`);
     if (r.maxHorasPorMes != null && totalH > r.maxHorasPorMes)
-      linhas.push(`  ⚠ ${totalH}h acima de maxHorasPorMes=${r.maxHorasPorMes}`);
+      violacoes.push(`  ⚠ ${totalH}h acima de maxHorasPorMes=${r.maxHorasPorMes}`);
     if (r.minHorasPorFimDeSemana != null && horasFDS < r.minHorasPorFimDeSemana)
-      linhas.push(`  ⚠ ${horasFDS}h em FDS abaixo de minHorasPorFimDeSemana=${r.minHorasPorFimDeSemana}`);
+      violacoes.push(`  ⚠ ${horasFDS}h em FDS abaixo de minHorasPorFimDeSemana=${r.minHorasPorFimDeSemana}`);
     if (r.maxHorasPorFimDeSemana != null && horasFDS > r.maxHorasPorFimDeSemana)
-      linhas.push(`  ⚠ ${horasFDS}h em FDS acima de maxHorasPorFimDeSemana=${r.maxHorasPorFimDeSemana}`);
+      violacoes.push(`  ⚠ ${horasFDS}h em FDS acima de maxHorasPorFimDeSemana=${r.maxHorasPorFimDeSemana}`);
 
-    avisos.push(linhas.join('\n'));
+    // Só vira aviso quando alguma regra é de fato violada · a linha-resumo
+    // sozinha é informativa e deixaria o card "cuidado" sempre sujo.
+    if (violacoes.length > 0) {
+      avisos.push(
+        [
+          `${h.abrev ?? h.nome}: ${totalN} plantões · ${totalH}h · ${horasFDS}h em FDS (${diasFDSUnicos} dias)`,
+          ...violacoes,
+        ].join('\n'),
+      );
+    }
   }
   return avisos;
 }

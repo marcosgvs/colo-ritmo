@@ -47,7 +47,9 @@ export function HistoricoPropostas({
               border: 'none',
               color: 'var(--ink-2)',
               cursor: 'pointer',
-              padding: 4,
+              padding: '4px 10px',
+              minHeight: 40, // área de toque confortável no mobile
+              minWidth: 40,
             }}
           >
             {aberto ? 'mostrar só recentes' : `ver todas (${propostas.length})`}

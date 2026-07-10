@@ -68,6 +68,7 @@ export function SetupCard({
                 style={{
                   font: '500 13px/1 var(--font-body)',
                   padding: '8px 14px',
+                  minHeight: 40, // área de toque confortável no mobile
                   borderRadius: 999,
                   border: ativo ? '1px solid var(--ink)' : '1px solid var(--line)',
                   background: ativo ? 'var(--ink)' : 'transparent',

@@ -43,7 +43,7 @@ export function BloqueiosCard({ mes, blocos, hospitais, onCriarBloco, onVoltar, 
       }}
     >
       <p style={{ font: '400 14px/1.5 var(--font-body)', color: 'var(--ink-2)', margin: '0 0 4px' }}>
-        Quer bloquear algum dia ou parte do dia? Clique no calendário pra adicionar uma atividade
+        quer bloquear algum dia ou parte do dia? clica no calendário pra adicionar uma atividade
         (consulta, sono, bloqueio, etc) que não pode ser plantão.
       </p>
       <Mono style={{ color: 'var(--ink-3)', fontSize: 11, marginBottom: 16, display: 'block' }}>
@@ -288,7 +288,7 @@ function BloqueioFormModal({
             max={23.5}
             step={0.5}
             value={horaInicio}
-            onChange={(e) => setHoraInicio(parseFloat(e.target.value) || 0)}
+            onChange={(e) => setHoraInicio(clampNum(parseFloat(e.target.value) || 0, 0, 23.5))}
             style={inputBase}
           />
         </Field>
@@ -299,7 +299,7 @@ function BloqueioFormModal({
             max={24}
             step={0.5}
             value={duracao}
-            onChange={(e) => setDuracao(parseFloat(e.target.value) || 0.5)}
+            onChange={(e) => setDuracao(clampNum(parseFloat(e.target.value) || 0.5, 0.5, 24))}
             style={inputBase}
           />
         </Field>
@@ -315,4 +315,8 @@ function BloqueioFormModal({
       </div>
     </Modal>
   );
+}
+
+function clampNum(v: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, v));
 }
