@@ -153,10 +153,22 @@ self.addEventListener('notificationclick', (event) => {
 
   event.waitUntil(
     (async () => {
+      const targetPath = new URL(targetUrl, self.location.origin).pathname;
       const allClients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      // O app é SPA com pushState: uma aba em /ritmo/montar ou /ritmo/usuario
+      // é o app aberto — comparar pathname exato abriria janela duplicada.
       for (const client of allClients) {
-        if (new URL(client.url).pathname === new URL(targetUrl, self.location.origin).pathname) {
+        const path = new URL(client.url).pathname;
+        if (path === targetPath || path.startsWith('/ritmo')) {
           await client.focus();
+          // só navega quando a notificação aponta pra rota específica diferente
+          if (path !== targetPath && targetPath !== '/ritmo/' && 'navigate' in client) {
+            try {
+              await client.navigate(targetUrl);
+            } catch {
+              // navegação bloqueada · o foco já resolve
+            }
+          }
           return;
         }
       }
