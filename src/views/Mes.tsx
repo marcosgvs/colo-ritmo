@@ -3,12 +3,15 @@ import type { Bloco, BlocoPlantao, HospitaisMap, Nivel } from '@/types';
 import {
   cargaSemanal,
   diaSemanaBR,
+  diaSemanaBRLong,
   fimDoMes,
   fmtDate,
+  fmtRange,
   fromISO,
   getHospital,
   HOJE,
   inicioDoMes,
+  MESES,
   semanaDe,
   toISO,
 } from '@/lib/data';
@@ -34,6 +37,15 @@ const MESES_LONG = [
 export function Mes({ blocos, hospitais, onSelectBloco }: MesProps) {
   const isMobile = useIsMobile();
   const [refIso, setRefIso] = useState<string>(HOJE);
+  // Mobile: a grade é só mapa (célula uniforme com bolinhas) · o detalhe
+  // do dia tocado vive num painel abaixo. Abre já com hoje selecionado.
+  const [diaSel, setDiaSel] = useState<string>(HOJE);
+
+  const navegarMes = (iso: string) => {
+    setRefIso(iso);
+    // hoje se o mês visível é o atual · senão o dia 1
+    setDiaSel(iso.slice(0, 7) === HOJE.slice(0, 7) ? HOJE : inicioDoMes(iso));
+  };
 
   const semanas = useMemo(() => {
     const inicio = inicioDoMes(refIso);
@@ -109,7 +121,7 @@ export function Mes({ blocos, hospitais, onSelectBloco }: MesProps) {
             {`${cargaDoMes}h previstas — média de ${semanas.length > 0 ? (cargaDoMes / semanas.length).toFixed(0) : 0}h/sem`}
           </Hand>
         </div>
-        <NavMes refIso={refIso} setRefIso={setRefIso} />
+        <NavMes refIso={refIso} setRefIso={navegarMes} />
       </div>
 
       <div
@@ -141,11 +153,12 @@ export function Mes({ blocos, hospitais, onSelectBloco }: MesProps) {
               <div
                 key={dow}
                 style={{
-                  padding: '12px 10px',
+                  padding: isMobile ? '10px 0 8px' : '12px 10px',
                   font: '700 10px/1 var(--font-body)',
                   letterSpacing: '0.06em',
                   textTransform: 'uppercase',
                   color: 'var(--ink-3)',
+                  textAlign: isMobile ? 'center' : 'left',
                 }}
               >
                 {dow}
@@ -192,6 +205,23 @@ export function Mes({ blocos, hospitais, onSelectBloco }: MesProps) {
                   const cargaDia = plantoesDia.reduce((s, p) => s + p.duracao, 0);
                   const opacidadeBg =
                     cargaDia > 0 ? Math.min(0.4, 0.08 + cargaDia * 0.02) : 0;
+                  const bgHeatmap = `color-mix(in srgb, var(--coral) ${Math.round(opacidadeBg * 100)}%, transparent)`;
+
+                  if (isMobile) {
+                    return (
+                      <DiaCompacto
+                        key={iso}
+                        iso={iso}
+                        dia={dataObj.getDate()}
+                        noMes={noMes}
+                        isHoje={isHoje}
+                        selecionado={iso === diaSel}
+                        bgHeatmap={bgHeatmap}
+                        blocosDia={blocosDia}
+                        onPick={setDiaSel}
+                      />
+                    );
+                  }
                   return (
                     <div
                       key={iso}
@@ -199,9 +229,7 @@ export function Mes({ blocos, hospitais, onSelectBloco }: MesProps) {
                         minHeight: 96,
                         padding: 8,
                         borderRight: '1px solid var(--line)',
-                        background: isHoje
-                          ? 'var(--lavender-surface)'
-                          : `color-mix(in srgb, var(--coral) ${Math.round(opacidadeBg * 100)}%, transparent)`,
+                        background: isHoje ? 'var(--lavender-surface)' : bgHeatmap,
                         opacity: noMes ? 1 : 0.45,
                         display: 'flex',
                         flexDirection: 'column',
@@ -287,6 +315,13 @@ export function Mes({ blocos, hospitais, onSelectBloco }: MesProps) {
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {isMobile && (
+            <PainelDia
+              iso={diaSel}
+              blocos={blocosPorDia.get(diaSel) ?? []}
+              onSelectBloco={onSelectBloco}
+            />
+          )}
           <ResumoMes
             blocos={blocos}
             hospitais={hospitais}
@@ -296,6 +331,220 @@ export function Mes({ blocos, hospitais, onSelectBloco }: MesProps) {
         </div>
       </div>
     </>
+  );
+}
+
+interface DiaCompactoProps {
+  iso: string;
+  dia: number;
+  noMes: boolean;
+  isHoje: boolean;
+  selecionado: boolean;
+  bgHeatmap: string;
+  blocosDia: Bloco[];
+  onPick: (iso: string) => void;
+}
+
+/**
+ * Célula mobile do mês · altura FIXA (a grade fica uniforme, que é o
+ * ponto). Número + até 3 bolinhas: plantões na cor do hospital primeiro,
+ * depois o resto (sono sage, demais sand). 4+ vira "+". O detalhe do dia
+ * vive no PainelDia abaixo da grade.
+ */
+function DiaCompacto({
+  iso,
+  dia,
+  noMes,
+  isHoje,
+  selecionado,
+  bgHeatmap,
+  blocosDia,
+  onPick,
+}: DiaCompactoProps) {
+  const cores: string[] = [];
+  for (const b of blocosDia) {
+    if (b.tipo === 'plantao') {
+      cores.unshift(`var(--${getHospital(b.hospitalId)?.cor ?? 'lavender'})`);
+    } else if (b.tipo === 'cedido') {
+      cores.push('var(--line-2)');
+    } else if (b.tipo === 'sono') {
+      cores.push('var(--sage)');
+    } else if (b.tipo !== 'deslocamento') {
+      cores.push('var(--sand)');
+    }
+  }
+  const extras = cores.length - 3;
+
+  return (
+    <button
+      type="button"
+      onClick={() => onPick(iso)}
+      aria-label={`dia ${dia}`}
+      aria-pressed={selecionado}
+      style={{
+        height: 52,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 5,
+        position: 'relative',
+        border: 'none',
+        borderRight: '1px solid var(--line)',
+        borderRadius: 0,
+        background: selecionado ? 'var(--lavender-surface)' : bgHeatmap,
+        opacity: noMes ? 1 : 0.45,
+        cursor: 'pointer',
+        padding: 0,
+      }}
+    >
+      {isHoje && (
+        <span
+          aria-hidden
+          style={{
+            position: 'absolute',
+            inset: 4,
+            border: '1.5px solid var(--lavender)',
+            borderRadius: 12,
+            pointerEvents: 'none',
+          }}
+        />
+      )}
+      <span
+        style={{
+          fontFamily: 'var(--font-display)',
+          fontWeight: 500,
+          fontSize: 15,
+          lineHeight: 1,
+          color: isHoje ? 'var(--lavender-ink)' : 'var(--ink)',
+        }}
+      >
+        {dia}
+      </span>
+      <span aria-hidden style={{ display: 'flex', alignItems: 'center', gap: 3, height: 6 }}>
+        {cores.slice(0, 3).map((c, i) => (
+          <span
+            key={i}
+            style={{ width: 5, height: 5, borderRadius: 999, background: c, display: 'block' }}
+          />
+        ))}
+        {extras > 0 && (
+          <span style={{ font: '700 8px/1 var(--font-body)', color: 'var(--ink-3)' }}>+</span>
+        )}
+      </span>
+    </button>
+  );
+}
+
+interface PainelDiaProps {
+  iso: string;
+  blocos: Bloco[];
+  onSelectBloco: (b: Bloco) => void;
+}
+
+/** Rótulo + cor de cada linha do painel · espelha a linguagem das outras views. */
+function linhaDoBloco(b: Bloco): { rotulo: string; cor: string } {
+  if (b.tipo === 'plantao') {
+    const hosp = getHospital(b.hospitalId);
+    return {
+      rotulo: `${hosp?.abrev ?? 'plantão'} · plantão${b.viaTroca ? ' · via troca' : ''}`,
+      cor: hosp?.cor ?? 'lavender',
+    };
+  }
+  if (b.tipo === 'cedido') return { rotulo: `cedido · ${b.cedidoPara}`, cor: 'sand' };
+  if (b.tipo === 'sono') return { rotulo: 'sono protegido', cor: 'sage' };
+  if (b.tipo === 'bloqueio') return { rotulo: `folga${b.motivo ? ` · ${b.motivo}` : ''}`, cor: 'olive' };
+  if (b.tipo === 'consulta') return { rotulo: `consulta${b.local ? ` · ${b.local}` : ''}`, cor: 'coral' };
+  if (b.tipo === 'estudo') return { rotulo: b.titulo ? `estudo · ${b.titulo}` : 'estudo', cor: 'blue' };
+  if (b.tipo === 'pessoal') return { rotulo: b.titulo ?? 'pessoal', cor: 'sand' };
+  if (b.tipo === 'outros') return { rotulo: b.titulo ?? 'evento', cor: 'sand' };
+  return { rotulo: b.tipo, cor: 'sand' };
+}
+
+function PainelDia({ iso, blocos, onSelectBloco }: PainelDiaProps) {
+  const dataObj = fromISO(iso);
+  const itens = blocos
+    .filter((b) => b.tipo !== 'deslocamento')
+    .sort((a, b) => a.horaInicio - b.horaInicio);
+  const horasPlantao = itens.reduce(
+    (s, b) => (b.tipo === 'plantao' ? s + b.duracao : s),
+    0,
+  );
+
+  return (
+    <section
+      aria-label="detalhe do dia"
+      style={{
+        background: 'var(--bg)',
+        border: '1px solid var(--line)',
+        borderRadius: 16,
+        padding: '16px 18px',
+        boxShadow: 'var(--shadow-sm)',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 4 }}>
+        <span
+          style={{
+            fontFamily: 'var(--font-display)',
+            fontWeight: 500,
+            fontSize: 18,
+            letterSpacing: '-0.01em',
+          }}
+        >
+          {diaSemanaBRLong(iso)} · {dataObj.getDate()} {MESES[dataObj.getMonth()]}
+        </span>
+        {horasPlantao > 0 && <Eyebrow>{horasPlantao}h de plantão</Eyebrow>}
+      </div>
+      {itens.length === 0 && (
+        <Hand color="var(--ink-2)" size={16} style={{ display: 'block', marginTop: 8 }}>
+          dia livre · respira
+        </Hand>
+      )}
+      {itens.map((b) => {
+        const { rotulo, cor } = linhaDoBloco(b);
+        return (
+          <button
+            key={`${b.id}`}
+            type="button"
+            onClick={() => onSelectBloco(b)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              width: '100%',
+              textAlign: 'left',
+              marginTop: 8,
+              padding: '12px 12px',
+              minHeight: 44,
+              background: `var(--${cor}-surface)`,
+              border: 'none',
+              borderLeft: `4px solid var(--${cor})`,
+              borderRadius: 12,
+              cursor: 'pointer',
+              font: '600 13px/1.2 var(--font-body)',
+              color: `var(--${cor}-ink)`,
+              opacity: b.tipo === 'cedido' ? 0.7 : 1,
+            }}
+          >
+            <span
+              style={{
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                textDecoration: b.tipo === 'cedido' ? 'line-through' : 'none',
+              }}
+            >
+              {rotulo}
+            </span>
+            <Mono style={{ marginLeft: 'auto', color: 'var(--ink-2)', flexShrink: 0 }}>
+              {b.horaInicio === 0 && b.duracao === 24
+                ? 'o dia inteiro'
+                : `${fmtRange(b.horaInicio, b.duracao)} · ${b.duracao}h`}
+            </Mono>
+          </button>
+        );
+      })}
+    </section>
   );
 }
 
