@@ -44,6 +44,9 @@ export function ListaDoDia({ blocos, hospitais: _h, onSelectBloco }: ListaDaSema
   const [scrollTop, setScrollTop] = useState(0);
   const [currentDay, setCurrentDay] = useState<number>(hojeIdx >= 0 ? hojeIdx : 0);
   const [agora, setAgora] = useState<number>(horaDecimalAgora());
+  // Uma virada por semana visível · sem o guard, o mesmo gesto de scroll
+  // dispararia várias vezes antes do re-render aterrissar no topo.
+  const virouRef = useRef(false);
 
   // Atualiza "agora" a cada minuto enquanto a view está aberta
   useEffect(() => {
@@ -62,17 +65,28 @@ export function ListaDoDia({ blocos, hospitais: _h, onSelectBloco }: ListaDaSema
       scrollRef.current.scrollTop = 0;
     }
     setCurrentDay(hojeIdx >= 0 ? hojeIdx : 0);
+    virouRef.current = false;
     // não depende de `agora` · só queremos o scroll inicial na mudança
     // de semana de referência
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refIso]);
 
+  const proximaSemana = () => setRefIso(adicionaDiaISO(semana[0]!, 7));
+
   function onScroll(e: React.UIEvent<HTMLDivElement>) {
-    const t = e.currentTarget.scrollTop;
+    const el = e.currentTarget;
+    const t = el.scrollTop;
     setScrollTop(t);
     const probe = t + 120;
     const d = Math.max(0, Math.min(N_DIAS - 1, Math.floor(probe / DAY_PX)));
     setCurrentDay(d);
+    // Bateu no fim da timeline (domingo já passou, só resta o rodapé):
+    // vira pra próxima semana sozinho · a nova abre no topo (segunda),
+    // então o rubber-band do iOS não dispara volta acidental.
+    if (!virouRef.current && t + el.clientHeight >= el.scrollHeight - 2) {
+      virouRef.current = true;
+      proximaSemana();
+    }
   }
 
   function scrollToDay(i: number) {
@@ -124,6 +138,8 @@ export function ListaDoDia({ blocos, hospitais: _h, onSelectBloco }: ListaDaSema
       <div
         ref={scrollRef}
         onScroll={onScroll}
+        role="region"
+        aria-label="linha do tempo da semana"
         style={{
           flex: 1,
           overflowY: 'auto',
@@ -141,6 +157,7 @@ export function ListaDoDia({ blocos, hospitais: _h, onSelectBloco }: ListaDaSema
           scrollTop={scrollTop}
           agora={agora}
           onSelectBloco={onSelectBloco}
+          onProximaSemana={proximaSemana}
         />
       </div>
     </div>
@@ -342,6 +359,7 @@ interface TimelineProps {
   scrollTop: number;
   agora: number;
   onSelectBloco: (b: Bloco) => void;
+  onProximaSemana: () => void;
 }
 
 function Timeline({
@@ -352,6 +370,7 @@ function Timeline({
   scrollTop,
   agora,
   onSelectBloco,
+  onProximaSemana,
 }: TimelineProps) {
   const total = N_DIAS * DAY_PX;
   const nowTop = hojeIdx >= 0 ? (hojeIdx * 24 + agora) * HOUR_PX : null;
@@ -407,7 +426,7 @@ function Timeline({
         />
       ))}
 
-      {/* fim da semana */}
+      {/* fim da semana · tap vira a semana (o scroll até aqui também vira) */}
       <div
         style={{
           position: 'absolute',
@@ -420,7 +439,25 @@ function Timeline({
         }}
       >
         <span style={{ height: 1, flex: 1, background: 'var(--line-2)' }} />
-        <Mono style={{ color: 'var(--ink-3)' }}>próxima semana</Mono>
+        <button
+          type="button"
+          onClick={onProximaSemana}
+          style={{
+            border: '1px solid var(--line)',
+            background: 'var(--bg-alt)',
+            borderRadius: 999,
+            padding: '10px 16px',
+            minHeight: 40,
+            cursor: 'pointer',
+            font: '600 12px/1 var(--font-body)',
+            color: 'var(--ink-2)',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+          }}
+        >
+          próxima semana <span aria-hidden>↓</span>
+        </button>
         <span style={{ height: 1, flex: 1, background: 'var(--line-2)' }} />
       </div>
     </div>
