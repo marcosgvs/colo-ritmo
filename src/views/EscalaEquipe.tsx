@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   DndContext,
+  DragOverlay,
   PointerSensor,
   useDraggable,
   useDroppable,
   useSensor,
   useSensors,
+  type CollisionDetection,
   type DragEndEvent,
+  type DragStartEvent,
 } from '@dnd-kit/core';
 import type {
   EscalaEquipe as EscalaEquipeT,
@@ -18,11 +21,17 @@ import type {
 import { DOWS, diaSemanaBR, fmtRange, fromISO, HOJE, MESES } from '@/lib/data';
 import {
   conflitosEquipe,
+  escolherSlotPorPonteiro,
+  idChipEscalado,
+  idChipRoster,
+  idSlot,
   JANELAS_DEFAULT,
   medicosDaImportada,
+  resolverDrop,
   resumoPorMedico,
   semanasDoMes,
   turnosDeReferencia,
+  type RetanguloSlot,
 } from '@/lib/equipe';
 import { Eyebrow, Hand, Mono, MonthPicker, Pill } from '@/components/atoms';
 import { useIsMobile } from '@/hooks/useIsMobile';
@@ -76,6 +85,29 @@ function nomeArq(abrev: string, mesISO: string, ext: string, medico?: string): s
   return `escala-${slugNome(abrev)}-${mesISO}${medico ? `-${slugNome(medico)}` : ''}.${ext}`;
 }
 
+/**
+ * O alvo do drop é a ponta do cursor, resolvido por
+ * `escolherSlotPorPonteiro` (regra e testes em lib/equipe) — o default do
+ * dnd-kit usa a área do chip arrastado e caía no dia vizinho do mirado.
+ */
+const colisaoPorCursor: CollisionDetection = (args) => {
+  const rects: RetanguloSlot[] = [];
+  for (const [id, rect] of args.droppableRects) {
+    if (!rect) continue;
+    rects.push({
+      id: String(id),
+      top: rect.top,
+      left: rect.left,
+      right: rect.left + rect.width,
+      bottom: rect.top + rect.height,
+    });
+  }
+  const escolhido = escolherSlotPorPonteiro(args.pointerCoordinates, rects);
+  if (!escolhido) return [];
+  const container = args.droppableContainers.find((c) => String(c.id) === escolhido);
+  return container ? [{ id: container.id }] : [];
+};
+
 /** União de janelas por rótulo (hospital + importada + rascunho), por hora. */
 function janelasConhecidas(
   hospital: Janela[] | undefined,
@@ -128,6 +160,8 @@ export function EscalaEquipe({
   const [medicoSel, setMedicoSel] = useState<string | null>(null);
   const [novoMedico, setNovoMedico] = useState('');
   const [exportando, setExportando] = useState<string | null>(null);
+  /** Id do que está sendo arrastado agora · alimenta o DragOverlay. */
+  const [arrastando, setArrastando] = useState<string | null>(null);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
@@ -367,12 +401,32 @@ export function EscalaEquipe({
     salvar({ obs: proximas }, `obs de ${rotuloDia(data)}`);
   }
 
+  /** Move um turno já escalado pra outro slot · uma ação só no histórico. */
+  function mover(de: TurnoEquipe, data: string, janela: string): void {
+    const atuais = atualRef.current.turnos;
+    const jaTemNoDestino = atuais.some(
+      (t) => t.data === data && t.janela === janela && t.medico === de.medico,
+    );
+    const semOrigem = atuais.filter(
+      (t) => !(t.data === de.data && t.janela === de.janela && t.medico === de.medico),
+    );
+    salvar(
+      {
+        turnos: jaTemNoDestino ? semOrigem : [...semOrigem, { data, janela, medico: de.medico }],
+      },
+      `moveu ${nomeCurto(de.medico)} · ${rotuloDia(de.data)} ${de.janela} → ${rotuloDia(data)} ${janela}`,
+    );
+  }
+
+  function onDragStart(ev: DragStartEvent): void {
+    setArrastando(String(ev.active.id));
+  }
+
   function onDragEnd(ev: DragEndEvent): void {
-    const medico = String(ev.active.id).replace(/^med\|/, '');
-    const over = ev.over?.id ? String(ev.over.id) : null;
-    if (!over || !over.startsWith('slot|')) return;
-    const [, data, janela] = over.split('|');
-    if (data && janela) escalar(data, janela, medico);
+    setArrastando(null);
+    const acao = resolverDrop(String(ev.active.id), ev.over?.id ? String(ev.over.id) : null);
+    if (acao.tipo === 'escalar') escalar(acao.data, acao.janela, acao.medico);
+    else if (acao.tipo === 'mover') mover(acao.de, acao.data, acao.janela);
   }
 
   function clicarSlot(data: string, janela: string): void {
@@ -558,7 +612,13 @@ export function EscalaEquipe({
 
   // ---- etapa montar ------------------------------------------------------
   return (
-    <DndContext sensors={sensors} onDragEnd={onDragEnd}>
+    <DndContext
+      sensors={sensors}
+      collisionDetection={colisaoPorCursor}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      onDragCancel={() => setArrastando(null)}
+    >
       <PageHead
         eyebrow="escala da equipe"
         titulo="o mês do time inteiro."
@@ -804,7 +864,49 @@ export function EscalaEquipe({
           mesISO={mesISO}
         />
       </div>
+
+      {/* O chip que segue o cursor mora aqui (portal do dnd-kit): fora de
+          qualquer stacking/overflow do header fixo e das linhas. */}
+      <DragOverlay dropAnimation={null}>
+        {arrastando && (
+          <ChipFlutuante
+            nome={nomeArrastado(arrastando)}
+            cor={corDoMedico(nomeArrastado(arrastando), medicos)}
+          />
+        )}
+      </DragOverlay>
     </DndContext>
+  );
+}
+
+/** Nome do médico embutido no id arrastado (roster ou turno escalado). */
+function nomeArrastado(id: string): string {
+  if (id.startsWith('med|')) return id.slice('med|'.length);
+  if (id.startsWith('turno|')) return id.split('|').slice(3).join('|');
+  return id;
+}
+
+function ChipFlutuante({ nome, cor }: { nome: string; cor: string }) {
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 8,
+        font: '600 13px/1 var(--font-body)',
+        padding: '9px 14px',
+        borderRadius: 999,
+        background: `var(--${cor}-surface)`,
+        border: `1.5px solid var(--${cor})`,
+        color: `var(--${cor}-ink)`,
+        boxShadow: '0 8px 20px rgba(58,46,42,0.18)',
+        cursor: 'grabbing',
+        transform: 'rotate(-1.5deg)',
+      }}
+    >
+      <span aria-hidden style={{ width: 8, height: 8, borderRadius: 999, background: `var(--${cor})` }} />
+      {nome}
+    </span>
   );
 }
 
@@ -928,8 +1030,8 @@ function ChipMedico({
   onSelecionar: () => void;
   onRemover: () => void;
 }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-    id: `med|${nome}`,
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: idChipRoster(nome),
   });
   return (
     <span
@@ -942,10 +1044,9 @@ function ChipMedico({
         border: `1.5px solid ${selecionado ? `var(--${cor}-ink)` : 'var(--line)'}`,
         background: selecionado ? `var(--${cor}-surface)` : 'var(--bg)',
         padding: '7px 10px 7px 12px',
-        transform: transform ? `translate(${transform.x}px, ${transform.y}px)` : undefined,
-        opacity: isDragging ? 0.75 : 1,
-        zIndex: isDragging ? 30 : undefined,
-        position: 'relative',
+        // o chip que segue o cursor é o DragOverlay · aqui só apagamos o
+        // original pra ficar claro de onde ele saiu
+        opacity: isDragging ? 0.4 : 1,
         touchAction: 'none',
       }}
     >
@@ -1121,7 +1222,7 @@ function SlotJanela({
   onClicar: () => void;
   onRemoverTurno: (t: TurnoEquipe) => void;
 }) {
-  const { setNodeRef, isOver } = useDroppable({ id: `slot|${iso}|${janela.rotulo}` });
+  const { setNodeRef, isOver } = useDroppable({ id: idSlot(iso, janela.rotulo) });
   const vazio = turnos.length === 0;
   return (
     <div
@@ -1159,40 +1260,67 @@ function SlotJanela({
           {janela.rotulo}
         </span>
       )}
-      {turnos.map((t) => {
-        const cor = corDoMedico(t.medico, medicos);
-        const emConflito = conflitos.has(`${t.medico}|${t.data}|${t.janela}`);
-        return (
-          <button
-            key={t.medico}
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onRemoverTurno(t);
-            }}
-            title={`${t.medico} · clica pra tirar`}
-            style={{
-              textAlign: 'left',
-              font: '600 13px/1.3 var(--font-body)',
-              padding: '7px 12px',
-              borderRadius: 8,
-              background: `var(--${cor}-surface)`,
-              border: emConflito ? '1.5px solid var(--err-ink)' : 'none',
-              borderLeft: `3px solid var(--${cor})`,
-              color: `var(--${cor}-ink)`,
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              // pisca ao entrar · sinaliza a mudança pra quem clicou
-              animation: 'colo-fab-in 220ms cubic-bezier(.2,.7,.2,1)',
-            }}
-          >
-            {t.medico}
-          </button>
-        );
-      })}
+      {turnos.map((t) => (
+        <ChipEscalado
+          key={t.medico}
+          turno={t}
+          cor={corDoMedico(t.medico, medicos)}
+          emConflito={conflitos.has(`${t.medico}|${t.data}|${t.janela}`)}
+          onRemover={() => onRemoverTurno(t)}
+        />
+      ))}
     </div>
+  );
+}
+
+/** Médico já escalado num turno · arrasta pra mover, clica pra tirar. */
+function ChipEscalado({
+  turno,
+  cor,
+  emConflito,
+  onRemover,
+}: {
+  turno: TurnoEquipe;
+  cor: string;
+  emConflito: boolean;
+  onRemover: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: idChipEscalado(turno),
+  });
+  return (
+    <button
+      ref={setNodeRef}
+      type="button"
+      {...listeners}
+      {...attributes}
+      onClick={(e) => {
+        e.stopPropagation();
+        onRemover();
+      }}
+      title={`${turno.medico} · arrasta pra mover de turno · clica pra tirar`}
+      style={{
+        textAlign: 'left',
+        font: '600 13px/1.3 var(--font-body)',
+        padding: '7px 12px',
+        borderRadius: 8,
+        background: `var(--${cor}-surface)`,
+        border: emConflito ? '1.5px solid var(--err-ink)' : 'none',
+        borderLeft: `3px solid var(--${cor})`,
+        color: `var(--${cor}-ink)`,
+        cursor: 'grab',
+        whiteSpace: 'nowrap',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        touchAction: 'none',
+        // o original vira fantasma enquanto o DragOverlay segue o cursor
+        opacity: isDragging ? 0.35 : 1,
+        // pisca ao entrar · sinaliza a mudança pra quem clicou
+        animation: 'colo-fab-in 220ms cubic-bezier(.2,.7,.2,1)',
+      }}
+    >
+      {turno.medico}
+    </button>
   );
 }
 

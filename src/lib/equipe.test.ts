@@ -2,7 +2,12 @@ import { describe, expect, test } from 'vitest';
 import type { EscalaImportada, Janela, TurnoEquipe } from '@/types';
 import {
   conflitosEquipe,
+  escolherSlotPorPonteiro,
+  idChipEscalado,
+  idChipRoster,
+  idSlot,
   medicosDaImportada,
+  resolverDrop,
   resumoPorMedico,
   semanasDoMes,
   turnosDeReferencia,
@@ -94,6 +99,75 @@ describe('turnosDeReferencia', () => {
   test('médico fora do roster e janela desconhecida ficam de fora', () => {
     const turnos = turnosDeReferencia(referencia, '2026-07', JANELAS, ['Bia']);
     expect(turnos).toEqual([{ data: '2026-07-06', janela: 'dia', medico: 'Bia' }]);
+  });
+});
+
+describe('escolherSlotPorPonteiro', () => {
+  // duas linhas-dia, cada uma com dois slots · vão de 10px entre as linhas
+  const rects = [
+    { id: 'slot|2026-07-06|dia', top: 0, left: 100, right: 200, bottom: 50 },
+    { id: 'slot|2026-07-06|noite', top: 0, left: 210, right: 310, bottom: 50 },
+    { id: 'slot|2026-07-07|dia', top: 60, left: 100, right: 200, bottom: 110 },
+    { id: 'slot|2026-07-07|noite', top: 60, left: 210, right: 310, bottom: 110 },
+  ];
+
+  test('cursor dentro de um slot escolhe aquele slot', () => {
+    expect(escolherSlotPorPonteiro({ x: 150, y: 25 }, rects)).toBe('slot|2026-07-06|dia');
+    expect(escolherSlotPorPonteiro({ x: 260, y: 90 }, rects)).toBe('slot|2026-07-07|noite');
+  });
+
+  test('cursor no vão ENTRE colunas cai no slot mais perto do MESMO dia', () => {
+    // x=205 está entre as duas colunas, y=25 é a linha do dia 06
+    expect(escolherSlotPorPonteiro({ x: 205, y: 25 }, rects)).toBe('slot|2026-07-06|dia');
+    expect(escolherSlotPorPonteiro({ x: 208, y: 90 }, rects)).toBe('slot|2026-07-07|noite');
+  });
+
+  test('cursor no vão ENTRE linhas não escolhe nada · nunca troca de dia', () => {
+    expect(escolherSlotPorPonteiro({ x: 150, y: 55 }, rects)).toBeNull();
+  });
+
+  test('cursor fora da grade (ou ausente) não escolhe nada', () => {
+    expect(escolherSlotPorPonteiro({ x: 150, y: 900 }, rects)).toBeNull();
+    expect(escolherSlotPorPonteiro(null, rects)).toBeNull();
+  });
+});
+
+describe('resolverDrop', () => {
+  test('chip do roster no slot → escalar', () => {
+    expect(resolverDrop(idChipRoster('Ana Maria'), idSlot('2026-07-06', 'noite'))).toEqual({
+      tipo: 'escalar',
+      medico: 'Ana Maria',
+      data: '2026-07-06',
+      janela: 'noite',
+    });
+  });
+
+  test('chip escalado em OUTRO slot → mover (não duplica)', () => {
+    const t = { data: '2026-07-06', janela: 'dia', medico: 'Ana' };
+    expect(resolverDrop(idChipEscalado(t), idSlot('2026-07-08', 'noite'))).toEqual({
+      tipo: 'mover',
+      de: t,
+      data: '2026-07-08',
+      janela: 'noite',
+    });
+  });
+
+  test('chip escalado de volta no mesmo slot → nada', () => {
+    const t = { data: '2026-07-06', janela: 'dia', medico: 'Ana' };
+    expect(resolverDrop(idChipEscalado(t), idSlot('2026-07-06', 'dia'))).toEqual({ tipo: 'nada' });
+  });
+
+  test('soltar fora de qualquer slot → nada', () => {
+    expect(resolverDrop(idChipRoster('Ana'), null)).toEqual({ tipo: 'nada' });
+    expect(resolverDrop(idChipRoster('Ana'), 'lixeira')).toEqual({ tipo: 'nada' });
+  });
+
+  test('nome com pipe no meio não quebra o parse do id', () => {
+    const t = { data: '2026-07-06', janela: 'dia', medico: 'Ana|Bia' };
+    expect(resolverDrop(idChipEscalado(t), idSlot('2026-07-07', 'dia'))).toMatchObject({
+      tipo: 'mover',
+      de: { medico: 'Ana|Bia' },
+    });
   });
 });
 

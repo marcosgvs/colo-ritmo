@@ -118,6 +118,103 @@ export function conflitosEquipe(turnos: TurnoEquipe[], janelas: Janela[]): Set<s
   return out;
 }
 
+/**
+ * Ids usados pelo drag-and-drop da página de equipe. Ficam aqui (e não
+ * inline na view) porque a resolução do drop é a parte com regra — e
+ * regra a gente testa.
+ *
+ *   chip do roster        → `med|{medico}`
+ *   chip já escalado      → `turno|{data}|{janela}|{medico}`
+ *   alvo (slot de turno)  → `slot|{data}|{janela}`
+ */
+export function idChipRoster(medico: string): string {
+  return `med|${medico}`;
+}
+
+export function idChipEscalado(t: TurnoEquipe): string {
+  return `turno|${t.data}|${t.janela}|${t.medico}`;
+}
+
+export function idSlot(data: string, janela: string): string {
+  return `slot|${data}|${janela}`;
+}
+
+export interface RetanguloSlot {
+  id: string;
+  top: number;
+  left: number;
+  right: number;
+  bottom: number;
+}
+
+/**
+ * Escolhe o slot alvo de um drop pela PONTA DO CURSOR.
+ *
+ * A detecção default do dnd-kit usa a área do chip arrastado, que numa
+ * grade de dia-por-linha atravessa duas linhas e escala no dia vizinho do
+ * que a pessoa mirou. Aqui:
+ *   1. slot sob o cursor → esse
+ *   2. senão, slot na MESMA FAIXA VERTICAL (mesmo dia), o mais próximo na
+ *      horizontal → cobre o vão de 6px entre colunas
+ *   3. senão → null · não adivinha dia. Escalar silenciosamente no dia
+ *      errado é pior que não escalar (a pessoa só repete o gesto).
+ */
+export function escolherSlotPorPonteiro(
+  ponteiro: { x: number; y: number } | null,
+  rects: RetanguloSlot[],
+): string | null {
+  if (!ponteiro) return null;
+  const { x, y } = ponteiro;
+  const dentro = rects.find(
+    (r) => x >= r.left && x <= r.right && y >= r.top && y <= r.bottom,
+  );
+  if (dentro) return dentro.id;
+
+  const mesmaFaixa = rects.filter((r) => y >= r.top && y <= r.bottom);
+  if (mesmaFaixa.length === 0) return null;
+  return mesmaFaixa.reduce((melhor, r) => {
+    const dist = (rr: RetanguloSlot) =>
+      x < rr.left ? rr.left - x : x > rr.right ? x - rr.right : 0;
+    return dist(r) < dist(melhor) ? r : melhor;
+  }).id;
+}
+
+export type AcaoDrop =
+  | { tipo: 'nada' }
+  | { tipo: 'escalar'; medico: string; data: string; janela: string }
+  | { tipo: 'mover'; de: TurnoEquipe; data: string; janela: string };
+
+/**
+ * Traduz (o que foi arrastado, onde soltou) na ação a executar.
+ * Soltar fora de um slot, ou de volta no mesmo slot, não faz nada.
+ */
+export function resolverDrop(activeId: string, overId: string | null): AcaoDrop {
+  if (!overId || !overId.startsWith('slot|')) return { tipo: 'nada' };
+  const [, data, janela] = overId.split('|');
+  if (!data || !janela) return { tipo: 'nada' };
+
+  if (activeId.startsWith('med|')) {
+    const medico = activeId.slice('med|'.length);
+    if (!medico) return { tipo: 'nada' };
+    return { tipo: 'escalar', medico, data, janela };
+  }
+
+  if (activeId.startsWith('turno|')) {
+    const [, dataOrigem, janelaOrigem, ...resto] = activeId.split('|');
+    const medico = resto.join('|');
+    if (!dataOrigem || !janelaOrigem || !medico) return { tipo: 'nada' };
+    if (dataOrigem === data && janelaOrigem === janela) return { tipo: 'nada' };
+    return {
+      tipo: 'mover',
+      de: { data: dataOrigem, janela: janelaOrigem, medico },
+      data,
+      janela,
+    };
+  }
+
+  return { tipo: 'nada' };
+}
+
 /** Janelas default quando o hospital não tem cadastro nem escala importada. */
 export const JANELAS_DEFAULT: Janela[] = [
   { rotulo: 'dia', inicio: 7, duracao: 12 },
