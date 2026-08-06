@@ -1,5 +1,5 @@
 import type { EscalaImportada, Janela, TurnoEquipe } from '@/types';
-import { diaSemanaBR, fimDoMes, inicioDoMes, semanaDe, toISO } from './dates';
+import { diaSemanaBR, fimDoMes, fromISO, inicioDoMes, semanaDe, toISO } from './dates';
 
 /**
  * Helpers puros da escala de EQUIPE (página onde a chefe monta o mês do
@@ -123,3 +123,52 @@ export const JANELAS_DEFAULT: Janela[] = [
   { rotulo: 'dia', inicio: 7, duracao: 12 },
   { rotulo: 'noite', inicio: 19, duracao: 12 },
 ];
+
+/** Ordinal do dia-da-semana dentro do mês (1º sábado, 2º sábado…). */
+function ordinalNoMes(iso: string): number {
+  return Math.floor((fromISO(iso).getDate() - 1) / 7) + 1;
+}
+
+/** ISO do N-ésimo dia-da-semana `dow` (0=seg…6=dom) do mês · null se não existe. */
+function dataDoOrdinal(mesISO: string, dow: number, ordinal: number): string | null {
+  const primeiro = `${mesISO}-01`;
+  const offset = (dow - diaSemanaBR(primeiro) + 7) % 7;
+  const dia = 1 + offset + (ordinal - 1) * 7;
+  const fim = fromISO(fimDoMes(primeiro)).getDate();
+  if (dia > fim) return null;
+  return `${mesISO}-${String(dia).padStart(2, '0')}`;
+}
+
+/**
+ * Pré-posiciona a escala nova a partir de uma escala antiga: cada célula
+ * migra pro MESMO dia-da-semana e MESMA posição no mês (2ª terça → 2ª
+ * terça). Célula sem correspondente (5ª ocorrência que o mês novo não
+ * tem), janela que não existe mais ou médico fora do roster ficam de fora
+ * — é ponto de partida, não gabarito.
+ */
+export function turnosDeReferencia(
+  referencia: EscalaImportada,
+  mesAlvoISO: string,
+  janelasAlvo: Janela[],
+  roster: string[],
+): TurnoEquipe[] {
+  const rotulos = new Map(janelasAlvo.map((j) => [j.rotulo.toLowerCase(), j.rotulo]));
+  const nomesRoster = new Set(roster);
+  const out: TurnoEquipe[] = [];
+  const vistos = new Set<string>();
+  for (const c of referencia.celulas) {
+    const janela = rotulos.get(c.turno.toLowerCase());
+    if (!janela) continue;
+    const data = dataDoOrdinal(mesAlvoISO, diaSemanaBR(c.data), ordinalNoMes(c.data));
+    if (!data) continue;
+    for (const nomeCru of c.nomes) {
+      const medico = nomeCru.trim();
+      if (!medico || !nomesRoster.has(medico)) continue;
+      const chave = `${data}|${janela}|${medico}`;
+      if (vistos.has(chave)) continue;
+      vistos.add(chave);
+      out.push({ data, janela, medico });
+    }
+  }
+  return out;
+}

@@ -22,6 +22,7 @@ import {
   medicosDaImportada,
   resumoPorMedico,
   semanasDoMes,
+  turnosDeReferencia,
 } from '@/lib/equipe';
 import { Eyebrow, Hand, Mono, MonthPicker, Pill } from '@/components/atoms';
 import { useIsMobile } from '@/hooks/useIsMobile';
@@ -29,8 +30,19 @@ import { PageHead } from './_PageHead';
 import {
   baixarPDFEquipeCompleto,
   baixarPDFEquipeMedico,
+  fmtHorarioJanela,
+  mesPorExtenso,
+  rotuloDiaCurto,
+  slugNome,
   type DadosPDFEquipe,
 } from '@/lib/pdfEquipe';
+import {
+  baixarArquivoTexto,
+  baixarXLSXEquipe,
+  icsEquipe,
+  textoEquipeGeral,
+  textoEquipeMedico,
+} from '@/lib/exportarEquipe';
 
 interface EscalaEquipeProps {
   hospitais: HospitaisMap;
@@ -60,11 +72,30 @@ function mesLabel(mesISO: string): string {
   return `${MESES[d.getMonth()]} ${d.getFullYear()}`;
 }
 
+function nomeArq(abrev: string, mesISO: string, ext: string, medico?: string): string {
+  return `escala-${slugNome(abrev)}-${mesISO}${medico ? `-${slugNome(medico)}` : ''}.${ext}`;
+}
+
+/** União de janelas por rótulo (hospital + importada + rascunho), por hora. */
+function janelasConhecidas(
+  hospital: Janela[] | undefined,
+  importada: Janela[] | undefined,
+  rascunho: Janela[] | undefined,
+): Janela[] {
+  const m = new Map<string, Janela>();
+  for (const j of [...(hospital ?? []), ...(importada ?? []), ...(rascunho ?? [])]) {
+    if (!m.has(j.rotulo.toLowerCase())) m.set(j.rotulo.toLowerCase(), j);
+  }
+  const lista = [...m.values()].sort((a, b) => a.inicio - b.inicio);
+  return lista.length > 0 ? lista : JANELAS_DEFAULT;
+}
+
 /**
  * EscalaEquipe · página (temporária) onde a chefe monta a escala do TIME
  * inteiro de um hospital: arrasta (ou seleciona e clica) médicos pros
- * turnos do mês, acompanha horas por semana/fds/total de cada um ao vivo,
- * e exporta PDF completo + um por médico. Feita pra desktop.
+ * turnos do mês, acompanha horas por semana/fds/total ao vivo, anota as
+ * observações do dia (os "asteriscos"), revisa a tabela completa e
+ * exporta txt/pdf/agenda/excel — geral e por médico. Feita pra desktop.
  */
 export function EscalaEquipe({
   hospitais,
@@ -74,13 +105,26 @@ export function EscalaEquipe({
 }: EscalaEquipeProps) {
   const isMobile = useIsMobile();
   const hospitaisLista = Object.values(hospitais);
-  const [hospitalId, setHospitalId] = useState<string>(hospitaisLista[0]?.id ?? '');
+
+  // Default: onde ela já estava trabalhando · senão o hospital da escala
+  // importada mais recente (proxy de "onde ela é chefe") · senão o 1º.
+  const [hospitalId, setHospitalId] = useState<string>(() => {
+    if (escalasEquipe[0]?.hospitalId && hospitais[escalasEquipe[0].hospitalId]) {
+      return escalasEquipe[0].hospitalId;
+    }
+    const imp = [...escalasImportadas].sort(
+      (a, b) => b.ano * 100 + b.mes - (a.ano * 100 + a.mes),
+    )[0];
+    if (imp && hospitais[imp.hospitalId]) return imp.hospitalId;
+    return hospitaisLista[0]?.id ?? '';
+  });
   const [mesISO, setMesISO] = useState<string>(() => {
-    // default: mês que vem · escala se monta antes do mês começar
+    if (escalasEquipe[0]?.mesISO) return escalasEquipe[0].mesISO;
     const d = fromISO(HOJE);
     d.setMonth(d.getMonth() + 1, 1);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   });
+  const [etapa, setEtapa] = useState<'montar' | 'revisar'>('montar');
   const [medicoSel, setMedicoSel] = useState<string | null>(null);
   const [novoMedico, setNovoMedico] = useState('');
   const [exportando, setExportando] = useState<string | null>(null);
@@ -98,13 +142,17 @@ export function EscalaEquipe({
 
   const medicos = rascunho?.medicos ?? [];
   const turnos = rascunho?.turnos ?? [];
+  const obs = rascunho?.obs ?? {};
+
+  const conhecidas = janelasConhecidas(
+    hospitais[hospitalId]?.janelas,
+    importadaRecente?.janelas,
+    rascunho?.janelas,
+  );
+  // Janelas ATIVAS (colunas da grade) · sem rascunho salvo, tudo menos
+  // "noitinha" — no HCB ela é ruído da escala antiga · religa no toggle.
   const janelas: Janela[] =
-    rascunho?.janelas ??
-    (hospitais[hospitalId]?.janelas?.length
-      ? hospitais[hospitalId]!.janelas!
-      : importadaRecente?.janelas?.length
-        ? importadaRecente.janelas
-        : JANELAS_DEFAULT);
+    rascunho?.janelas ?? conhecidas.filter((j) => j.rotulo.toLowerCase() !== 'noitinha');
 
   const semanas = useMemo(() => semanasDoMes(mesISO), [mesISO]);
   const resumos = useMemo(
@@ -124,11 +172,10 @@ export function EscalaEquipe({
     return m;
   }, [turnos]);
 
-  // Cliques em sequência rápida chegam antes do re-render: ler `turnos`
-  // direto do closure perderia atribuições (o 2º save nasceria do estado
-  // velho). O ref acumula otimisticamente entre renders.
-  const atualRef = useRef({ medicos, janelas, turnos });
-  atualRef.current = { medicos, janelas, turnos };
+  // Cliques em sequência rápida chegam antes do re-render: ler do closure
+  // perderia atribuições. O ref acumula otimisticamente entre renders.
+  const atualRef = useRef({ medicos, janelas, turnos, obs });
+  atualRef.current = { medicos, janelas, turnos, obs };
 
   function salvar(prox: Partial<EscalaEquipeT>): void {
     const proximo: EscalaEquipeT = {
@@ -142,6 +189,7 @@ export function EscalaEquipe({
       medicos: proximo.medicos,
       janelas: proximo.janelas,
       turnos: proximo.turnos,
+      obs: proximo.obs ?? {},
     };
     onSalvar(proximo);
   }
@@ -149,12 +197,23 @@ export function EscalaEquipe({
   function puxarDaImportada(): void {
     if (!importadaRecente) return;
     const vindos = medicosDaImportada(importadaRecente);
-    const mescla = [...medicos];
-    for (const m of vindos) if (!mescla.includes(m)) mescla.push(m);
-    salvar({
-      medicos: mescla,
-      janelas: rascunho?.janelas ?? importadaRecente.janelas ?? janelas,
-    });
+    const roster = [...medicos];
+    for (const m of vindos) if (!roster.includes(m)) roster.push(m);
+    // Pré-posiciona: cada um cai no mesmo dia-da-semana/posição do mês
+    // que ocupava na escala de referência · o que ela já colocou fica.
+    const sugeridos = turnosDeReferencia(importadaRecente, mesISO, janelas, roster);
+    const existentes = new Set(turnos.map((t) => `${t.data}|${t.janela}|${t.medico}`));
+    const novos = sugeridos.filter((t) => !existentes.has(`${t.data}|${t.janela}|${t.medico}`));
+    salvar({ medicos: roster, turnos: [...turnos, ...novos] });
+  }
+
+  function alternarJanela(j: Janela): void {
+    const ativa = janelas.some((x) => x.rotulo.toLowerCase() === j.rotulo.toLowerCase());
+    const novas = ativa
+      ? janelas.filter((x) => x.rotulo.toLowerCase() !== j.rotulo.toLowerCase())
+      : [...janelas, j].sort((a, b) => a.inicio - b.inicio);
+    if (novas.length === 0) return; // pelo menos uma coluna
+    salvar({ janelas: novas });
   }
 
   function adicionarMedico(): void {
@@ -189,6 +248,13 @@ export function EscalaEquipe({
     });
   }
 
+  function anotarObs(data: string, texto: string): void {
+    const proximas = { ...atualRef.current.obs };
+    if (texto.trim()) proximas[data] = texto;
+    else delete proximas[data];
+    salvar({ obs: proximas });
+  }
+
   function onDragEnd(ev: DragEndEvent): void {
     const medico = String(ev.active.id).replace(/^med\|/, '');
     const over = ev.over?.id ? String(ev.over.id) : null;
@@ -201,29 +267,6 @@ export function EscalaEquipe({
     if (medicoSel) escalar(data, janela, medicoSel);
   }
 
-  async function exportarCompleto(): Promise<void> {
-    setExportando('completo');
-    try {
-      await baixarPDFEquipeCompleto(dadosPDF());
-    } finally {
-      setExportando(null);
-    }
-  }
-
-  async function exportarPorMedico(): Promise<void> {
-    setExportando('medicos');
-    try {
-      const comTurno = medicos.filter((m) => turnos.some((t) => t.medico === m));
-      for (const m of comTurno) {
-        await baixarPDFEquipeMedico(dadosPDF(), m);
-        // o browser engasga com downloads simultâneos · respiro entre eles
-        await new Promise((r) => setTimeout(r, 450));
-      }
-    } finally {
-      setExportando(null);
-    }
-  }
-
   function dadosPDF(): DadosPDFEquipe {
     const h = hospitais[hospitalId];
     return {
@@ -233,18 +276,28 @@ export function EscalaEquipe({
       janelas,
       turnos,
       medicos,
+      obs,
     };
   }
 
+  async function exportar(chave: string, acao: () => Promise<void> | void): Promise<void> {
+    setExportando(chave);
+    try {
+      await acao();
+    } finally {
+      setExportando(null);
+    }
+  }
+
+  const abrev = hospitais[hospitalId]?.abrev ?? hospitalId;
+
   if (isMobile) {
     return (
-      <>
-        <PageHead
-          eyebrow="escala da equipe"
-          titulo="melhor no computador."
-          hand="montar a escala do time inteiro pede tela grande · abre no desktop"
-        />
-      </>
+      <PageHead
+        eyebrow="escala da equipe"
+        titulo="melhor no computador."
+        hand="montar a escala do time inteiro pede tela grande · abre no desktop"
+      />
     );
   }
 
@@ -258,6 +311,140 @@ export function EscalaEquipe({
     );
   }
 
+  // ---- etapa revisar/exportar -------------------------------------------
+  if (etapa === 'revisar') {
+    const comTurno = medicos.filter((m) => turnos.some((t) => t.medico === m));
+    return (
+      <>
+        <PageHead
+          eyebrow="escala da equipe"
+          titulo="confere e manda."
+          hand={`${abrev} · ${mesLabel(mesISO)} · a tabela abaixo é exatamente o que sai nos exports`}
+        />
+        <div style={{ display: 'flex', gap: 10, marginBottom: 18, alignItems: 'center' }}>
+          <button type="button" onClick={() => setEtapa('montar')} style={botaoSecundario}>
+            ‹ voltar pra editar
+          </button>
+          <span style={{ flex: 1 }} />
+          <Eyebrow>{turnos.length} turnos · {comTurno.length} médicos escalados</Eyebrow>
+        </div>
+
+        <TabelaRevisao mesISO={mesISO} janelas={janelas} turnosPorSlot={turnosPorSlot} obs={obs} />
+
+        {/* escala completa */}
+        <div style={cardExport}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontFamily: 'var(--font-display)', fontWeight: 500, fontSize: 16 }}>
+              escala completa
+            </span>
+            <Mono style={{ color: 'var(--ink-3)' }}>{mesPorExtenso(mesISO)}</Mono>
+            <span style={{ flex: 1 }} />
+            <BotaoExport
+              rotulo="txt"
+              ocupado={exportando}
+              chave="geral-txt"
+              onClick={() =>
+                exportar('geral-txt', () =>
+                  baixarArquivoTexto(nomeArq(abrev, mesISO, 'txt'), textoEquipeGeral(dadosPDF())),
+                )
+              }
+            />
+            <BotaoExport
+              rotulo="pdf"
+              ocupado={exportando}
+              chave="geral-pdf"
+              onClick={() => exportar('geral-pdf', () => baixarPDFEquipeCompleto(dadosPDF()))}
+            />
+            <BotaoExport
+              rotulo="agenda (.ics)"
+              ocupado={exportando}
+              chave="geral-ics"
+              onClick={() =>
+                exportar('geral-ics', () =>
+                  baixarArquivoTexto(nomeArq(abrev, mesISO, 'ics'), icsEquipe(dadosPDF())),
+                )
+              }
+            />
+            <BotaoExport
+              rotulo="excel"
+              ocupado={exportando}
+              chave="geral-xlsx"
+              onClick={() => exportar('geral-xlsx', () => baixarXLSXEquipe(dadosPDF()))}
+            />
+          </div>
+          <Mono style={{ display: 'block', marginTop: 8, color: 'var(--ink-3)' }}>
+            o .ics importa direto no google calendar · o excel abre no sheets
+          </Mono>
+        </div>
+
+        {/* por médico */}
+        <div style={cardExport}>
+          <span style={{ fontFamily: 'var(--font-display)', fontWeight: 500, fontSize: 16 }}>
+            um pra cada médico
+          </span>
+          {comTurno.length === 0 && (
+            <Mono style={{ display: 'block', marginTop: 8, color: 'var(--ink-3)' }}>
+              ninguém escalado ainda
+            </Mono>
+          )}
+          {comTurno.map((m) => {
+            const r = resumos.find((x) => x.medico === m);
+            const cor = corDoMedico(m, medicos);
+            return (
+              <div
+                key={m}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  padding: '10px 0',
+                  borderBottom: '1px dashed var(--line-2)',
+                }}
+              >
+                <span aria-hidden style={{ width: 8, height: 8, borderRadius: 999, background: `var(--${cor})` }} />
+                <span style={{ font: '600 13px/1.2 var(--font-body)' }}>{m}</span>
+                <Mono style={{ color: 'var(--ink-3)' }}>
+                  {r?.plantoes ?? 0} plantões · {r?.total ?? 0}h
+                </Mono>
+                <span style={{ flex: 1 }} />
+                <BotaoExport
+                  rotulo="txt"
+                  ocupado={exportando}
+                  chave={`txt-${m}`}
+                  onClick={() =>
+                    exportar(`txt-${m}`, () =>
+                      baixarArquivoTexto(
+                        nomeArq(abrev, mesISO, 'txt', m),
+                        textoEquipeMedico(dadosPDF(), m),
+                      ),
+                    )
+                  }
+                />
+                <BotaoExport
+                  rotulo="pdf"
+                  ocupado={exportando}
+                  chave={`pdf-${m}`}
+                  onClick={() => exportar(`pdf-${m}`, () => baixarPDFEquipeMedico(dadosPDF(), m))}
+                />
+                <BotaoExport
+                  rotulo="agenda"
+                  ocupado={exportando}
+                  chave={`ics-${m}`}
+                  onClick={() =>
+                    exportar(`ics-${m}`, () =>
+                      baixarArquivoTexto(nomeArq(abrev, mesISO, 'ics', m), icsEquipe(dadosPDF(), m)),
+                    )
+                  }
+                />
+              </div>
+            );
+          })}
+        </div>
+      </>
+    );
+  }
+
+  // ---- etapa montar ------------------------------------------------------
   return (
     <DndContext sensors={sensors} onDragEnd={onDragEnd}>
       <PageHead
@@ -266,43 +453,97 @@ export function EscalaEquipe({
         hand="arrasta o nome pro turno · ou clica no nome e vai clicando nos turnos"
       />
 
-      {/* setup: hospital + mês + puxar equipe */}
-      <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 18 }}>
-        <select
-          value={hospitalId}
-          onChange={(e) => setHospitalId(e.target.value)}
-          style={{ ...inputStyle, width: 'auto', minWidth: 180 }}
-        >
-          {hospitaisLista.map((h) => (
-            <option key={h.id} value={h.id}>
-              {h.abrev} · {h.nome}
-            </option>
-          ))}
-        </select>
+      {/* setup: hospital + mês + puxar + revisar */}
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
+        {hospitaisLista.length > 1 && (
+          <select
+            value={hospitalId}
+            onChange={(e) => setHospitalId(e.target.value)}
+            style={{ ...inputStyle, width: 'auto', minWidth: 160 }}
+          >
+            {hospitaisLista.map((h) => (
+              <option key={h.id} value={h.id}>
+                {h.abrev} · {h.nome}
+              </option>
+            ))}
+          </select>
+        )}
         <MonthPicker value={mesISO} onChange={setMesISO} />
         {importadaRecente && (
           <button type="button" onClick={puxarDaImportada} style={botaoSecundario}>
-            puxar equipe da escala de {MESES[importadaRecente.mes - 1]}/{importadaRecente.ano}
+            puxar a escala de {MESES[importadaRecente.mes - 1]}/{importadaRecente.ano} (nomes + posições)
           </button>
         )}
         <span style={{ flex: 1 }} />
         <button
           type="button"
-          onClick={() => void exportarCompleto()}
-          disabled={turnos.length === 0 || exportando !== null}
-          style={{ ...botaoPrimario, opacity: turnos.length === 0 || exportando ? 0.5 : 1 }}
+          onClick={() => setEtapa('revisar')}
+          disabled={turnos.length === 0}
+          style={{ ...botaoPrimario, opacity: turnos.length === 0 ? 0.5 : 1 }}
         >
-          {exportando === 'completo' ? 'gerando…' : 'pdf completo'}
-        </button>
-        <button
-          type="button"
-          onClick={() => void exportarPorMedico()}
-          disabled={turnos.length === 0 || exportando !== null}
-          style={{ ...botaoSecundario, opacity: turnos.length === 0 || exportando ? 0.5 : 1 }}
-        >
-          {exportando === 'medicos' ? 'gerando…' : 'pdf por médico'}
+          salvar e exportar ›
         </button>
       </div>
+
+      {/* escalas já salvas */}
+      {escalasEquipe.length > 0 && (
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
+          <Eyebrow>salvas</Eyebrow>
+          {escalasEquipe.map((e) => {
+            const ativa = e.hospitalId === hospitalId && e.mesISO === mesISO;
+            return (
+              <button
+                key={`${e.hospitalId}-${e.mesISO}`}
+                type="button"
+                onClick={() => {
+                  setHospitalId(e.hospitalId);
+                  setMesISO(e.mesISO);
+                }}
+                style={{
+                  ...botaoSecundario,
+                  padding: '8px 12px',
+                  background: ativa ? 'var(--lavender-surface)' : 'var(--bg-alt)',
+                  border: `1px solid ${ativa ? 'var(--lavender)' : 'var(--line)'}`,
+                  color: ativa ? 'var(--lavender-ink)' : 'var(--ink-2)',
+                }}
+              >
+                {hospitais[e.hospitalId]?.abrev ?? e.hospitalId} · {mesLabel(e.mesISO)} · {e.turnos.length} turnos
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* janelas ativas */}
+      {conhecidas.length > 1 && (
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
+          <Eyebrow>turnos do hospital</Eyebrow>
+          {conhecidas.map((j) => {
+            const ativa = janelas.some((x) => x.rotulo.toLowerCase() === j.rotulo.toLowerCase());
+            return (
+              <button
+                key={j.rotulo}
+                type="button"
+                onClick={() => alternarJanela(j)}
+                aria-pressed={ativa}
+                title={fmtRange(j.inicio, j.duracao)}
+                style={{
+                  font: '600 12px/1 var(--font-body)',
+                  padding: '8px 14px',
+                  borderRadius: 999,
+                  border: `1px solid ${ativa ? 'var(--ink)' : 'var(--line)'}`,
+                  background: ativa ? 'var(--ink)' : 'var(--bg)',
+                  color: ativa ? 'var(--bg)' : 'var(--ink-3)',
+                  cursor: 'pointer',
+                  textDecoration: ativa ? 'none' : 'line-through',
+                }}
+              >
+                {j.rotulo} · {fmtRange(j.inicio, j.duracao)}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* roster de médicos */}
       <div
@@ -398,6 +639,8 @@ export function EscalaEquipe({
                   medicos={medicos}
                   conflitos={conflitos}
                   temSelecao={!!medicoSel}
+                  obs={obs[iso] ?? ''}
+                  onObs={(txt) => anotarObs(iso, txt)}
                   onClicarSlot={clicarSlot}
                   onRemoverTurno={desescalar}
                 />
@@ -416,6 +659,100 @@ export function EscalaEquipe({
         />
       </div>
     </DndContext>
+  );
+}
+
+function BotaoExport({
+  rotulo,
+  chave,
+  ocupado,
+  onClick,
+}: {
+  rotulo: string;
+  chave: string;
+  ocupado: string | null;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={ocupado !== null}
+      style={{
+        ...botaoSecundario,
+        padding: '8px 14px',
+        opacity: ocupado && ocupado !== chave ? 0.5 : 1,
+      }}
+    >
+      {ocupado === chave ? 'gerando…' : rotulo}
+    </button>
+  );
+}
+
+/** Tabela dia × janela · exatamente o que sai nos exports. */
+function TabelaRevisao({
+  mesISO,
+  janelas,
+  turnosPorSlot,
+  obs,
+}: {
+  mesISO: string;
+  janelas: Janela[];
+  turnosPorSlot: Map<string, TurnoEquipe[]>;
+  obs: Record<string, string>;
+}) {
+  const dias: string[] = [];
+  const fim = fromISO(`${mesISO}-01`);
+  fim.setMonth(fim.getMonth() + 1, 0);
+  for (let d = 1; d <= fim.getDate(); d++) {
+    dias.push(`${mesISO}-${String(d).padStart(2, '0')}`);
+  }
+  const temObs = Object.keys(obs).some((d) => d.startsWith(mesISO) && obs[d]?.trim());
+  return (
+    <div
+      style={{
+        background: 'var(--bg)',
+        border: '1px solid var(--line)',
+        borderRadius: 16,
+        overflow: 'hidden',
+        boxShadow: 'var(--shadow-sm)',
+        marginBottom: 18,
+      }}
+    >
+      <table style={{ width: '100%', borderCollapse: 'collapse', font: '500 12px/1.4 var(--font-body)' }}>
+        <thead>
+          <tr style={{ background: 'var(--bg-alt)' }}>
+            <th style={thStyle}>dia</th>
+            {janelas.map((j) => (
+              <th key={j.rotulo} style={thStyle}>
+                {j.rotulo} · {fmtHorarioJanela(j)}
+              </th>
+            ))}
+            {temObs && <th style={thStyle}>obs</th>}
+          </tr>
+        </thead>
+        <tbody>
+          {dias.map((iso) => {
+            const fds = diaSemanaBR(iso) >= 5;
+            return (
+              <tr key={iso} style={{ background: fds ? 'var(--bg-alt)' : 'transparent' }}>
+                <td style={{ ...tdStyle, whiteSpace: 'nowrap', color: 'var(--ink-2)', fontWeight: 600 }}>
+                  {rotuloDiaCurto(iso)}
+                </td>
+                {janelas.map((j) => (
+                  <td key={j.rotulo} style={tdStyle}>
+                    {(turnosPorSlot.get(`${iso}|${j.rotulo}`) ?? []).map((t) => t.medico).join(' · ')}
+                  </td>
+                ))}
+                {temObs && (
+                  <td style={{ ...tdStyle, color: 'var(--ink-3)', fontStyle: 'italic' }}>{obs[iso] ?? ''}</td>
+                )}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -500,6 +837,8 @@ function DiaEquipe({
   medicos,
   conflitos,
   temSelecao,
+  obs,
+  onObs,
   onClicarSlot,
   onRemoverTurno,
 }: {
@@ -510,16 +849,23 @@ function DiaEquipe({
   medicos: string[];
   conflitos: Set<string>;
   temSelecao: boolean;
+  obs: string;
+  onObs: (texto: string) => void;
   onClicarSlot: (data: string, janela: string) => void;
   onRemoverTurno: (t: TurnoEquipe) => void;
 }) {
   const noMes = iso.startsWith(mesISO);
   const fds = diaSemanaBR(iso) >= 5;
   const isHoje = iso === HOJE;
+  // obs digita local e salva no blur · salvar a cada tecla re-renderiza a
+  // grade inteira no meio da digitação
+  const [obsLocal, setObsLocal] = useState(obs);
+  const [editandoObs, setEditandoObs] = useState(false);
+  const obsExibida = editandoObs ? obsLocal : obs;
   return (
     <div
       style={{
-        minHeight: 96,
+        minHeight: 110,
         borderRight: '1px solid var(--line)',
         background: fds ? 'var(--bg-alt)' : 'transparent',
         opacity: noMes ? 1 : 0.35,
@@ -552,6 +898,34 @@ function DiaEquipe({
             onRemoverTurno={onRemoverTurno}
           />
         ))}
+      {noMes && (
+        <input
+          value={obsExibida}
+          onFocus={() => {
+            setObsLocal(obs);
+            setEditandoObs(true);
+          }}
+          onChange={(e) => setObsLocal(e.target.value)}
+          onBlur={() => {
+            setEditandoObs(false);
+            if (obsLocal !== obs) onObs(obsLocal);
+          }}
+          placeholder="* obs"
+          aria-label={`observação de ${iso}`}
+          style={{
+            margin: '2px 4px 4px',
+            padding: '3px 6px',
+            border: 'none',
+            borderTop: '1px dashed var(--line-2)',
+            background: 'transparent',
+            font: `400 10px/1.3 var(--font-body)`,
+            fontStyle: 'italic',
+            color: 'var(--ink-2)',
+            outline: 'none',
+            width: 'calc(100% - 8px)',
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -756,4 +1130,29 @@ const botaoSecundario: React.CSSProperties = {
   background: 'var(--bg-alt)',
   color: 'var(--ink-2)',
   cursor: 'pointer',
+};
+
+const thStyle: React.CSSProperties = {
+  padding: '10px 12px',
+  textAlign: 'left',
+  font: '700 10px/1 var(--font-body)',
+  letterSpacing: '0.06em',
+  textTransform: 'uppercase',
+  color: 'var(--ink-3)',
+  borderBottom: '1px solid var(--line)',
+};
+
+const tdStyle: React.CSSProperties = {
+  padding: '7px 12px',
+  borderBottom: '1px solid var(--line)',
+  verticalAlign: 'top',
+};
+
+const cardExport: React.CSSProperties = {
+  background: 'var(--bg)',
+  border: '1px solid var(--line)',
+  borderRadius: 16,
+  padding: '16px 18px',
+  boxShadow: 'var(--shadow-sm)',
+  marginBottom: 14,
 };

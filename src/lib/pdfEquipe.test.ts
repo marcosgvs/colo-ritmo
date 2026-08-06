@@ -7,6 +7,7 @@ import {
   fmtHorarioJanela,
   mesPorExtenso,
   nomeArquivoEquipe,
+  obsDoMesOrdenadas,
   rotuloDiaCurto,
   rotuloDiaLongo,
   slugNome,
@@ -138,6 +139,26 @@ describe('agruparPorDiaJanela', () => {
   it('dia sem turno não gera chave', () => {
     const mapa = agruparPorDiaJanela(turnos, roster);
     expect(mapa.has('2026-07-03|dia')).toBe(false);
+  });
+});
+
+describe('obsDoMesOrdenadas', () => {
+  it('filtra pro mês, apara e ordena por data', () => {
+    const obs = {
+      '2026-07-20': '  fecha mais cedo  ',
+      '2026-07-03': 'feriado',
+      '2026-06-30': 'de outro mês',
+      '2026-07-10': '   ',
+    };
+    expect(obsDoMesOrdenadas(obs, '2026-07')).toEqual([
+      { data: '2026-07-03', texto: 'feriado' },
+      { data: '2026-07-20', texto: 'fecha mais cedo' },
+    ]);
+  });
+
+  it('sem obs retorna vazio', () => {
+    expect(obsDoMesOrdenadas(undefined, '2026-07')).toEqual([]);
+    expect(obsDoMesOrdenadas({}, '2026-07')).toEqual([]);
   });
 });
 

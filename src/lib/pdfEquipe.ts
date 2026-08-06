@@ -46,6 +46,8 @@ export interface DadosPDFEquipe {
   turnos: TurnoEquipe[];
   /** Roster completo, na ordem do roster. */
   medicos: string[];
+  /** Observações por dia (data ISO → texto) · os "asteriscos" da escala oficial. */
+  obs?: Record<string, string>;
 }
 
 // --- Funções puras (testáveis sem jsPDF) -------------------------------------
@@ -130,6 +132,21 @@ export function agruparPorDiaJanela(
     arr.sort((a, b) => (idx.get(a) ?? Infinity) - (idx.get(b) ?? Infinity) || a.localeCompare(b));
   }
   return out;
+}
+
+/**
+ * Observações do mês em ordem de data · só dias DENTRO do mês e com texto
+ * não-vazio (obs de outro mês que sobrou no registro fica de fora).
+ */
+export function obsDoMesOrdenadas(
+  obs: Record<string, string> | undefined,
+  mesISO: string,
+): Array<{ data: string; texto: string }> {
+  if (!obs) return [];
+  return Object.entries(obs)
+    .filter(([data, texto]) => data.startsWith(`${mesISO}-`) && texto.trim() !== '')
+    .map(([data, texto]) => ({ data, texto: texto.trim() }))
+    .sort((a, b) => a.data.localeCompare(b.data));
 }
 
 /** Turnos de um médico, ordenados por data e horário de início da janela. */
@@ -316,6 +333,7 @@ export async function baixarPDFEquipeCompleto(d: DadosPDFEquipe): Promise<void> 
   const linhasPorPagina = Math.max(1, Math.floor((limiteY - y - headH) / rowH));
   let indice = 0;
   let topoTabela = y;
+  let fimTabelaY = y;
 
   while (indice < dias.length) {
     if (indice > 0) {
@@ -373,6 +391,47 @@ export async function baixarPDFEquipeCompleto(d: DadosPDFEquipe): Promise<void> 
       }
     }
     indice += lote.length;
+    fimTabelaY = corpoY + lote.length * rowH;
+  }
+
+  // --- Observações do mês · abaixo da tabela, uma linha por dia ---
+  const observacoes = obsDoMesOrdenadas(d.obs, d.mesISO);
+  if (observacoes.length > 0) {
+    const alturaLinha = 4.2;
+    let oy = fimTabelaY + 8;
+
+    const quebrarPagina = (): void => {
+      pdf.addPage();
+      pintarFundo(pdf, p);
+      desenharRodape(pdf, p);
+      oy = desenharCabecalho(pdf, p, logoPng, d) + 3;
+    };
+
+    // Título + pelo menos uma linha juntos · senão vai pra próxima página
+    if (oy + 6 + alturaLinha > limiteY) quebrarPagina();
+    pdf.setFont('Nunito', 'bold');
+    pdf.setFontSize(8);
+    pdf.setTextColor(COR_INK_3);
+    pdf.text('OBSERVAÇÕES', p.margemX, oy, { charSpace: 1.2 });
+    oy += 5.5;
+
+    for (const { data, texto } of observacoes) {
+      pdf.setFont('Nunito', 'normal');
+      pdf.setFontSize(8.5);
+      const linhas = pdf.splitTextToSize(
+        `${rotuloDiaCurto(data)} — ${texto}`,
+        larguraTotal,
+      ) as string[];
+      const alt = linhas.length * alturaLinha;
+      if (oy + alt > limiteY) {
+        quebrarPagina();
+        pdf.setFont('Nunito', 'normal');
+        pdf.setFontSize(8.5);
+      }
+      pdf.setTextColor(COR_INK_2);
+      pdf.text(linhas, p.margemX, oy);
+      oy += alt + 1;
+    }
   }
 
   pdf.save(nomeArquivoEquipe(d.hospitalAbrev, d.mesISO));

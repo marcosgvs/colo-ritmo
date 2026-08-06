@@ -283,5 +283,7 @@ export interface EscalaEquipe {
   medicos: string[];
   janelas: Janela[];
   turnos: TurnoEquipe[];
+  /** Observações por dia (data ISO → texto) · os "asteriscos" da escala oficial. */
+  obs?: Record<string, string>;
   atualizadaEm: string;
 }
