@@ -158,6 +158,23 @@ describe('EscalaEquipe · montar', () => {
     expect(salvo.obs).toEqual({ [`${mesAlvo()}-10`]: '* Mariana até 13h' });
   });
 
+  test('desfazer volta o movimento e refazer aplica de novo', () => {
+    mockDesktop();
+    const { onSalvar } = montar([rascunhoComEquipe()]);
+    const roster = screen.getByText('equipe').parentElement!;
+    fireEvent.click(within(roster).getByRole('button', { name: 'Paula' }));
+    fireEvent.click(screen.getByRole('button', { name: `turno noite de ${mesAlvo()}-12` }));
+    // escalou (call 0) · desfaz (call 1) · refaz (call 2)
+    fireEvent.click(screen.getByRole('button', { name: 'desfazer' }));
+    const desfeito = onSalvar.mock.calls[1]![0] as EscalaEquipeT;
+    expect(desfeito.turnos).toEqual([{ data: `${mesAlvo()}-10`, janela: 'dia', medico: 'Mariana' }]);
+    fireEvent.click(screen.getByRole('button', { name: 'refazer' }));
+    const refeito = onSalvar.mock.calls[2]![0] as EscalaEquipeT;
+    expect(refeito.turnos).toContainEqual({ data: `${mesAlvo()}-12`, janela: 'noite', medico: 'Paula' });
+    // sinalização do movimento por extenso
+    expect(screen.getByText(/refeito · escalou Paula/)).toBeTruthy();
+  });
+
   test('lista de salvas aparece e carrega ao clicar', () => {
     mockDesktop();
     const outra: EscalaEquipeT = { ...rascunhoComEquipe(), mesISO: '2026-01', turnos: [] };

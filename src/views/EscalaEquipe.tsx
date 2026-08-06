@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   DndContext,
   PointerSensor,
@@ -173,15 +173,57 @@ export function EscalaEquipe({
   }, [turnos]);
 
   // Cliques em sequência rápida chegam antes do re-render: ler do closure
-  // perderia atribuições. O ref acumula otimisticamente entre renders.
+  // perderia atribuições. O ref acumula otimisticamente entre renders e SÓ
+  // ressincroniza quando o rascunho das props muda de verdade (save que
+  // voltou, realtime, troca de mês) — re-render interno (histórico, seleção)
+  // não pode descartar o acúmulo.
   const atualRef = useRef({ medicos, janelas, turnos, obs });
-  atualRef.current = { medicos, janelas, turnos, obs };
+  const origemRef = useRef<{ rascunho: EscalaEquipeT | undefined; chave: string }>({
+    rascunho,
+    chave: `${hospitalId}|${mesISO}`,
+  });
+  if (
+    origemRef.current.rascunho !== rascunho ||
+    origemRef.current.chave !== `${hospitalId}|${mesISO}`
+  ) {
+    origemRef.current = { rascunho, chave: `${hospitalId}|${mesISO}` };
+    atualRef.current = { medicos, janelas, turnos, obs };
+  }
 
-  function salvar(prox: Partial<EscalaEquipeT>): void {
+  // Histórico de movimentos (desfazer/refazer) · por hospital+mês, só da
+  // sessão. Cada entrada guarda o estado ANTES do movimento + a descrição
+  // — a descrição também sinaliza pro leigo o que acabou de acontecer.
+  type Snapshot = typeof atualRef.current;
+  interface Movimento {
+    snap: Snapshot;
+    desc: string;
+  }
+  const chaveEscala = `${hospitalId}|${mesISO}`;
+  const [hist, setHist] = useState<{ chave: string; passado: Movimento[]; futuro: Movimento[] }>({
+    chave: chaveEscala,
+    passado: [],
+    futuro: [],
+  });
+  const passado = hist.chave === chaveEscala ? hist.passado : [];
+  const futuro = hist.chave === chaveEscala ? hist.futuro : [];
+  const [ultimaAcao, setUltimaAcao] = useState<string | null>(null);
+
+  function aplicar(snap: Snapshot): void {
+    atualRef.current = snap;
+    onSalvar({
+      hospitalId,
+      mesISO,
+      ...snap,
+      atualizadaEm: new Date().toISOString(),
+    });
+  }
+
+  function salvar(prox: Partial<EscalaEquipeT>, desc: string): void {
+    const antes = atualRef.current;
     const proximo: EscalaEquipeT = {
       hospitalId,
       mesISO,
-      ...atualRef.current,
+      ...antes,
       ...prox,
       atualizadaEm: new Date().toISOString(),
     };
@@ -191,7 +233,65 @@ export function EscalaEquipe({
       turnos: proximo.turnos,
       obs: proximo.obs ?? {},
     };
+    setHist((h) => ({
+      chave: chaveEscala,
+      passado: [...(h.chave === chaveEscala ? h.passado : []), { snap: antes, desc }].slice(-30),
+      futuro: [],
+    }));
+    setUltimaAcao(desc);
     onSalvar(proximo);
+  }
+
+  function desfazer(): void {
+    setHist((h) => {
+      const p = h.chave === chaveEscala ? [...h.passado] : [];
+      const mov = p.pop();
+      if (!mov) return h;
+      const agora = atualRef.current;
+      aplicar(mov.snap);
+      setUltimaAcao(`desfeito · ${mov.desc}`);
+      return {
+        chave: chaveEscala,
+        passado: p,
+        futuro: [...(h.chave === chaveEscala ? h.futuro : []), { snap: agora, desc: mov.desc }],
+      };
+    });
+  }
+
+  function refazer(): void {
+    setHist((h) => {
+      const f = h.chave === chaveEscala ? [...h.futuro] : [];
+      const mov = f.pop();
+      if (!mov) return h;
+      const agora = atualRef.current;
+      aplicar(mov.snap);
+      setUltimaAcao(`refeito · ${mov.desc}`);
+      return {
+        chave: chaveEscala,
+        passado: [...(h.chave === chaveEscala ? h.passado : []), { snap: agora, desc: mov.desc }],
+        futuro: f,
+      };
+    });
+  }
+
+  // ctrl/cmd+Z desfaz · +shift refaz · ignora quando digitando num campo
+  useEffect(() => {
+    function onKey(e: KeyboardEvent): void {
+      if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 'z') return;
+      const alvo = e.target as HTMLElement | null;
+      if (alvo && (alvo.tagName === 'INPUT' || alvo.tagName === 'TEXTAREA')) return;
+      e.preventDefault();
+      if (e.shiftKey) refazer();
+      else desfazer();
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chaveEscala]);
+
+  /** "seg 08" pra descrever movimentos. */
+  function rotuloDia(iso: string): string {
+    return `${DOWS[diaSemanaBR(iso)]} ${iso.slice(8)}`;
   }
 
   function puxarDaImportada(): void {
@@ -204,7 +304,10 @@ export function EscalaEquipe({
     const sugeridos = turnosDeReferencia(importadaRecente, mesISO, janelas, roster);
     const existentes = new Set(turnos.map((t) => `${t.data}|${t.janela}|${t.medico}`));
     const novos = sugeridos.filter((t) => !existentes.has(`${t.data}|${t.janela}|${t.medico}`));
-    salvar({ medicos: roster, turnos: [...turnos, ...novos] });
+    salvar(
+      { medicos: roster, turnos: [...turnos, ...novos] },
+      `puxou a escala de ${MESES[importadaRecente.mes - 1]}/${importadaRecente.ano}`,
+    );
   }
 
   function alternarJanela(j: Janela): void {
@@ -213,21 +316,24 @@ export function EscalaEquipe({
       ? janelas.filter((x) => x.rotulo.toLowerCase() !== j.rotulo.toLowerCase())
       : [...janelas, j].sort((a, b) => a.inicio - b.inicio);
     if (novas.length === 0) return; // pelo menos uma coluna
-    salvar({ janelas: novas });
+    salvar({ janelas: novas }, `${ativa ? 'desligou' : 'ligou'} o turno ${j.rotulo}`);
   }
 
   function adicionarMedico(): void {
     const nome = novoMedico.trim();
     if (!nome || medicos.includes(nome)) return;
-    salvar({ medicos: [...medicos, nome] });
+    salvar({ medicos: [...medicos, nome] }, `adicionou ${nome}`);
     setNovoMedico('');
   }
 
   function removerMedico(nome: string): void {
-    salvar({
-      medicos: medicos.filter((m) => m !== nome),
-      turnos: turnos.filter((t) => t.medico !== nome),
-    });
+    salvar(
+      {
+        medicos: medicos.filter((m) => m !== nome),
+        turnos: turnos.filter((t) => t.medico !== nome),
+      },
+      `removeu ${nome}`,
+    );
     if (medicoSel === nome) setMedicoSel(null);
   }
 
@@ -237,22 +343,28 @@ export function EscalaEquipe({
       (t) => t.data === data && t.janela === janela && t.medico === medico,
     );
     if (jaTem) return;
-    salvar({ turnos: [...atuais, { data, janela, medico }] });
+    salvar(
+      { turnos: [...atuais, { data, janela, medico }] },
+      `escalou ${nomeCurto(medico)} · ${rotuloDia(data)} · ${janela}`,
+    );
   }
 
   function desescalar(t: TurnoEquipe): void {
-    salvar({
-      turnos: atualRef.current.turnos.filter(
-        (x) => !(x.data === t.data && x.janela === t.janela && x.medico === t.medico),
-      ),
-    });
+    salvar(
+      {
+        turnos: atualRef.current.turnos.filter(
+          (x) => !(x.data === t.data && x.janela === t.janela && x.medico === t.medico),
+        ),
+      },
+      `tirou ${nomeCurto(t.medico)} · ${rotuloDia(t.data)} · ${t.janela}`,
+    );
   }
 
   function anotarObs(data: string, texto: string): void {
     const proximas = { ...atualRef.current.obs };
     if (texto.trim()) proximas[data] = texto;
     else delete proximas[data];
-    salvar({ obs: proximas });
+    salvar({ obs: proximas }, `obs de ${rotuloDia(data)}`);
   }
 
   function onDragEnd(ev: DragEndEvent): void {
@@ -545,108 +657,142 @@ export function EscalaEquipe({
         </div>
       )}
 
-      {/* roster de médicos */}
-      <div
-        style={{
-          display: 'flex',
-          gap: 8,
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          padding: '12px 14px',
-          background: 'var(--bg-alt)',
-          border: '1px solid var(--line)',
-          borderRadius: 14,
-          marginBottom: 16,
-        }}
-      >
-        <Eyebrow style={{ marginRight: 4 }}>equipe</Eyebrow>
-        {medicos.map((m) => (
-          <ChipMedico
-            key={m}
-            nome={m}
-            cor={corDoMedico(m, medicos)}
-            selecionado={medicoSel === m}
-            onSelecionar={() => setMedicoSel(medicoSel === m ? null : m)}
-            onRemover={() => removerMedico(m)}
-          />
-        ))}
-        <input
-          value={novoMedico}
-          onChange={(e) => setNovoMedico(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') adicionarMedico();
-          }}
-          placeholder="+ nome do médico · enter"
-          style={{ ...inputStyle, width: 200 }}
-        />
-        {medicos.length === 0 && !importadaRecente && (
-          <Mono style={{ color: 'var(--ink-3)' }}>
-            digita os nomes · ou importa uma escala antiga em sincronizar
-          </Mono>
-        )}
-      </div>
-
-      {medicoSel && (
-        <Hand color="var(--lavender-ink)" size={15} style={{ display: 'block', marginBottom: 12 }}>
-          escalando {nomeCurto(medicoSel)} · clica nos turnos (clica no nome de novo pra soltar)
-        </Hand>
-      )}
-
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 300px', gap: 24, alignItems: 'flex-start' }}>
-        {/* calendário */}
-        <div
-          style={{
-            background: 'var(--bg)',
-            border: '1px solid var(--line)',
-            borderRadius: 16,
-            overflow: 'hidden',
-            boxShadow: 'var(--shadow-sm)',
-          }}
-        >
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', background: 'var(--bg-alt)', borderBottom: '1px solid var(--line)' }}>
-            {DOWS.map((d) => (
-              <div
-                key={d}
-                style={{
-                  padding: '10px 8px',
-                  font: '700 10px/1 var(--font-body)',
-                  letterSpacing: '0.06em',
-                  textTransform: 'uppercase',
-                  color: 'var(--ink-3)',
-                  textAlign: 'center',
-                }}
-              >
-                {d}
-              </div>
-            ))}
-          </div>
-          {semanas.map((semana, i) => (
+        <div>
+          {/* Bloco grudado no topo enquanto o mês rola: o roster (pra trocar
+              de médico sem voltar) + o cabeçalho das colunas. */}
+          <div style={{ position: 'sticky', top: 0, zIndex: 15, background: 'var(--bg)', paddingBottom: 2 }}>
             <div
-              key={`${semana[0]}-${i}`}
               style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(7, 1fr)',
-                borderBottom: i === semanas.length - 1 ? 'none' : '1px solid var(--line)',
+                display: 'flex',
+                gap: 8,
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                padding: '12px 14px',
+                background: 'var(--bg-alt)',
+                border: '1px solid var(--line)',
+                borderRadius: 14,
+                marginBottom: 8,
               }}
             >
-              {semana.map((iso) => (
-                <DiaEquipe
-                  key={iso}
-                  iso={iso}
-                  mesISO={mesISO}
-                  janelas={janelas}
-                  turnosPorSlot={turnosPorSlot}
-                  medicos={medicos}
-                  conflitos={conflitos}
-                  temSelecao={!!medicoSel}
-                  obs={obs[iso] ?? ''}
-                  onObs={(txt) => anotarObs(iso, txt)}
-                  onClicarSlot={clicarSlot}
-                  onRemoverTurno={desescalar}
+              <Eyebrow style={{ marginRight: 4 }}>equipe</Eyebrow>
+              {medicos.map((m) => (
+                <ChipMedico
+                  key={m}
+                  nome={m}
+                  cor={corDoMedico(m, medicos)}
+                  selecionado={medicoSel === m}
+                  onSelecionar={() => setMedicoSel(medicoSel === m ? null : m)}
+                  onRemover={() => removerMedico(m)}
                 />
               ))}
+              <input
+                value={novoMedico}
+                onChange={(e) => setNovoMedico(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') adicionarMedico();
+                }}
+                placeholder="+ nome do médico · enter"
+                style={{ ...inputStyle, width: 190 }}
+              />
+              {medicos.length === 0 && !importadaRecente && (
+                <Mono style={{ color: 'var(--ink-3)' }}>
+                  digita os nomes · ou importa uma escala antiga em sincronizar
+                </Mono>
+              )}
+              <span style={{ flex: 1 }} />
+              <button
+                type="button"
+                onClick={desfazer}
+                disabled={passado.length === 0}
+                aria-label="desfazer"
+                title={
+                  passado.length > 0
+                    ? `desfazer · ${passado[passado.length - 1]!.desc} (ctrl+z)`
+                    : 'nada pra desfazer'
+                }
+                style={{ ...botaoDesfazer, opacity: passado.length === 0 ? 0.35 : 1 }}
+              >
+                ↶
+              </button>
+              <button
+                type="button"
+                onClick={refazer}
+                disabled={futuro.length === 0}
+                aria-label="refazer"
+                title={
+                  futuro.length > 0
+                    ? `refazer · ${futuro[futuro.length - 1]!.desc} (ctrl+shift+z)`
+                    : 'nada pra refazer'
+                }
+                style={{ ...botaoDesfazer, opacity: futuro.length === 0 ? 0.35 : 1 }}
+              >
+                ↷
+              </button>
+              {(medicoSel || ultimaAcao) && (
+                <span style={{ width: '100%', display: 'flex', gap: 14, alignItems: 'baseline' }}>
+                  {medicoSel && (
+                    <Hand color="var(--lavender-ink)" size={14}>
+                      escalando {nomeCurto(medicoSel)} · clica nos turnos (clica no nome de novo pra soltar)
+                    </Hand>
+                  )}
+                  {ultimaAcao && (
+                    <Mono style={{ color: 'var(--ink-3)', marginLeft: medicoSel ? 'auto' : 0 }}>
+                      {ultimaAcao}
+                    </Mono>
+                  )}
+                </span>
+              )}
             </div>
-          ))}
+
+            {/* cabeçalho das colunas */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: gridDia(janelas.length),
+                background: 'var(--bg-alt)',
+                border: '1px solid var(--line)',
+                borderRadius: '12px 12px 0 0',
+                borderBottom: 'none',
+              }}
+            >
+              <div style={cabecalhoColuna}>dia</div>
+              {janelas.map((j) => (
+                <div key={j.rotulo} style={cabecalhoColuna}>
+                  {j.rotulo} · {fmtRange(j.inicio, j.duracao)}
+                </div>
+              ))}
+              <div style={cabecalhoColuna}>obs</div>
+            </div>
+          </div>
+
+          {/* um dia por linha · largura inteira, respiro, scroll natural */}
+          <div
+            style={{
+              background: 'var(--bg)',
+              border: '1px solid var(--line)',
+              borderRadius: '0 0 16px 16px',
+              overflow: 'hidden',
+              boxShadow: 'var(--shadow-sm)',
+            }}
+          >
+            {diasDoMesLista(mesISO).map((iso, i) => (
+              <DiaLinha
+                key={iso}
+                iso={iso}
+                primeiraLinha={i === 0}
+                janelas={janelas}
+                turnosPorSlot={turnosPorSlot}
+                medicos={medicos}
+                conflitos={conflitos}
+                temSelecao={!!medicoSel}
+                obs={obs[iso] ?? ''}
+                onObs={(txt) => anotarObs(iso, txt)}
+                onClicarSlot={clicarSlot}
+                onRemoverTurno={desescalar}
+              />
+            ))}
+          </div>
         </div>
 
         {/* status lateral */}
@@ -660,6 +806,19 @@ export function EscalaEquipe({
       </div>
     </DndContext>
   );
+}
+
+/** Colunas de uma linha-dia: data | janelas | obs. */
+function gridDia(nJanelas: number): string {
+  return `96px repeat(${nJanelas}, minmax(0, 1fr)) 180px`;
+}
+
+function diasDoMesLista(mesISO: string): string[] {
+  const fim = fromISO(`${mesISO}-01`);
+  fim.setMonth(fim.getMonth() + 1, 0);
+  const out: string[] = [];
+  for (let d = 1; d <= fim.getDate(); d++) out.push(`${mesISO}-${String(d).padStart(2, '0')}`);
+  return out;
 }
 
 function BotaoExport({
@@ -829,9 +988,9 @@ function ChipMedico({
   );
 }
 
-function DiaEquipe({
+function DiaLinha({
   iso,
-  mesISO,
+  primeiraLinha,
   janelas,
   turnosPorSlot,
   medicos,
@@ -843,7 +1002,7 @@ function DiaEquipe({
   onRemoverTurno,
 }: {
   iso: string;
-  mesISO: string;
+  primeiraLinha: boolean;
   janelas: Janela[];
   turnosPorSlot: Map<string, TurnoEquipe[]>;
   medicos: string[];
@@ -854,9 +1013,10 @@ function DiaEquipe({
   onClicarSlot: (data: string, janela: string) => void;
   onRemoverTurno: (t: TurnoEquipe) => void;
 }) {
-  const noMes = iso.startsWith(mesISO);
-  const fds = diaSemanaBR(iso) >= 5;
+  const dow = diaSemanaBR(iso);
+  const fds = dow >= 5;
   const isHoje = iso === HOJE;
+  const inicioDeSemana = dow === 0 && !primeiraLinha;
   // obs digita local e salva no blur · salvar a cada tecla re-renderiza a
   // grade inteira no meio da digitação
   const [obsLocal, setObsLocal] = useState(obs);
@@ -865,67 +1025,79 @@ function DiaEquipe({
   return (
     <div
       style={{
-        minHeight: 110,
-        borderRight: '1px solid var(--line)',
+        display: 'grid',
+        gridTemplateColumns: gridDia(janelas.length),
+        minHeight: 64,
         background: fds ? 'var(--bg-alt)' : 'transparent',
-        opacity: noMes ? 1 : 0.35,
-        display: 'flex',
-        flexDirection: 'column',
+        // segunda-feira abre a semana com um traço mais firme · respiro visual
+        borderTop: primeiraLinha ? 'none' : inicioDeSemana ? '2px solid var(--line-2)' : '1px solid var(--line)',
+        borderLeft: isHoje ? '3px solid var(--lavender)' : '3px solid transparent',
       }}
     >
-      <span
-        style={{
-          fontFamily: 'var(--font-display)',
-          fontWeight: 500,
-          fontSize: 13,
-          padding: '6px 8px 2px',
-          color: isHoje ? 'var(--lavender-ink)' : 'var(--ink-2)',
-        }}
-      >
-        {fromISO(iso).getDate()}
-      </span>
-      {noMes &&
-        janelas.map((j) => (
-          <SlotJanela
-            key={j.rotulo}
-            iso={iso}
-            janela={j}
-            turnos={turnosPorSlot.get(`${iso}|${j.rotulo}`) ?? []}
-            medicos={medicos}
-            conflitos={conflitos}
-            temSelecao={temSelecao}
-            onClicar={() => onClicarSlot(iso, j.rotulo)}
-            onRemoverTurno={onRemoverTurno}
-          />
-        ))}
-      {noMes && (
-        <input
-          value={obsExibida}
-          onFocus={() => {
-            setObsLocal(obs);
-            setEditandoObs(true);
-          }}
-          onChange={(e) => setObsLocal(e.target.value)}
-          onBlur={() => {
-            setEditandoObs(false);
-            if (obsLocal !== obs) onObs(obsLocal);
-          }}
-          placeholder="* obs"
-          aria-label={`observação de ${iso}`}
+      <div style={{ padding: '12px 12px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <span
           style={{
-            margin: '2px 4px 4px',
-            padding: '3px 6px',
-            border: 'none',
-            borderTop: '1px dashed var(--line-2)',
-            background: 'transparent',
-            font: `400 10px/1.3 var(--font-body)`,
-            fontStyle: 'italic',
-            color: 'var(--ink-2)',
-            outline: 'none',
-            width: 'calc(100% - 8px)',
+            fontFamily: 'var(--font-display)',
+            fontWeight: 500,
+            fontSize: 16,
+            letterSpacing: '-0.01em',
+            color: isHoje ? 'var(--lavender-ink)' : fds ? 'var(--ink)' : 'var(--ink-2)',
           }}
+        >
+          {DOWS[dow]} {fromISO(iso).getDate()}
+        </span>
+        {isHoje && (
+          <Hand color="var(--lavender-ink)" size={12}>
+            hoje
+          </Hand>
+        )}
+      </div>
+      {janelas.map((j) => (
+        <SlotJanela
+          key={j.rotulo}
+          iso={iso}
+          janela={j}
+          turnos={turnosPorSlot.get(`${iso}|${j.rotulo}`) ?? []}
+          medicos={medicos}
+          conflitos={conflitos}
+          temSelecao={temSelecao}
+          onClicar={() => onClicarSlot(iso, j.rotulo)}
+          onRemoverTurno={onRemoverTurno}
         />
-      )}
+      ))}
+      <input
+        value={obsExibida}
+        onFocus={() => {
+          setObsLocal(obs);
+          setEditandoObs(true);
+        }}
+        onChange={(e) => setObsLocal(e.target.value)}
+        onBlur={() => {
+          setEditandoObs(false);
+          if (obsLocal !== obs) onObs(obsLocal);
+        }}
+        placeholder="* obs"
+        aria-label={`observação de ${iso}`}
+        style={{
+          margin: '8px 10px',
+          padding: '6px 10px',
+          border: '1px dashed transparent',
+          borderRadius: 8,
+          background: 'transparent',
+          font: `400 12px/1.4 var(--font-body)`,
+          fontStyle: 'italic',
+          color: 'var(--ink-2)',
+          outline: 'none',
+          alignSelf: 'flex-start',
+          width: 'calc(100% - 20px)',
+        }}
+        onMouseEnter={(e) => {
+          (e.target as HTMLInputElement).style.borderColor = 'var(--line-2)';
+        }}
+        onMouseLeave={(e) => {
+          (e.target as HTMLInputElement).style.borderColor = 'transparent';
+        }}
+      />
     </div>
   );
 }
@@ -950,6 +1122,7 @@ function SlotJanela({
   onRemoverTurno: (t: TurnoEquipe) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: `slot|${iso}|${janela.rotulo}` });
+  const vazio = turnos.length === 0;
   return (
     <div
       ref={setNodeRef}
@@ -958,29 +1131,34 @@ function SlotJanela({
       aria-label={`turno ${janela.rotulo} de ${iso}`}
       title={`${janela.rotulo} · ${fmtRange(janela.inicio, janela.duracao)}`}
       style={{
-        flex: 1,
-        margin: '2px 4px',
-        padding: '3px 4px',
-        borderRadius: 8,
-        border: `1.5px dashed ${isOver ? 'var(--lavender-ink)' : 'var(--line-2)'}`,
+        margin: '8px 6px',
+        padding: '6px 6px',
+        borderRadius: 10,
+        border: `1.5px dashed ${
+          isOver ? 'var(--lavender-ink)' : vazio ? 'var(--line-2)' : 'transparent'
+        }`,
         background: isOver ? 'var(--lavender-surface)' : 'transparent',
         cursor: temSelecao ? 'copy' : 'default',
         display: 'flex',
         flexDirection: 'column',
-        gap: 2,
-        minHeight: 30,
+        gap: 5,
+        minHeight: 46,
+        justifyContent: vazio ? 'center' : 'flex-start',
       }}
     >
-      <span
-        style={{
-          font: '700 8px/1 var(--font-body)',
-          letterSpacing: '0.05em',
-          textTransform: 'uppercase',
-          color: 'var(--ink-3)',
-        }}
-      >
-        {janela.rotulo}
-      </span>
+      {vazio && (
+        <span
+          aria-hidden
+          style={{
+            font: '600 11px/1 var(--font-body)',
+            color: 'var(--line-2)',
+            textAlign: 'center',
+            userSelect: 'none',
+          }}
+        >
+          {janela.rotulo}
+        </span>
+      )}
       {turnos.map((t) => {
         const cor = corDoMedico(t.medico, medicos);
         const emConflito = conflitos.has(`${t.medico}|${t.data}|${t.janela}`);
@@ -995,9 +1173,9 @@ function SlotJanela({
             title={`${t.medico} · clica pra tirar`}
             style={{
               textAlign: 'left',
-              font: '600 10px/1.2 var(--font-body)',
-              padding: '3px 6px',
-              borderRadius: 6,
+              font: '600 13px/1.3 var(--font-body)',
+              padding: '7px 12px',
+              borderRadius: 8,
               background: `var(--${cor}-surface)`,
               border: emConflito ? '1.5px solid var(--err-ink)' : 'none',
               borderLeft: `3px solid var(--${cor})`,
@@ -1006,9 +1184,11 @@ function SlotJanela({
               whiteSpace: 'nowrap',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
+              // pisca ao entrar · sinaliza a mudança pra quem clicou
+              animation: 'colo-fab-in 220ms cubic-bezier(.2,.7,.2,1)',
             }}
           >
-            {nomeCurto(t.medico)}
+            {t.medico}
           </button>
         );
       })}
@@ -1130,6 +1310,25 @@ const botaoSecundario: React.CSSProperties = {
   background: 'var(--bg-alt)',
   color: 'var(--ink-2)',
   cursor: 'pointer',
+};
+
+const botaoDesfazer: React.CSSProperties = {
+  font: '600 15px/1 var(--font-body)',
+  width: 36,
+  height: 36,
+  borderRadius: 999,
+  border: '1px solid var(--line)',
+  background: 'var(--bg)',
+  color: 'var(--ink-2)',
+  cursor: 'pointer',
+};
+
+const cabecalhoColuna: React.CSSProperties = {
+  padding: '11px 12px',
+  font: '700 10px/1 var(--font-body)',
+  letterSpacing: '0.06em',
+  textTransform: 'uppercase',
+  color: 'var(--ink-3)',
 };
 
 const thStyle: React.CSSProperties = {
