@@ -10,7 +10,8 @@ import { EscalaEquipe } from './EscalaEquipe';
 vi.mock('@/lib/pdfEquipe', () => ({
   baixarPDFEquipeCompleto: vi.fn().mockResolvedValue(undefined),
   baixarPDFEquipeMedico: vi.fn().mockResolvedValue(undefined),
-  fmtHorarioJanela: (j: { inicio: number; duracao: number }) => `${j.inicio}:00–${(j.inicio + j.duracao) % 24}:00`,
+  fmtHorarioJanela: (j: { inicio: number; duracao: number }) =>
+    `${j.inicio}:00–${(j.inicio + j.duracao) % 24}:00`,
   mesPorExtenso: (m: string) => m,
   rotuloDiaCurto: (iso: string) => iso.slice(8),
   slugNome: (s: string) => s.toLowerCase().replace(/\s+/g, '-'),
@@ -99,43 +100,95 @@ function rascunhoComEquipe(): EscalaEquipeT {
   };
 }
 
+/** Etapa 1 → 2 · sem puxar a escala antiga (desmarca o checkbox). */
+function abrirCalendario(): void {
+  const check = screen.queryByRole('checkbox');
+  if (check && (check as HTMLInputElement).checked) fireEvent.click(check);
+  fireEvent.click(screen.getByRole('button', { name: 'abrir o calendário ›' }));
+}
+
+/** Roster no calendário (a caixa "equipe · N"). */
+function roster(): HTMLElement {
+  return screen.getByRole('button', { name: /expandir a equipe|diminuir a equipe/ }).parentElement!
+    .parentElement!;
+}
+
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
   vi.clearAllMocks();
 });
 
-describe('EscalaEquipe · montar', () => {
-  test('sem rascunho, "noitinha" nasce desligada (só dia e noite na grade)', () => {
+describe('EscalaEquipe · etapa 1 (setup)', () => {
+  test('abre no setup com mês, checkbox de puxar e turnos · noitinha desligada', () => {
     mockDesktop();
     montar();
-    const toggleNoitinha = screen.getByRole('button', { name: /noitinha/ });
-    expect(toggleNoitinha.getAttribute('aria-pressed')).toBe('false');
-    // slot de noitinha não existe na grade
-    expect(screen.queryByRole('button', { name: `turno noitinha de ${mesAlvo()}-01` })).toBeNull();
-    expect(screen.getByRole('button', { name: `turno dia de ${mesAlvo()}-01` })).toBeTruthy();
+    expect(screen.getByText('qual mês vamos montar?')).toBeTruthy();
+    expect(screen.getByRole('checkbox')).toBeTruthy();
+    expect(screen.getByRole('button', { name: /noitinha/ }).getAttribute('aria-pressed')).toBe('false');
+    // o calendário só existe na etapa 2
+    expect(screen.queryByRole('button', { name: `turno dia de ${mesAlvo()}-01` })).toBeNull();
   });
 
-  test('puxar a escala antiga traz nomes E posições (mesmo dia-da-semana/ordinal)', () => {
+  test('checkbox marcado puxa nomes E posições ao abrir o calendário', () => {
     mockDesktop();
     const { onSalvar } = montar();
-    fireEvent.click(screen.getByRole('button', { name: /puxar a escala de jun\/2026/ }));
+    expect((screen.getByRole('checkbox') as HTMLInputElement).checked).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'abrir o calendário ›' }));
     const salvo = onSalvar.mock.calls[0]![0] as EscalaEquipeT;
     expect(salvo.medicos).toEqual(['Paula', 'Mariana']);
-    // celula da 1ª segunda de junho migra pra 1ª segunda do mês alvo
     const [ano, mes] = mesAlvo().split('-').map(Number);
     const primeiro = new Date(ano!, mes! - 1, 1);
     const offset = (1 - (primeiro.getDay() === 0 ? 7 : primeiro.getDay()) + 7) % 7;
     const primeiraSegunda = `${mesAlvo()}-${String(1 + offset).padStart(2, '0')}`;
     expect(salvo.turnos).toContainEqual({ data: primeiraSegunda, janela: 'dia', medico: 'Mariana' });
-    expect(salvo.turnos).toContainEqual({ data: primeiraSegunda, janela: 'dia', medico: 'Paula' });
+    // e chegou no calendário
+    expect(screen.getByRole('button', { name: 'salvar e visualizar o mês ›' })).toBeTruthy();
+  });
+
+  test('checkbox desmarcado abre o calendário limpo', () => {
+    mockDesktop();
+    const { onSalvar } = montar();
+    abrirCalendario();
+    expect(onSalvar).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: `turno dia de ${mesAlvo()}-01` })).toBeTruthy();
+  });
+
+  test('escala já começada aparece pra continuar e vai direto pro calendário', () => {
+    mockDesktop();
+    montar([rascunhoComEquipe()]);
+    fireEvent.click(screen.getByRole('button', { name: /HCB · .+ · 1 turnos/ }));
+    expect(screen.getByRole('button', { name: 'salvar e visualizar o mês ›' })).toBeTruthy();
+  });
+});
+
+describe('EscalaEquipe · etapa 2 (calendário)', () => {
+  test('barra compacta mostra hospital, mês e turnos · clica pra voltar ao setup', () => {
+    mockDesktop();
+    montar([rascunhoComEquipe()]);
+    abrirCalendario();
+    const barra = screen.getByTitle('mudar hospital, mês ou turnos');
+    expect(barra.textContent).toContain('HCB');
+    expect(barra.textContent).toContain('dia · noite');
+    fireEvent.click(barra);
+    expect(screen.getByText('qual mês vamos montar?')).toBeTruthy();
+  });
+
+  test('equipe começa colapsada e expande no clique', () => {
+    mockDesktop();
+    montar([rascunhoComEquipe()]);
+    abrirCalendario();
+    const toggle = screen.getByRole('button', { name: 'expandir a equipe' });
+    expect(toggle.textContent).toContain('equipe · 2');
+    fireEvent.click(toggle);
+    expect(screen.getByRole('button', { name: 'diminuir a equipe' })).toBeTruthy();
   });
 
   test('selecionar médico e clicar num turno escala · clicar no chip escalado remove', () => {
     mockDesktop();
     const { onSalvar } = montar([rascunhoComEquipe()]);
-    const roster = screen.getByText('equipe').parentElement!;
-    fireEvent.click(within(roster).getByRole('button', { name: 'Paula' }));
+    abrirCalendario();
+    fireEvent.click(within(roster()).getByRole('button', { name: 'Paula' }));
     fireEvent.click(screen.getByRole('button', { name: `turno noite de ${mesAlvo()}-12` }));
     const salvo = onSalvar.mock.calls[0]![0] as EscalaEquipeT;
     expect(salvo.turnos).toContainEqual({ data: `${mesAlvo()}-12`, janela: 'noite', medico: 'Paula' });
@@ -146,77 +199,89 @@ describe('EscalaEquipe · montar', () => {
     expect(salvo2.turnos).toEqual([{ data: `${mesAlvo()}-12`, janela: 'noite', medico: 'Paula' }]);
   });
 
-  test('obs do dia salva no blur', () => {
+  test('desfazer e refazer com os botões de ícone', () => {
     mockDesktop();
     const { onSalvar } = montar([rascunhoComEquipe()]);
-    const campo = screen.getByLabelText(`observação de ${mesAlvo()}-10`);
-    fireEvent.focus(campo);
-    fireEvent.change(campo, { target: { value: '* Mariana até 13h' } });
-    expect(onSalvar).not.toHaveBeenCalled(); // digitar não salva
-    fireEvent.blur(campo);
-    const salvo = onSalvar.mock.calls[0]![0] as EscalaEquipeT;
-    expect(salvo.obs).toEqual({ [`${mesAlvo()}-10`]: '* Mariana até 13h' });
-  });
-
-  test('desfazer volta o movimento e refazer aplica de novo', () => {
-    mockDesktop();
-    const { onSalvar } = montar([rascunhoComEquipe()]);
-    const roster = screen.getByText('equipe').parentElement!;
-    fireEvent.click(within(roster).getByRole('button', { name: 'Paula' }));
+    abrirCalendario();
+    fireEvent.click(within(roster()).getByRole('button', { name: 'Paula' }));
     fireEvent.click(screen.getByRole('button', { name: `turno noite de ${mesAlvo()}-12` }));
-    // escalou (call 0) · desfaz (call 1) · refaz (call 2)
     fireEvent.click(screen.getByRole('button', { name: 'desfazer' }));
     const desfeito = onSalvar.mock.calls[1]![0] as EscalaEquipeT;
     expect(desfeito.turnos).toEqual([{ data: `${mesAlvo()}-10`, janela: 'dia', medico: 'Mariana' }]);
     fireEvent.click(screen.getByRole('button', { name: 'refazer' }));
     const refeito = onSalvar.mock.calls[2]![0] as EscalaEquipeT;
     expect(refeito.turnos).toContainEqual({ data: `${mesAlvo()}-12`, janela: 'noite', medico: 'Paula' });
-    // sinalização do movimento por extenso
     expect(screen.getByText(/refeito · escalou Paula/)).toBeTruthy();
   });
 
-  test('lista de salvas aparece e carrega ao clicar', () => {
+  test('obs do dia salva no blur', () => {
     mockDesktop();
-    const outra: EscalaEquipeT = { ...rascunhoComEquipe(), mesISO: '2026-01', turnos: [] };
-    montar([rascunhoComEquipe(), outra]);
-    expect(screen.getByText('salvas')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: /jan 2026 · 0 turnos/ }));
-    // carregou a de janeiro: painel de status mostra o mês
-    expect(screen.getByText('jan 2026')).toBeTruthy();
+    const { onSalvar } = montar([rascunhoComEquipe()]);
+    abrirCalendario();
+    const campo = screen.getByLabelText(`observação de ${mesAlvo()}-10`);
+    fireEvent.focus(campo);
+    fireEvent.change(campo, { target: { value: '* Mariana até 13h' } });
+    expect(onSalvar).not.toHaveBeenCalled();
+    fireEvent.blur(campo);
+    const salvo = onSalvar.mock.calls[0]![0] as EscalaEquipeT;
+    expect(salvo.obs).toEqual({ [`${mesAlvo()}-10`]: '* Mariana até 13h' });
+  });
+
+  test('adicionar médico pelo input com enter', () => {
+    mockDesktop();
+    const { onSalvar } = montar([rascunhoComEquipe()]);
+    abrirCalendario();
+    const input = screen.getByPlaceholderText('+ nome · enter');
+    fireEvent.change(input, { target: { value: 'Rafael' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect((onSalvar.mock.calls[0]![0] as EscalaEquipeT).medicos).toContain('Rafael');
+  });
+
+  test('sem turnos o botão de visualizar fica desabilitado', () => {
+    mockDesktop();
+    montar([{ ...rascunhoComEquipe(), turnos: [] }]);
+    abrirCalendario();
+    const btn = screen.getByRole('button', { name: 'salvar e visualizar o mês ›' }) as HTMLButtonElement;
+    expect(btn.disabled).toBe(true);
   });
 });
 
-describe('EscalaEquipe · revisar e exportar', () => {
-  test('salvar e exportar abre a tabela completa com os nomes', () => {
+describe('EscalaEquipe · etapas 3 e 4 (visualizar e exportar)', () => {
+  function irAteRevisar(): void {
+    abrirCalendario();
+    fireEvent.click(screen.getByRole('button', { name: 'salvar e visualizar o mês ›' }));
+  }
+
+  test('visualizar mostra a tabela do mês com os nomes', () => {
     mockDesktop();
     montar([rascunhoComEquipe()]);
-    fireEvent.click(screen.getByRole('button', { name: 'salvar e exportar ›' }));
-    expect(screen.getByText('confere e manda.')).toBeTruthy();
-    expect(screen.getByRole('table')).toBeTruthy();
+    irAteRevisar();
+    expect(screen.getByText('o mês inteiro, de uma olhada.')).toBeTruthy();
     expect(within(screen.getByRole('table')).getByText('Mariana')).toBeTruthy();
-    // voltar funciona
-    fireEvent.click(screen.getByRole('button', { name: '‹ voltar pra editar' }));
-    expect(screen.getByText('o mês do time inteiro.')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '‹ voltar pro calendário' }));
+    expect(screen.getByRole('button', { name: 'salvar e visualizar o mês ›' })).toBeTruthy();
   });
 
-  test('export por médico baixa txt com o nome no arquivo', () => {
+  test('exportar é a etapa seguinte · txt por médico usa o nome no arquivo', () => {
     mockDesktop();
     montar([rascunhoComEquipe()]);
-    fireEvent.click(screen.getByRole('button', { name: 'salvar e exportar ›' }));
-    const linhaMariana = screen.getByText('um pra cada médico').parentElement!;
-    fireEvent.click(within(linhaMariana).getAllByRole('button', { name: 'txt' })[0]!);
+    irAteRevisar();
+    fireEvent.click(screen.getByRole('button', { name: 'exportar ›' }));
+    expect(screen.getByText('agora manda.')).toBeTruthy();
+
+    const bloco = screen.getByText('um pra cada médico').parentElement!;
+    fireEvent.click(within(bloco).getAllByRole('button', { name: 'txt' })[0]!);
     expect(textoEquipeMedico).toHaveBeenCalledWith(expect.anything(), 'Mariana');
-    expect(baixarArquivoTexto).toHaveBeenCalledWith(
-      `escala-hcb-${mesAlvo()}-mariana.txt`,
-      'texto',
-    );
+    expect(baixarArquivoTexto).toHaveBeenCalledWith(`escala-hcb-${mesAlvo()}-mariana.txt`, 'texto');
   });
 
-  test('sem turnos o botão salvar e exportar fica desabilitado', () => {
+  test('volta de exportar pra visualizar', () => {
     mockDesktop();
-    montar([{ ...rascunhoComEquipe(), turnos: [] }]);
-    const btn = screen.getByRole('button', { name: 'salvar e exportar ›' }) as HTMLButtonElement;
-    expect(btn.disabled).toBe(true);
+    montar([rascunhoComEquipe()]);
+    irAteRevisar();
+    fireEvent.click(screen.getByRole('button', { name: 'exportar ›' }));
+    fireEvent.click(screen.getByRole('button', { name: '‹ voltar pra ver o mês' }));
+    expect(screen.getByText('o mês inteiro, de uma olhada.')).toBeTruthy();
   });
 });
 

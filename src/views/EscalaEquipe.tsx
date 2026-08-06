@@ -69,7 +69,7 @@ function corDoMedico(medico: string, medicos: string[]): string {
   return CORES_MEDICO[i % CORES_MEDICO.length]!;
 }
 
-/** Primeiro nome + inicial do segundo quando há ambiguidade de espaço. */
+/** Primeiro nome + inicial do segundo · usado nas mensagens de movimento. */
 function nomeCurto(nome: string): string {
   const partes = nome.trim().split(/\s+/);
   if (partes.length === 1) return partes[0]!;
@@ -122,12 +122,22 @@ function janelasConhecidas(
   return lista.length > 0 ? lista : JANELAS_DEFAULT;
 }
 
+/** Altura das áreas com scroll próprio · a página em si não rola. O
+ * desconto cobre header do app + padding + barra do setup + equipe. */
+const ALTURA_PAINEL = 'clamp(320px, calc(100vh - 290px), 900px)';
+
+type Etapa = 'setup' | 'montar' | 'revisar' | 'exportar';
+
 /**
  * EscalaEquipe · página (temporária) onde a chefe monta a escala do TIME
- * inteiro de um hospital: arrasta (ou seleciona e clica) médicos pros
- * turnos do mês, acompanha horas por semana/fds/total ao vivo, anota as
- * observações do dia (os "asteriscos"), revisa a tabela completa e
- * exporta txt/pdf/agenda/excel — geral e por médico. Feita pra desktop.
+ * inteiro de um hospital, em 4 etapas:
+ *
+ *   setup    → hospital, mês, puxar escala anterior, turnos do hospital
+ *   montar   → calendário dia-por-linha · arrasta/clica os médicos
+ *   revisar  → o mês inteiro numa tabela, pra conferir antes de mandar
+ *   exportar → txt · pdf · agenda · excel · geral e por médico
+ *
+ * Feita pra desktop (mobile avisa).
  */
 export function EscalaEquipe({
   hospitais,
@@ -156,12 +166,16 @@ export function EscalaEquipe({
     d.setMonth(d.getMonth() + 1, 1);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   });
-  const [etapa, setEtapa] = useState<'montar' | 'revisar'>('montar');
+  const [etapa, setEtapa] = useState<Etapa>('setup');
+  const [puxarAoAbrir, setPuxarAoAbrir] = useState(true);
+  const [rosterAberto, setRosterAberto] = useState(false);
   const [medicoSel, setMedicoSel] = useState<string | null>(null);
   const [novoMedico, setNovoMedico] = useState('');
   const [exportando, setExportando] = useState<string | null>(null);
   /** Id do que está sendo arrastado agora · alimenta o DragOverlay. */
   const [arrastando, setArrastando] = useState<string | null>(null);
+  /** Volta o calendário pro dia 1 ao trocar de mês (o nó DOM é reusado). */
+  const scrollCalRef = useRef<HTMLDivElement>(null);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
@@ -183,7 +197,7 @@ export function EscalaEquipe({
     importadaRecente?.janelas,
     rascunho?.janelas,
   );
-  // Janelas ATIVAS (colunas da grade) · sem rascunho salvo, tudo menos
+  // Janelas ATIVAS (colunas do calendário) · sem rascunho salvo, tudo menos
   // "noitinha" — no HCB ela é ruído da escala antiga · religa no toggle.
   const janelas: Janela[] =
     rascunho?.janelas ?? conhecidas.filter((j) => j.rotulo.toLowerCase() !== 'noitinha');
@@ -244,12 +258,7 @@ export function EscalaEquipe({
 
   function aplicar(snap: Snapshot): void {
     atualRef.current = snap;
-    onSalvar({
-      hospitalId,
-      mesISO,
-      ...snap,
-      atualizadaEm: new Date().toISOString(),
-    });
+    onSalvar({ hospitalId, mesISO, ...snap, atualizadaEm: new Date().toISOString() });
   }
 
   function salvar(prox: Partial<EscalaEquipeT>, desc: string): void {
@@ -323,6 +332,12 @@ export function EscalaEquipe({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chaveEscala]);
 
+  // Trocar de mês (ou entrar no calendário vindo de outra etapa) tem que
+  // começar no dia 1 · o nó do scroll é reaproveitado pelo React.
+  useEffect(() => {
+    if (etapa === 'montar' && scrollCalRef.current) scrollCalRef.current.scrollTop = 0;
+  }, [etapa, mesISO, hospitalId]);
+
   /** "seg 08" pra descrever movimentos. */
   function rotuloDia(iso: string): string {
     return `${DOWS[diaSemanaBR(iso)]} ${iso.slice(8)}`;
@@ -331,24 +346,31 @@ export function EscalaEquipe({
   function puxarDaImportada(): void {
     if (!importadaRecente) return;
     const vindos = medicosDaImportada(importadaRecente);
-    const roster = [...medicos];
+    const roster = [...atualRef.current.medicos];
     for (const m of vindos) if (!roster.includes(m)) roster.push(m);
     // Pré-posiciona: cada um cai no mesmo dia-da-semana/posição do mês
     // que ocupava na escala de referência · o que ela já colocou fica.
-    const sugeridos = turnosDeReferencia(importadaRecente, mesISO, janelas, roster);
-    const existentes = new Set(turnos.map((t) => `${t.data}|${t.janela}|${t.medico}`));
+    const atuais = atualRef.current.turnos;
+    const sugeridos = turnosDeReferencia(importadaRecente, mesISO, atualRef.current.janelas, roster);
+    const existentes = new Set(atuais.map((t) => `${t.data}|${t.janela}|${t.medico}`));
     const novos = sugeridos.filter((t) => !existentes.has(`${t.data}|${t.janela}|${t.medico}`));
     salvar(
-      { medicos: roster, turnos: [...turnos, ...novos] },
+      { medicos: roster, turnos: [...atuais, ...novos] },
       `puxou a escala de ${MESES[importadaRecente.mes - 1]}/${importadaRecente.ano}`,
     );
   }
 
+  function abrirCalendario(): void {
+    if (puxarAoAbrir && importadaRecente) puxarDaImportada();
+    setEtapa('montar');
+  }
+
   function alternarJanela(j: Janela): void {
-    const ativa = janelas.some((x) => x.rotulo.toLowerCase() === j.rotulo.toLowerCase());
+    const atuais = atualRef.current.janelas;
+    const ativa = atuais.some((x) => x.rotulo.toLowerCase() === j.rotulo.toLowerCase());
     const novas = ativa
-      ? janelas.filter((x) => x.rotulo.toLowerCase() !== j.rotulo.toLowerCase())
-      : [...janelas, j].sort((a, b) => a.inicio - b.inicio);
+      ? atuais.filter((x) => x.rotulo.toLowerCase() !== j.rotulo.toLowerCase())
+      : [...atuais, j].sort((a, b) => a.inicio - b.inicio);
     if (novas.length === 0) return; // pelo menos uma coluna
     salvar({ janelas: novas }, `${ativa ? 'desligou' : 'ligou'} o turno ${j.rotulo}`);
   }
@@ -356,15 +378,15 @@ export function EscalaEquipe({
   function adicionarMedico(): void {
     const nome = novoMedico.trim();
     if (!nome || medicos.includes(nome)) return;
-    salvar({ medicos: [...medicos, nome] }, `adicionou ${nome}`);
+    salvar({ medicos: [...atualRef.current.medicos, nome] }, `adicionou ${nome}`);
     setNovoMedico('');
   }
 
   function removerMedico(nome: string): void {
     salvar(
       {
-        medicos: medicos.filter((m) => m !== nome),
-        turnos: turnos.filter((t) => t.medico !== nome),
+        medicos: atualRef.current.medicos.filter((m) => m !== nome),
+        turnos: atualRef.current.turnos.filter((t) => t.medico !== nome),
       },
       `removeu ${nome}`,
     );
@@ -373,10 +395,7 @@ export function EscalaEquipe({
 
   function escalar(data: string, janela: string, medico: string): void {
     const atuais = atualRef.current.turnos;
-    const jaTem = atuais.some(
-      (t) => t.data === data && t.janela === janela && t.medico === medico,
-    );
-    if (jaTem) return;
+    if (atuais.some((t) => t.data === data && t.janela === janela && t.medico === medico)) return;
     salvar(
       { turnos: [...atuais, { data, janela, medico }] },
       `escalou ${nomeCurto(medico)} · ${rotuloDia(data)} · ${janela}`,
@@ -394,13 +413,6 @@ export function EscalaEquipe({
     );
   }
 
-  function anotarObs(data: string, texto: string): void {
-    const proximas = { ...atualRef.current.obs };
-    if (texto.trim()) proximas[data] = texto;
-    else delete proximas[data];
-    salvar({ obs: proximas }, `obs de ${rotuloDia(data)}`);
-  }
-
   /** Move um turno já escalado pra outro slot · uma ação só no histórico. */
   function mover(de: TurnoEquipe, data: string, janela: string): void {
     const atuais = atualRef.current.turnos;
@@ -411,11 +423,16 @@ export function EscalaEquipe({
       (t) => !(t.data === de.data && t.janela === de.janela && t.medico === de.medico),
     );
     salvar(
-      {
-        turnos: jaTemNoDestino ? semOrigem : [...semOrigem, { data, janela, medico: de.medico }],
-      },
+      { turnos: jaTemNoDestino ? semOrigem : [...semOrigem, { data, janela, medico: de.medico }] },
       `moveu ${nomeCurto(de.medico)} · ${rotuloDia(de.data)} ${de.janela} → ${rotuloDia(data)} ${janela}`,
     );
+  }
+
+  function anotarObs(data: string, texto: string): void {
+    const proximas = { ...atualRef.current.obs };
+    if (texto.trim()) proximas[data] = texto;
+    else delete proximas[data];
+    salvar({ obs: proximas }, `obs de ${rotuloDia(data)}`);
   }
 
   function onDragStart(ev: DragStartEvent): void {
@@ -477,38 +494,193 @@ export function EscalaEquipe({
     );
   }
 
-  // ---- etapa revisar/exportar -------------------------------------------
+  // ---- etapa 1 · setup ---------------------------------------------------
+  if (etapa === 'setup') {
+    return (
+      <>
+        <PageHead
+          eyebrow="escala da equipe · passo 1 de 4"
+          titulo="qual mês vamos montar?"
+          hand="escolhe aqui e a gente abre o calendário limpo do outro lado"
+        />
+
+        <div style={{ ...cartao, maxWidth: 620, display: 'flex', flexDirection: 'column', gap: 18 }}>
+          {hospitaisLista.length > 1 && (
+            <label style={campo}>
+              <Eyebrow>hospital</Eyebrow>
+              <select
+                value={hospitalId}
+                onChange={(e) => setHospitalId(e.target.value)}
+                style={inputStyle}
+              >
+                {hospitaisLista.map((h) => (
+                  <option key={h.id} value={h.id}>
+                    {h.abrev} · {h.nome}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+
+          <div style={campo}>
+            <Eyebrow>mês</Eyebrow>
+            <MonthPicker value={mesISO} onChange={setMesISO} />
+          </div>
+
+          {importadaRecente && (
+            <label
+              style={{
+                display: 'flex',
+                gap: 12,
+                alignItems: 'flex-start',
+                cursor: 'pointer',
+                padding: '12px 14px',
+                borderRadius: 12,
+                background: puxarAoAbrir ? 'var(--lavender-surface)' : 'var(--bg-alt)',
+                border: `1px solid ${puxarAoAbrir ? 'var(--lavender)' : 'var(--line)'}`,
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={puxarAoAbrir}
+                onChange={(e) => setPuxarAoAbrir(e.target.checked)}
+                style={{ width: 18, height: 18, marginTop: 1, accentColor: 'var(--lavender-ink)' }}
+              />
+              <span>
+                <span style={{ font: '600 13px/1.4 var(--font-body)', color: 'var(--ink)' }}>
+                  puxar a escala de {MESES[importadaRecente.mes - 1]}/{importadaRecente.ano}
+                </span>
+                <Mono style={{ display: 'block', marginTop: 4, color: 'var(--ink-2)' }}>
+                  traz a equipe e já posiciona cada um no mesmo dia da semana
+                </Mono>
+              </span>
+            </label>
+          )}
+
+          <div style={campo}>
+            <Eyebrow>turnos do hospital</Eyebrow>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 2 }}>
+              {conhecidas.map((j) => {
+                const ativa = janelas.some((x) => x.rotulo.toLowerCase() === j.rotulo.toLowerCase());
+                return (
+                  <button
+                    key={j.rotulo}
+                    type="button"
+                    onClick={() => alternarJanela(j)}
+                    aria-pressed={ativa}
+                    style={{
+                      font: '600 12px/1 var(--font-body)',
+                      padding: '9px 14px',
+                      borderRadius: 999,
+                      border: `1px solid ${ativa ? 'var(--ink)' : 'var(--line)'}`,
+                      background: ativa ? 'var(--ink)' : 'var(--bg)',
+                      color: ativa ? 'var(--bg)' : 'var(--ink-3)',
+                      cursor: 'pointer',
+                      textDecoration: ativa ? 'none' : 'line-through',
+                    }}
+                  >
+                    {j.rotulo} · {fmtRange(j.inicio, j.duracao)}
+                  </button>
+                );
+              })}
+            </div>
+            <Mono style={{ color: 'var(--ink-3)', marginTop: 8 }}>
+              os desligados não aparecem no calendário
+            </Mono>
+          </div>
+
+          <button type="button" onClick={abrirCalendario} style={{ ...botaoPrimario, marginTop: 4 }}>
+            abrir o calendário ›
+          </button>
+        </div>
+
+        {escalasEquipe.length > 0 && (
+          <div style={{ marginTop: 22, maxWidth: 620 }}>
+            <Eyebrow>ou continua uma que você já começou</Eyebrow>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+              {escalasEquipe.map((e) => (
+                <button
+                  key={`${e.hospitalId}-${e.mesISO}`}
+                  type="button"
+                  onClick={() => {
+                    setHospitalId(e.hospitalId);
+                    setMesISO(e.mesISO);
+                    setPuxarAoAbrir(false);
+                    setEtapa('montar');
+                  }}
+                  style={{ ...botaoSecundario, padding: '10px 14px' }}
+                >
+                  {hospitais[e.hospitalId]?.abrev ?? e.hospitalId} · {mesLabel(e.mesISO)} ·{' '}
+                  {e.turnos.length} turnos
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </>
+    );
+  }
+
+  // ---- etapa 3 · revisar (o mês inteiro numa tabela) ---------------------
   if (etapa === 'revisar') {
     const comTurno = medicos.filter((m) => turnos.some((t) => t.medico === m));
     return (
       <>
         <PageHead
-          eyebrow="escala da equipe"
-          titulo="confere e manda."
-          hand={`${abrev} · ${mesLabel(mesISO)} · a tabela abaixo é exatamente o que sai nos exports`}
+          eyebrow="escala da equipe · passo 3 de 4"
+          titulo="o mês inteiro, de uma olhada."
+          hand={`${abrev} · ${mesLabel(mesISO)} · confere e segue pro envio`}
         />
-        <div style={{ display: 'flex', gap: 10, marginBottom: 18, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 10, marginBottom: 16, alignItems: 'center' }}>
           <button type="button" onClick={() => setEtapa('montar')} style={botaoSecundario}>
-            ‹ voltar pra editar
+            ‹ voltar pro calendário
           </button>
+          <Eyebrow>
+            {turnos.length} turnos · {comTurno.length} médicos escalados
+          </Eyebrow>
           <span style={{ flex: 1 }} />
-          <Eyebrow>{turnos.length} turnos · {comTurno.length} médicos escalados</Eyebrow>
+          <button type="button" onClick={() => setEtapa('exportar')} style={botaoPrimario}>
+            exportar ›
+          </button>
         </div>
 
-        <TabelaRevisao mesISO={mesISO} janelas={janelas} turnosPorSlot={turnosPorSlot} obs={obs} />
+        <TabelaRevisao
+          mesISO={mesISO}
+          janelas={janelas}
+          turnosPorSlot={turnosPorSlot}
+          obs={obs}
+        />
+      </>
+    );
+  }
 
-        {/* escala completa */}
-        <div style={cardExport}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontFamily: 'var(--font-display)', fontWeight: 500, fontSize: 16 }}>
+  // ---- etapa 4 · exportar ------------------------------------------------
+  if (etapa === 'exportar') {
+    const comTurno = medicos.filter((m) => turnos.some((t) => t.medico === m));
+    return (
+      <>
+        <PageHead
+          eyebrow="escala da equipe · passo 4 de 4"
+          titulo="agora manda."
+          hand={`${abrev} · ${mesLabel(mesISO)} · o .ics entra no google calendar · o excel abre no sheets`}
+        />
+        <div style={{ display: 'flex', gap: 10, marginBottom: 16, alignItems: 'center' }}>
+          <button type="button" onClick={() => setEtapa('revisar')} style={botaoSecundario}>
+            ‹ voltar pra ver o mês
+          </button>
+        </div>
+
+        <div style={{ ...cartao, marginBottom: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <span style={{ fontFamily: 'var(--font-display)', fontWeight: 500, fontSize: 17 }}>
               escala completa
             </span>
             <Mono style={{ color: 'var(--ink-3)' }}>{mesPorExtenso(mesISO)}</Mono>
             <span style={{ flex: 1 }} />
             <BotaoExport
               rotulo="txt"
-              ocupado={exportando}
               chave="geral-txt"
+              ocupado={exportando}
               onClick={() =>
                 exportar('geral-txt', () =>
                   baixarArquivoTexto(nomeArq(abrev, mesISO, 'txt'), textoEquipeGeral(dadosPDF())),
@@ -517,14 +689,14 @@ export function EscalaEquipe({
             />
             <BotaoExport
               rotulo="pdf"
-              ocupado={exportando}
               chave="geral-pdf"
+              ocupado={exportando}
               onClick={() => exportar('geral-pdf', () => baixarPDFEquipeCompleto(dadosPDF()))}
             />
             <BotaoExport
               rotulo="agenda (.ics)"
-              ocupado={exportando}
               chave="geral-ics"
+              ocupado={exportando}
               onClick={() =>
                 exportar('geral-ics', () =>
                   baixarArquivoTexto(nomeArq(abrev, mesISO, 'ics'), icsEquipe(dadosPDF())),
@@ -533,19 +705,15 @@ export function EscalaEquipe({
             />
             <BotaoExport
               rotulo="excel"
-              ocupado={exportando}
               chave="geral-xlsx"
+              ocupado={exportando}
               onClick={() => exportar('geral-xlsx', () => baixarXLSXEquipe(dadosPDF()))}
             />
           </div>
-          <Mono style={{ display: 'block', marginTop: 8, color: 'var(--ink-3)' }}>
-            o .ics importa direto no google calendar · o excel abre no sheets
-          </Mono>
         </div>
 
-        {/* por médico */}
-        <div style={cardExport}>
-          <span style={{ fontFamily: 'var(--font-display)', fontWeight: 500, fontSize: 16 }}>
+        <div style={cartao}>
+          <span style={{ fontFamily: 'var(--font-display)', fontWeight: 500, fontSize: 17 }}>
             um pra cada médico
           </span>
           {comTurno.length === 0 && (
@@ -553,64 +721,75 @@ export function EscalaEquipe({
               ninguém escalado ainda
             </Mono>
           )}
-          {comTurno.map((m) => {
-            const r = resumos.find((x) => x.medico === m);
-            const cor = corDoMedico(m, medicos);
-            return (
-              <div
-                key={m}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 10,
-                  padding: '10px 0',
-                  borderBottom: '1px dashed var(--line-2)',
-                }}
-              >
-                <span aria-hidden style={{ width: 8, height: 8, borderRadius: 999, background: `var(--${cor})` }} />
-                <span style={{ font: '600 13px/1.2 var(--font-body)' }}>{m}</span>
-                <Mono style={{ color: 'var(--ink-3)' }}>
-                  {r?.plantoes ?? 0} plantões · {r?.total ?? 0}h
-                </Mono>
-                <span style={{ flex: 1 }} />
-                <BotaoExport
-                  rotulo="txt"
-                  ocupado={exportando}
-                  chave={`txt-${m}`}
-                  onClick={() =>
-                    exportar(`txt-${m}`, () =>
-                      baixarArquivoTexto(
-                        nomeArq(abrev, mesISO, 'txt', m),
-                        textoEquipeMedico(dadosPDF(), m),
-                      ),
-                    )
-                  }
-                />
-                <BotaoExport
-                  rotulo="pdf"
-                  ocupado={exportando}
-                  chave={`pdf-${m}`}
-                  onClick={() => exportar(`pdf-${m}`, () => baixarPDFEquipeMedico(dadosPDF(), m))}
-                />
-                <BotaoExport
-                  rotulo="agenda"
-                  ocupado={exportando}
-                  chave={`ics-${m}`}
-                  onClick={() =>
-                    exportar(`ics-${m}`, () =>
-                      baixarArquivoTexto(nomeArq(abrev, mesISO, 'ics', m), icsEquipe(dadosPDF(), m)),
-                    )
-                  }
-                />
-              </div>
-            );
-          })}
+          <div
+            style={{
+              maxHeight: 'clamp(220px, calc(100vh - 430px), 560px)',
+              overflowY: 'auto',
+              marginTop: 6,
+            }}
+          >
+            {comTurno.map((m) => {
+              const r = resumos.find((x) => x.medico === m);
+              const cor = corDoMedico(m, medicos);
+              return (
+                <div
+                  key={m}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    padding: '11px 0',
+                    borderBottom: '1px dashed var(--line-2)',
+                  }}
+                >
+                  <span
+                    aria-hidden
+                    style={{ width: 8, height: 8, borderRadius: 999, background: `var(--${cor})` }}
+                  />
+                  <span style={{ font: '600 13px/1.2 var(--font-body)' }}>{m}</span>
+                  <Mono style={{ color: 'var(--ink-3)' }}>
+                    {r?.plantoes ?? 0} plantões · {r?.total ?? 0}h
+                  </Mono>
+                  <span style={{ flex: 1 }} />
+                  <BotaoExport
+                    rotulo="txt"
+                    chave={`txt-${m}`}
+                    ocupado={exportando}
+                    onClick={() =>
+                      exportar(`txt-${m}`, () =>
+                        baixarArquivoTexto(
+                          nomeArq(abrev, mesISO, 'txt', m),
+                          textoEquipeMedico(dadosPDF(), m),
+                        ),
+                      )
+                    }
+                  />
+                  <BotaoExport
+                    rotulo="pdf"
+                    chave={`pdf-${m}`}
+                    ocupado={exportando}
+                    onClick={() => exportar(`pdf-${m}`, () => baixarPDFEquipeMedico(dadosPDF(), m))}
+                  />
+                  <BotaoExport
+                    rotulo="agenda"
+                    chave={`ics-${m}`}
+                    ocupado={exportando}
+                    onClick={() =>
+                      exportar(`ics-${m}`, () =>
+                        baixarArquivoTexto(nomeArq(abrev, mesISO, 'ics', m), icsEquipe(dadosPDF(), m)),
+                      )
+                    }
+                  />
+                </div>
+              );
+            })}
+          </div>
         </div>
       </>
     );
   }
 
-  // ---- etapa montar ------------------------------------------------------
+  // ---- etapa 2 · montar --------------------------------------------------
   return (
     <DndContext
       sensors={sensors}
@@ -619,223 +798,228 @@ export function EscalaEquipe({
       onDragEnd={onDragEnd}
       onDragCancel={() => setArrastando(null)}
     >
-      <PageHead
-        eyebrow="escala da equipe"
-        titulo="o mês do time inteiro."
-        hand="arrasta o nome pro turno · ou clica no nome e vai clicando nos turnos"
-      />
+      {/* barra do setup, compacta · clica pra voltar e ajustar */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          flexWrap: 'wrap',
+          marginBottom: 10,
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => setEtapa('setup')}
+          title="mudar hospital, mês ou turnos"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            padding: '9px 14px',
+            borderRadius: 999,
+            border: '1px solid var(--line)',
+            background: 'var(--bg-alt)',
+            cursor: 'pointer',
+            font: '600 13px/1 var(--font-body)',
+            color: 'var(--ink)',
+          }}
+        >
+          {abrev} · {mesLabel(mesISO)}
+          <span style={{ color: 'var(--ink-3)', fontWeight: 500 }}>
+            {janelas.map((j) => j.rotulo).join(' · ')}
+          </span>
+          <span style={{ color: 'var(--ink-3)', font: '500 11px/1 var(--font-body)' }}>ajustar</span>
+        </button>
 
-      {/* setup: hospital + mês + puxar + revisar */}
-      <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
-        {hospitaisLista.length > 1 && (
-          <select
-            value={hospitalId}
-            onChange={(e) => setHospitalId(e.target.value)}
-            style={{ ...inputStyle, width: 'auto', minWidth: 160 }}
-          >
-            {hospitaisLista.map((h) => (
-              <option key={h.id} value={h.id}>
-                {h.abrev} · {h.nome}
-              </option>
-            ))}
-          </select>
-        )}
-        <MonthPicker value={mesISO} onChange={setMesISO} />
-        {importadaRecente && (
-          <button type="button" onClick={puxarDaImportada} style={botaoSecundario}>
-            puxar a escala de {MESES[importadaRecente.mes - 1]}/{importadaRecente.ano} (nomes + posições)
-          </button>
-        )}
         <span style={{ flex: 1 }} />
+
+        <button
+          type="button"
+          onClick={desfazer}
+          disabled={passado.length === 0}
+          aria-label="desfazer"
+          title={
+            passado.length > 0
+              ? `desfazer · ${passado[passado.length - 1]!.desc} (ctrl+z)`
+              : 'nada pra desfazer'
+          }
+          style={{ ...botaoIcone, opacity: passado.length === 0 ? 0.35 : 1 }}
+        >
+          <IconeGirar />
+        </button>
+        <button
+          type="button"
+          onClick={refazer}
+          disabled={futuro.length === 0}
+          aria-label="refazer"
+          title={
+            futuro.length > 0
+              ? `refazer · ${futuro[futuro.length - 1]!.desc} (ctrl+shift+z)`
+              : 'nada pra refazer'
+          }
+          style={{ ...botaoIcone, opacity: futuro.length === 0 ? 0.35 : 1 }}
+        >
+          <IconeGirar espelhado />
+        </button>
+
         <button
           type="button"
           onClick={() => setEtapa('revisar')}
           disabled={turnos.length === 0}
           style={{ ...botaoPrimario, opacity: turnos.length === 0 ? 0.5 : 1 }}
         >
-          salvar e exportar ›
+          salvar e visualizar o mês ›
         </button>
       </div>
 
-      {/* escalas já salvas */}
-      {escalasEquipe.length > 0 && (
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
-          <Eyebrow>salvas</Eyebrow>
-          {escalasEquipe.map((e) => {
-            const ativa = e.hospitalId === hospitalId && e.mesISO === mesISO;
-            return (
-              <button
-                key={`${e.hospitalId}-${e.mesISO}`}
-                type="button"
-                onClick={() => {
-                  setHospitalId(e.hospitalId);
-                  setMesISO(e.mesISO);
-                }}
-                style={{
-                  ...botaoSecundario,
-                  padding: '8px 12px',
-                  background: ativa ? 'var(--lavender-surface)' : 'var(--bg-alt)',
-                  border: `1px solid ${ativa ? 'var(--lavender)' : 'var(--line)'}`,
-                  color: ativa ? 'var(--lavender-ink)' : 'var(--ink-2)',
-                }}
-              >
-                {hospitais[e.hospitalId]?.abrev ?? e.hospitalId} · {mesLabel(e.mesISO)} · {e.turnos.length} turnos
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      {/* janelas ativas */}
-      {conhecidas.length > 1 && (
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
-          <Eyebrow>turnos do hospital</Eyebrow>
-          {conhecidas.map((j) => {
-            const ativa = janelas.some((x) => x.rotulo.toLowerCase() === j.rotulo.toLowerCase());
-            return (
-              <button
-                key={j.rotulo}
-                type="button"
-                onClick={() => alternarJanela(j)}
-                aria-pressed={ativa}
-                title={fmtRange(j.inicio, j.duracao)}
-                style={{
-                  font: '600 12px/1 var(--font-body)',
-                  padding: '8px 14px',
-                  borderRadius: 999,
-                  border: `1px solid ${ativa ? 'var(--ink)' : 'var(--line)'}`,
-                  background: ativa ? 'var(--ink)' : 'var(--bg)',
-                  color: ativa ? 'var(--bg)' : 'var(--ink-3)',
-                  cursor: 'pointer',
-                  textDecoration: ativa ? 'none' : 'line-through',
-                }}
-              >
-                {j.rotulo} · {fmtRange(j.inicio, j.duracao)}
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 300px', gap: 24, alignItems: 'flex-start' }}>
-        <div>
-          {/* Bloco grudado no topo enquanto o mês rola: o roster (pra trocar
-              de médico sem voltar) + o cabeçalho das colunas. */}
-          <div style={{ position: 'sticky', top: 0, zIndex: 15, background: 'var(--bg)', paddingBottom: 2 }}>
-            <div
+      {/* equipe · compacta, expande quando precisa */}
+      <div
+        style={{
+          background: 'var(--bg-alt)',
+          border: '1px solid var(--line)',
+          borderRadius: 12,
+          padding: '8px 12px',
+          marginBottom: 10,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button
+            type="button"
+            onClick={() => setRosterAberto((o) => !o)}
+            aria-expanded={rosterAberto}
+            aria-label={rosterAberto ? 'diminuir a equipe' : 'expandir a equipe'}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 7,
+              border: 'none',
+              background: 'transparent',
+              cursor: 'pointer',
+              padding: '2px 0',
+              font: '700 10px/1 var(--font-body)',
+              letterSpacing: '0.06em',
+              textTransform: 'uppercase',
+              color: 'var(--ink-3)',
+            }}
+          >
+            <span
+              aria-hidden
               style={{
-                display: 'flex',
-                gap: 8,
-                alignItems: 'center',
-                flexWrap: 'wrap',
-                padding: '12px 14px',
-                background: 'var(--bg-alt)',
-                border: '1px solid var(--line)',
-                borderRadius: 14,
-                marginBottom: 8,
+                display: 'inline-block',
+                transition: 'transform 160ms ease',
+                transform: rosterAberto ? 'rotate(90deg)' : 'none',
+                fontSize: 11,
               }}
             >
-              <Eyebrow style={{ marginRight: 4 }}>equipe</Eyebrow>
-              {medicos.map((m) => (
-                <ChipMedico
-                  key={m}
-                  nome={m}
-                  cor={corDoMedico(m, medicos)}
-                  selecionado={medicoSel === m}
-                  onSelecionar={() => setMedicoSel(medicoSel === m ? null : m)}
-                  onRemover={() => removerMedico(m)}
-                />
-              ))}
-              <input
-                value={novoMedico}
-                onChange={(e) => setNovoMedico(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') adicionarMedico();
-                }}
-                placeholder="+ nome do médico · enter"
-                style={{ ...inputStyle, width: 190 }}
-              />
-              {medicos.length === 0 && !importadaRecente && (
-                <Mono style={{ color: 'var(--ink-3)' }}>
-                  digita os nomes · ou importa uma escala antiga em sincronizar
-                </Mono>
-              )}
-              <span style={{ flex: 1 }} />
-              <button
-                type="button"
-                onClick={desfazer}
-                disabled={passado.length === 0}
-                aria-label="desfazer"
-                title={
-                  passado.length > 0
-                    ? `desfazer · ${passado[passado.length - 1]!.desc} (ctrl+z)`
-                    : 'nada pra desfazer'
-                }
-                style={{ ...botaoDesfazer, opacity: passado.length === 0 ? 0.35 : 1 }}
-              >
-                ↶
-              </button>
-              <button
-                type="button"
-                onClick={refazer}
-                disabled={futuro.length === 0}
-                aria-label="refazer"
-                title={
-                  futuro.length > 0
-                    ? `refazer · ${futuro[futuro.length - 1]!.desc} (ctrl+shift+z)`
-                    : 'nada pra refazer'
-                }
-                style={{ ...botaoDesfazer, opacity: futuro.length === 0 ? 0.35 : 1 }}
-              >
-                ↷
-              </button>
-              {(medicoSel || ultimaAcao) && (
-                <span style={{ width: '100%', display: 'flex', gap: 14, alignItems: 'baseline' }}>
-                  {medicoSel && (
-                    <Hand color="var(--lavender-ink)" size={14}>
-                      escalando {nomeCurto(medicoSel)} · clica nos turnos (clica no nome de novo pra soltar)
-                    </Hand>
-                  )}
-                  {ultimaAcao && (
-                    <Mono style={{ color: 'var(--ink-3)', marginLeft: medicoSel ? 'auto' : 0 }}>
-                      {ultimaAcao}
-                    </Mono>
-                  )}
-                </span>
-              )}
-            </div>
+              ▶
+            </span>
+            equipe · {medicos.length}
+          </button>
 
-            {/* cabeçalho das colunas */}
+          {/* seleção atual sempre visível, mesmo colapsado */}
+          {medicoSel ? (
+            <Hand color="var(--lavender-ink)" size={14}>
+              escalando {nomeCurto(medicoSel)} · clica nos turnos
+            </Hand>
+          ) : (
+            <Mono style={{ color: 'var(--ink-3)' }}>
+              arrasta o nome pro turno · ou clica no nome e vai clicando
+            </Mono>
+          )}
+          <span style={{ flex: 1 }} />
+          {ultimaAcao && (
+            <Mono style={{ color: 'var(--ink-3)', textAlign: 'right' }}>{ultimaAcao}</Mono>
+          )}
+          {/* fica aqui (e não junto dos chips) pra continuar alcançável
+              quando a lista está colapsada */}
+          <input
+            value={novoMedico}
+            onChange={(e) => setNovoMedico(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') adicionarMedico();
+            }}
+            placeholder="+ nome · enter"
+            style={{ ...inputStyle, width: 150, padding: '6px 10px', flexShrink: 0 }}
+          />
+        </div>
+
+        <div
+          style={{
+            display: 'flex',
+            gap: 7,
+            alignItems: 'flex-start',
+            alignContent: 'flex-start',
+            flexWrap: 'wrap',
+            marginTop: 8,
+            maxHeight: rosterAberto ? 132 : 34,
+            overflowY: rosterAberto ? 'auto' : 'hidden',
+            transition: 'max-height 180ms ease',
+          }}
+        >
+          {medicos.map((m) => (
+            <ChipMedico
+              key={m}
+              nome={m}
+              cor={corDoMedico(m, medicos)}
+              selecionado={medicoSel === m}
+              onSelecionar={() => setMedicoSel(medicoSel === m ? null : m)}
+              onRemover={() => removerMedico(m)}
+            />
+          ))}
+          {medicos.length === 0 && (
+            <Mono style={{ color: 'var(--ink-3)' }}>
+              digita os nomes ali do lado · ou volta e puxa a escala anterior
+            </Mono>
+          )}
+        </div>
+      </div>
+
+      {/* calendário + status · cada um com scroll próprio */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'minmax(0, 1fr) 290px',
+          gap: 18,
+          alignItems: 'stretch',
+        }}
+      >
+        <div
+          style={{
+            background: 'var(--bg)',
+            border: '1px solid var(--line)',
+            borderRadius: 14,
+            overflow: 'hidden',
+            boxShadow: 'var(--shadow-sm)',
+            display: 'flex',
+            flexDirection: 'column',
+            height: ALTURA_PAINEL,
+          }}
+        >
+          <div ref={scrollCalRef} style={{ overflowY: 'auto', overflowX: 'hidden' }}>
+            {/* cabeçalho das colunas · gruda no topo DESTE scroll */}
             <div
               style={{
                 display: 'grid',
                 gridTemplateColumns: gridDia(janelas.length),
+                position: 'sticky',
+                top: 0,
+                zIndex: 6,
                 background: 'var(--bg-alt)',
-                border: '1px solid var(--line)',
-                borderRadius: '12px 12px 0 0',
-                borderBottom: 'none',
+                borderBottom: '1px solid var(--line-2)',
               }}
             >
               <div style={cabecalhoColuna}>dia</div>
               {janelas.map((j) => (
-                <div key={j.rotulo} style={cabecalhoColuna}>
-                  {j.rotulo} · {fmtRange(j.inicio, j.duracao)}
+                <div key={j.rotulo} style={{ ...cabecalhoColuna, ...divisoriaColuna }}>
+                  {j.rotulo}
+                  <span style={{ color: 'var(--line-2)', margin: '0 4px' }}>·</span>
+                  {fmtRange(j.inicio, j.duracao)}
                 </div>
               ))}
-              <div style={cabecalhoColuna}>obs</div>
+              <div style={{ ...cabecalhoColuna, ...divisoriaColuna }}>obs</div>
             </div>
-          </div>
 
-          {/* um dia por linha · largura inteira, respiro, scroll natural */}
-          <div
-            style={{
-              background: 'var(--bg)',
-              border: '1px solid var(--line)',
-              borderRadius: '0 0 16px 16px',
-              overflow: 'hidden',
-              boxShadow: 'var(--shadow-sm)',
-            }}
-          >
             {diasDoMesLista(mesISO).map((iso, i) => (
               <DiaLinha
                 key={iso}
@@ -855,7 +1039,6 @@ export function EscalaEquipe({
           </div>
         </div>
 
-        {/* status lateral */}
         <StatusEquipe
           resumos={resumos}
           medicos={medicos}
@@ -866,7 +1049,7 @@ export function EscalaEquipe({
       </div>
 
       {/* O chip que segue o cursor mora aqui (portal do dnd-kit): fora de
-          qualquer stacking/overflow do header fixo e das linhas. */}
+          qualquer stacking/overflow do cabeçalho e das linhas. */}
       <DragOverlay dropAnimation={null}>
         {arrastando && (
           <ChipFlutuante
@@ -884,6 +1067,25 @@ function nomeArrastado(id: string): string {
   if (id.startsWith('med|')) return id.slice('med|'.length);
   if (id.startsWith('turno|')) return id.split('|').slice(3).join('|');
   return id;
+}
+
+/**
+ * arrow-rotate-left do Font Awesome Free 7 (CC BY 4.0 · fontawesome.com).
+ * `espelhado` vira a seta pra virar o "refazer".
+ */
+function IconeGirar({ espelhado }: { espelhado?: boolean }) {
+  return (
+    <svg
+      width="15"
+      height="15"
+      viewBox="0 0 640 640"
+      fill="currentColor"
+      aria-hidden
+      style={espelhado ? { transform: 'scaleX(-1)' } : undefined}
+    >
+      <path d="M320 128C263.2 128 212.1 152.7 176.9 192L224 192C241.7 192 256 206.3 256 224C256 241.7 241.7 256 224 256L96 256C78.3 256 64 241.7 64 224L64 96C64 78.3 78.3 64 96 64C113.7 64 128 78.3 128 96L128 150.7C174.9 97.6 243.5 64 320 64C461.4 64 576 178.6 576 320C576 461.4 461.4 576 320 576C233 576 156.1 532.6 109.9 466.3C99.8 451.8 103.3 431.9 117.8 421.7C132.3 411.5 152.2 415.1 162.4 429.6C197.2 479.4 254.8 511.9 320 511.9C426 511.9 512 425.9 512 319.9C512 213.9 426 128 320 128z" />
+    </svg>
+  );
 }
 
 function ChipFlutuante({ nome, cor }: { nome: string; cor: string }) {
@@ -912,7 +1114,7 @@ function ChipFlutuante({ nome, cor }: { nome: string; cor: string }) {
 
 /** Colunas de uma linha-dia: data | janelas | obs. */
 function gridDia(nJanelas: number): string {
-  return `96px repeat(${nJanelas}, minmax(0, 1fr)) 180px`;
+  return `88px repeat(${nJanelas}, minmax(0, 1fr)) 168px`;
 }
 
 function diasDoMesLista(mesISO: string): string[] {
@@ -950,7 +1152,7 @@ function BotaoExport({
   );
 }
 
-/** Tabela dia × janela · exatamente o que sai nos exports. */
+/** Tabela dia × janela · exatamente o que sai nos exports · scroll próprio. */
 function TabelaRevisao({
   mesISO,
   janelas,
@@ -962,57 +1164,71 @@ function TabelaRevisao({
   turnosPorSlot: Map<string, TurnoEquipe[]>;
   obs: Record<string, string>;
 }) {
-  const dias: string[] = [];
-  const fim = fromISO(`${mesISO}-01`);
-  fim.setMonth(fim.getMonth() + 1, 0);
-  for (let d = 1; d <= fim.getDate(); d++) {
-    dias.push(`${mesISO}-${String(d).padStart(2, '0')}`);
-  }
+  const dias = diasDoMesLista(mesISO);
   const temObs = Object.keys(obs).some((d) => d.startsWith(mesISO) && obs[d]?.trim());
+  // O React reaproveita o nó DOM da etapa anterior (mesma posição, mesmo
+  // tipo), e com ele vem o scrollTop do calendário — a tabela abria no
+  // meio do mês. Começa sempre no dia 1.
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+  }, [mesISO]);
   return (
     <div
       style={{
         background: 'var(--bg)',
         border: '1px solid var(--line)',
-        borderRadius: 16,
+        borderRadius: 14,
         overflow: 'hidden',
         boxShadow: 'var(--shadow-sm)',
-        marginBottom: 18,
+        height: ALTURA_PAINEL,
+        display: 'flex',
       }}
     >
-      <table style={{ width: '100%', borderCollapse: 'collapse', font: '500 12px/1.4 var(--font-body)' }}>
-        <thead>
-          <tr style={{ background: 'var(--bg-alt)' }}>
-            <th style={thStyle}>dia</th>
-            {janelas.map((j) => (
-              <th key={j.rotulo} style={thStyle}>
-                {j.rotulo} · {fmtHorarioJanela(j)}
-              </th>
-            ))}
-            {temObs && <th style={thStyle}>obs</th>}
-          </tr>
-        </thead>
-        <tbody>
-          {dias.map((iso) => {
-            const fds = diaSemanaBR(iso) >= 5;
-            return (
-              <tr key={iso} style={{ background: fds ? 'var(--bg-alt)' : 'transparent' }}>
-                <td style={{ ...tdStyle, whiteSpace: 'nowrap', color: 'var(--ink-2)', fontWeight: 600 }}>
-                  {rotuloDiaCurto(iso)}
-                </td>
-                {janelas.map((j) => (
-                  <td key={j.rotulo} style={tdStyle}>
-                    {(turnosPorSlot.get(`${iso}|${j.rotulo}`) ?? []).map((t) => t.medico).join(' · ')}
+      <div ref={scrollRef} style={{ overflowY: 'auto', width: '100%' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', font: '500 12.5px/1.5 var(--font-body)' }}>
+          <thead>
+            <tr>
+              <th style={{ ...thStyle, position: 'sticky', top: 0, background: 'var(--bg-alt)' }}>dia</th>
+              {janelas.map((j) => (
+                <th
+                  key={j.rotulo}
+                  style={{ ...thStyle, ...divisoriaColuna, position: 'sticky', top: 0, background: 'var(--bg-alt)' }}
+                >
+                  {j.rotulo} · {fmtHorarioJanela(j)}
+                </th>
+              ))}
+              {temObs && (
+                <th style={{ ...thStyle, ...divisoriaColuna, position: 'sticky', top: 0, background: 'var(--bg-alt)' }}>
+                  obs
+                </th>
+              )}
+            </tr>
+          </thead>
+          <tbody>
+            {dias.map((iso) => {
+              const fds = diaSemanaBR(iso) >= 5;
+              return (
+                <tr key={iso} style={{ background: fds ? 'var(--bg-alt)' : 'transparent' }}>
+                  <td style={{ ...tdStyle, whiteSpace: 'nowrap', color: 'var(--ink-2)', fontWeight: 600 }}>
+                    {rotuloDiaCurto(iso)}
                   </td>
-                ))}
-                {temObs && (
-                  <td style={{ ...tdStyle, color: 'var(--ink-3)', fontStyle: 'italic' }}>{obs[iso] ?? ''}</td>
-                )}
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+                  {janelas.map((j) => (
+                    <td key={j.rotulo} style={{ ...tdStyle, ...divisoriaColuna }}>
+                      {(turnosPorSlot.get(`${iso}|${j.rotulo}`) ?? []).map((t) => t.medico).join(' · ')}
+                    </td>
+                  ))}
+                  {temObs && (
+                    <td style={{ ...tdStyle, ...divisoriaColuna, color: 'var(--ink-3)', fontStyle: 'italic' }}>
+                      {obs[iso] ?? ''}
+                    </td>
+                  )}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -1030,20 +1246,18 @@ function ChipMedico({
   onSelecionar: () => void;
   onRemover: () => void;
 }) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: idChipRoster(nome),
-  });
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: idChipRoster(nome) });
   return (
     <span
       ref={setNodeRef}
       style={{
         display: 'inline-flex',
         alignItems: 'center',
-        gap: 6,
+        gap: 5,
         borderRadius: 999,
         border: `1.5px solid ${selecionado ? `var(--${cor}-ink)` : 'var(--line)'}`,
         background: selecionado ? `var(--${cor}-surface)` : 'var(--bg)',
-        padding: '7px 10px 7px 12px',
+        padding: '5px 8px 5px 10px',
         // o chip que segue o cursor é o DragOverlay · aqui só apagamos o
         // original pra ficar claro de onde ele saiu
         opacity: isDragging ? 0.4 : 1,
@@ -1058,16 +1272,16 @@ function ChipMedico({
         style={{
           display: 'inline-flex',
           alignItems: 'center',
-          gap: 7,
+          gap: 6,
           border: 'none',
           background: 'transparent',
-          font: '600 13px/1 var(--font-body)',
+          font: '600 12.5px/1 var(--font-body)',
           color: 'var(--ink)',
           cursor: 'grab',
           padding: 0,
         }}
       >
-        <span aria-hidden style={{ width: 8, height: 8, borderRadius: 999, background: `var(--${cor})` }} />
+        <span aria-hidden style={{ width: 7, height: 7, borderRadius: 999, background: `var(--${cor})` }} />
         {nome}
       </button>
       <button
@@ -1080,7 +1294,7 @@ function ChipMedico({
           color: 'var(--ink-3)',
           cursor: 'pointer',
           font: '600 12px/1 var(--font-body)',
-          padding: '2px 2px',
+          padding: 0,
         }}
       >
         ×
@@ -1128,19 +1342,30 @@ function DiaLinha({
       style={{
         display: 'grid',
         gridTemplateColumns: gridDia(janelas.length),
-        minHeight: 64,
+        minHeight: 58,
         background: fds ? 'var(--bg-alt)' : 'transparent',
         // segunda-feira abre a semana com um traço mais firme · respiro visual
-        borderTop: primeiraLinha ? 'none' : inicioDeSemana ? '2px solid var(--line-2)' : '1px solid var(--line)',
-        borderLeft: isHoje ? '3px solid var(--lavender)' : '3px solid transparent',
+        borderTop: primeiraLinha
+          ? 'none'
+          : inicioDeSemana
+            ? '2px solid var(--line-2)'
+            : '1px solid var(--line)',
       }}
     >
-      <div style={{ padding: '12px 12px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <div
+        style={{
+          padding: '10px 10px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 1,
+          borderLeft: isHoje ? '3px solid var(--lavender)' : '3px solid transparent',
+        }}
+      >
         <span
           style={{
             fontFamily: 'var(--font-display)',
             fontWeight: 500,
-            fontSize: 16,
+            fontSize: 15,
             letterSpacing: '-0.01em',
             color: isHoje ? 'var(--lavender-ink)' : fds ? 'var(--ink)' : 'var(--ink-2)',
           }}
@@ -1148,7 +1373,7 @@ function DiaLinha({
           {DOWS[dow]} {fromISO(iso).getDate()}
         </span>
         {isHoje && (
-          <Hand color="var(--lavender-ink)" size={12}>
+          <Hand color="var(--lavender-ink)" size={11}>
             hoje
           </Hand>
         )}
@@ -1166,39 +1391,40 @@ function DiaLinha({
           onRemoverTurno={onRemoverTurno}
         />
       ))}
-      <input
-        value={obsExibida}
-        onFocus={() => {
-          setObsLocal(obs);
-          setEditandoObs(true);
-        }}
-        onChange={(e) => setObsLocal(e.target.value)}
-        onBlur={() => {
-          setEditandoObs(false);
-          if (obsLocal !== obs) onObs(obsLocal);
-        }}
-        placeholder="* obs"
-        aria-label={`observação de ${iso}`}
-        style={{
-          margin: '8px 10px',
-          padding: '6px 10px',
-          border: '1px dashed transparent',
-          borderRadius: 8,
-          background: 'transparent',
-          font: `400 12px/1.4 var(--font-body)`,
-          fontStyle: 'italic',
-          color: 'var(--ink-2)',
-          outline: 'none',
-          alignSelf: 'flex-start',
-          width: 'calc(100% - 20px)',
-        }}
-        onMouseEnter={(e) => {
-          (e.target as HTMLInputElement).style.borderColor = 'var(--line-2)';
-        }}
-        onMouseLeave={(e) => {
-          (e.target as HTMLInputElement).style.borderColor = 'transparent';
-        }}
-      />
+      <div style={{ ...divisoriaColuna, display: 'flex', alignItems: 'flex-start' }}>
+        <input
+          value={obsExibida}
+          onFocus={() => {
+            setObsLocal(obs);
+            setEditandoObs(true);
+          }}
+          onChange={(e) => setObsLocal(e.target.value)}
+          onBlur={() => {
+            setEditandoObs(false);
+            if (obsLocal !== obs) onObs(obsLocal);
+          }}
+          placeholder="* obs"
+          aria-label={`observação de ${iso}`}
+          style={{
+            margin: '8px 10px',
+            padding: '5px 8px',
+            border: '1px dashed transparent',
+            borderRadius: 8,
+            background: 'transparent',
+            font: '400 12px/1.4 var(--font-body)',
+            fontStyle: 'italic',
+            color: 'var(--ink-2)',
+            outline: 'none',
+            width: 'calc(100% - 20px)',
+          }}
+          onMouseEnter={(e) => {
+            (e.target as HTMLInputElement).style.borderColor = 'var(--line-2)';
+          }}
+          onMouseLeave={(e) => {
+            (e.target as HTMLInputElement).style.borderColor = 'transparent';
+          }}
+        />
+      </div>
     </div>
   );
 }
@@ -1225,50 +1451,52 @@ function SlotJanela({
   const { setNodeRef, isOver } = useDroppable({ id: idSlot(iso, janela.rotulo) });
   const vazio = turnos.length === 0;
   return (
-    <div
-      ref={setNodeRef}
-      onClick={onClicar}
-      role="button"
-      aria-label={`turno ${janela.rotulo} de ${iso}`}
-      title={`${janela.rotulo} · ${fmtRange(janela.inicio, janela.duracao)}`}
-      style={{
-        margin: '8px 6px',
-        padding: '6px 6px',
-        borderRadius: 10,
-        border: `1.5px dashed ${
-          isOver ? 'var(--lavender-ink)' : vazio ? 'var(--line-2)' : 'transparent'
-        }`,
-        background: isOver ? 'var(--lavender-surface)' : 'transparent',
-        cursor: temSelecao ? 'copy' : 'default',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 5,
-        minHeight: 46,
-        justifyContent: vazio ? 'center' : 'flex-start',
-      }}
-    >
-      {vazio && (
-        <span
-          aria-hidden
-          style={{
-            font: '600 11px/1 var(--font-body)',
-            color: 'var(--line-2)',
-            textAlign: 'center',
-            userSelect: 'none',
-          }}
-        >
-          {janela.rotulo}
-        </span>
-      )}
-      {turnos.map((t) => (
-        <ChipEscalado
-          key={t.medico}
-          turno={t}
-          cor={corDoMedico(t.medico, medicos)}
-          emConflito={conflitos.has(`${t.medico}|${t.data}|${t.janela}`)}
-          onRemover={() => onRemoverTurno(t)}
-        />
-      ))}
+    <div style={divisoriaColuna}>
+      <div
+        ref={setNodeRef}
+        onClick={onClicar}
+        role="button"
+        aria-label={`turno ${janela.rotulo} de ${iso}`}
+        title={`${janela.rotulo} · ${fmtRange(janela.inicio, janela.duracao)}`}
+        style={{
+          margin: 6,
+          padding: 4,
+          minHeight: 44,
+          borderRadius: 10,
+          border: `1.5px dashed ${
+            isOver ? 'var(--lavender-ink)' : vazio ? 'var(--line-2)' : 'transparent'
+          }`,
+          background: isOver ? 'var(--lavender-surface)' : 'transparent',
+          cursor: temSelecao ? 'copy' : 'default',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 4,
+          justifyContent: vazio ? 'center' : 'flex-start',
+        }}
+      >
+        {vazio && (
+          <span
+            aria-hidden
+            style={{
+              font: '600 11px/1 var(--font-body)',
+              color: 'var(--line-2)',
+              textAlign: 'center',
+              userSelect: 'none',
+            }}
+          >
+            {janela.rotulo}
+          </span>
+        )}
+        {turnos.map((t) => (
+          <ChipEscalado
+            key={t.medico}
+            turno={t}
+            cor={corDoMedico(t.medico, medicos)}
+            emConflito={conflitos.has(`${t.medico}|${t.data}|${t.janela}`)}
+            onRemover={() => onRemoverTurno(t)}
+          />
+        ))}
+      </div>
     </div>
   );
 }
@@ -1301,8 +1529,8 @@ function ChipEscalado({
       title={`${turno.medico} · arrasta pra mover de turno · clica pra tirar`}
       style={{
         textAlign: 'left',
-        font: '600 13px/1.3 var(--font-body)',
-        padding: '7px 12px',
+        font: '600 12.5px/1.3 var(--font-body)',
+        padding: '6px 10px',
         borderRadius: 8,
         background: `var(--${cor}-surface)`,
         border: emConflito ? '1.5px solid var(--err-ink)' : 'none',
@@ -1313,9 +1541,7 @@ function ChipEscalado({
         overflow: 'hidden',
         textOverflow: 'ellipsis',
         touchAction: 'none',
-        // o original vira fantasma enquanto o DragOverlay segue o cursor
         opacity: isDragging ? 0.35 : 1,
-        // pisca ao entrar · sinaliza a mudança pra quem clicou
         animation: 'colo-fab-in 220ms cubic-bezier(.2,.7,.2,1)',
       }}
     >
@@ -1344,68 +1570,88 @@ function StatusEquipe({
       style={{
         background: 'var(--bg)',
         border: '1px solid var(--line)',
-        borderRadius: 16,
-        padding: '16px 18px',
+        borderRadius: 14,
         boxShadow: 'var(--shadow-sm)',
-        position: 'sticky',
-        top: 16,
+        height: ALTURA_PAINEL,
+        display: 'flex',
+        flexDirection: 'column',
       }}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
-        <span style={{ fontFamily: 'var(--font-display)', fontWeight: 500, fontSize: 16 }}>
+      <div
+        style={{
+          padding: '14px 16px 10px',
+          borderBottom: '1px solid var(--line)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'baseline',
+          gap: 8,
+        }}
+      >
+        <span style={{ fontFamily: 'var(--font-display)', fontWeight: 500, fontSize: 15 }}>
           quem tá com quanto
         </span>
         <Eyebrow>{mesLabel(mesISO)}</Eyebrow>
       </div>
-      {conflitos > 0 && (
-        <Pill kind="err" style={{ marginBottom: 10 }}>
-          {conflitos / 2 >= 1 ? Math.round(conflitos / 2) : 1} choque{conflitos > 2 ? 's' : ''} de horário
-        </Pill>
-      )}
-      {resumos.length === 0 && (
-        <Mono style={{ color: 'var(--ink-3)', display: 'block' }}>adiciona a equipe ali em cima</Mono>
-      )}
-      {resumos.map((r) => {
-        const cor = corDoMedico(r.medico, medicos);
-        const desvio = media > 0 && r.total > 0 ? r.total - media : 0;
-        return (
-          <div key={r.medico} style={{ padding: '10px 0', borderBottom: '1px dashed var(--line-2)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span aria-hidden style={{ width: 8, height: 8, borderRadius: 999, background: `var(--${cor})`, flexShrink: 0 }} />
-              <span style={{ font: '600 13px/1.2 var(--font-body)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {r.medico}
-              </span>
-              <Mono style={{ marginLeft: 'auto', color: 'var(--ink)', flexShrink: 0 }}>
-                {r.total}h
-              </Mono>
-            </div>
-            <div style={{ display: 'flex', gap: 6, marginTop: 5, alignItems: 'center' }}>
-              <Mono style={{ color: 'var(--ink-3)', fontSize: 10 }}>
-                {r.porSemana.map((h) => `${h}`).join(' · ')} /sem
-              </Mono>
-              <Mono style={{ color: 'var(--ink-3)', fontSize: 10, marginLeft: 'auto' }}>
-                fds {r.fds}h
-              </Mono>
-              {Math.abs(desvio) >= 12 && (
-                <Mono
+
+      <div style={{ overflowY: 'auto', padding: '0 16px 14px' }}>
+        {conflitos > 0 && (
+          <Pill kind="err" style={{ margin: '12px 0 4px' }}>
+            {Math.max(1, Math.round(conflitos / 2))} choque
+            {conflitos > 2 ? 's' : ''} de horário
+          </Pill>
+        )}
+        {resumos.length === 0 && (
+          <Mono style={{ color: 'var(--ink-3)', display: 'block', marginTop: 12 }}>
+            adiciona a equipe ali em cima
+          </Mono>
+        )}
+        {resumos.map((r) => {
+          const cor = corDoMedico(r.medico, medicos);
+          const desvio = media > 0 && r.total > 0 ? r.total - media : 0;
+          return (
+            <div key={r.medico} style={{ padding: '9px 0', borderBottom: '1px dashed var(--line-2)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span
+                  aria-hidden
+                  style={{ width: 8, height: 8, borderRadius: 999, background: `var(--${cor})`, flexShrink: 0 }}
+                />
+                <span
                   style={{
-                    fontSize: 10,
-                    color: desvio > 0 ? 'var(--coral-ink)' : 'var(--sage-ink)',
+                    font: '600 12.5px/1.2 var(--font-body)',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
                   }}
                 >
-                  {desvio > 0 ? '+' : ''}
-                  {Math.round(desvio)}h vs média
+                  {r.medico}
+                </span>
+                <Mono style={{ marginLeft: 'auto', color: 'var(--ink)', flexShrink: 0 }}>{r.total}h</Mono>
+              </div>
+              <div style={{ display: 'flex', gap: 6, marginTop: 4, alignItems: 'center' }}>
+                <Mono style={{ color: 'var(--ink-3)', fontSize: 10 }}>
+                  {r.porSemana.join(' · ')} /sem
                 </Mono>
-              )}
+                <Mono style={{ color: 'var(--ink-3)', fontSize: 10, marginLeft: 'auto' }}>
+                  fds {r.fds}h
+                </Mono>
+                {Math.abs(desvio) >= 12 && (
+                  <Mono
+                    style={{ fontSize: 10, color: desvio > 0 ? 'var(--coral-ink)' : 'var(--sage-ink)' }}
+                  >
+                    {desvio > 0 ? '+' : ''}
+                    {Math.round(desvio)}h
+                  </Mono>
+                )}
+              </div>
             </div>
-          </div>
-        );
-      })}
-      {resumos.length > 0 && (
-        <Mono style={{ display: 'block', marginTop: 10, color: 'var(--ink-3)', fontSize: 10 }}>
-          {semanas} semanas no mês · média {Math.round(media)}h por médico escalado
-        </Mono>
-      )}
+          );
+        })}
+        {resumos.length > 0 && (
+          <Mono style={{ display: 'block', marginTop: 10, color: 'var(--ink-3)', fontSize: 10 }}>
+            {semanas} semanas · média {Math.round(media)}h por médico escalado
+          </Mono>
+        )}
+      </div>
     </div>
   );
 }
@@ -1420,9 +1666,23 @@ const inputStyle: React.CSSProperties = {
   outline: 'none',
 };
 
+const campo: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 7,
+};
+
+const cartao: React.CSSProperties = {
+  background: 'var(--bg)',
+  border: '1px solid var(--line)',
+  borderRadius: 16,
+  padding: '20px 22px',
+  boxShadow: 'var(--shadow-sm)',
+};
+
 const botaoPrimario: React.CSSProperties = {
   font: '600 13px/1 var(--font-body)',
-  padding: '11px 20px',
+  padding: '12px 22px',
   borderRadius: 999,
   border: 'none',
   background: 'var(--ink)',
@@ -1440,8 +1700,7 @@ const botaoSecundario: React.CSSProperties = {
   cursor: 'pointer',
 };
 
-const botaoDesfazer: React.CSSProperties = {
-  font: '600 15px/1 var(--font-body)',
+const botaoIcone: React.CSSProperties = {
   width: 36,
   height: 36,
   borderRadius: 999,
@@ -1449,12 +1708,21 @@ const botaoDesfazer: React.CSSProperties = {
   background: 'var(--bg)',
   color: 'var(--ink-2)',
   cursor: 'pointer',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: 0,
+};
+
+/** Linha vertical entre colunas de turno · sem isso as colunas somem. */
+const divisoriaColuna: React.CSSProperties = {
+  borderLeft: '1px solid var(--line)',
 };
 
 const cabecalhoColuna: React.CSSProperties = {
-  padding: '11px 12px',
+  padding: '10px 12px',
   font: '700 10px/1 var(--font-body)',
-  letterSpacing: '0.06em',
+  letterSpacing: '0.05em',
   textTransform: 'uppercase',
   color: 'var(--ink-3)',
 };
@@ -1473,13 +1741,4 @@ const tdStyle: React.CSSProperties = {
   padding: '7px 12px',
   borderBottom: '1px solid var(--line)',
   verticalAlign: 'top',
-};
-
-const cardExport: React.CSSProperties = {
-  background: 'var(--bg)',
-  border: '1px solid var(--line)',
-  borderRadius: 16,
-  padding: '16px 18px',
-  boxShadow: 'var(--shadow-sm)',
-  marginBottom: 14,
 };
