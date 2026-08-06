@@ -261,3 +261,27 @@ export interface EscalaImportada {
    */
   apelidoUsado?: string;
 }
+
+/**
+ * Escala da EQUIPE inteira de um hospital · página temporária onde a
+ * chefe monta o mês de todo mundo (não só o dela). Um turno = um médico
+ * escalado numa janela de um dia. Vive no user_state como as propostas.
+ */
+export interface TurnoEquipe {
+  /** YYYY-MM-DD. */
+  data: string;
+  /** Rótulo da janela (bate com Janela.rotulo). */
+  janela: string;
+  /** Nome do médico exatamente como está no roster. */
+  medico: string;
+}
+
+export interface EscalaEquipe {
+  hospitalId: string;
+  /** YYYY-MM. */
+  mesISO: string;
+  medicos: string[];
+  janelas: Janela[];
+  turnos: TurnoEquipe[];
+  atualizadaEm: string;
+}

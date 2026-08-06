@@ -81,7 +81,7 @@ type FonteRecord = { arquivo: string; nome: string; estilo: string; b64: string 
 let fontesCache: FonteRecord[] | null = null;
 let logoCache: string | null = null;
 
-async function carregarFontes(pdf: jsPDF): Promise<void> {
+export async function carregarFontes(pdf: jsPDF): Promise<void> {
   if (!fontesCache) {
     const lista = [
       { arquivo: 'Fraunces-Regular.ttf', nome: 'Fraunces', estilo: 'normal' },
@@ -118,7 +118,7 @@ function arrayBufferToBase64(buf: ArrayBuffer): string {
   return btoa(binary);
 }
 
-async function logoComoPNG(): Promise<string> {
+export async function logoComoPNG(): Promise<string> {
   if (logoCache) return logoCache;
   return new Promise((resolve, reject) => {
     const img = new Image();

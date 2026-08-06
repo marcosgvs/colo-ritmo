@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type {
   Bloco,
+  EscalaEquipe,
   EscalaImportada,
   Hospital,
   Preferencias,
@@ -11,6 +12,7 @@ import { supabase } from '@/lib/supabase';
 import { marcarConflitos } from '@/lib/data';
 
 const MAX_PROPOSTAS_HISTORICO = 10;
+const MAX_ESCALAS_EQUIPE = 6;
 
 /**
  * Modo espelho · Marcos (dev) vê o state da Mariana (usuária real) ao vivo
@@ -46,6 +48,7 @@ export interface UserStateBlob {
   preferencias?: Preferencias;
   escalasImportadas?: EscalaImportada[];
   propostasMontar?: PropostaHistorico[];
+  escalasEquipe?: EscalaEquipe[];
   /** null explícito = desconectado · chave ausente = blob antigo (preserva). */
   gcalConfig?: GcalConfig | null;
   updatedAt?: string;
@@ -62,6 +65,7 @@ export interface UserStateValor {
   preferencias: Preferencias;
   escalasImportadas: EscalaImportada[];
   propostasMontar: PropostaHistorico[];
+  escalasEquipe: EscalaEquipe[];
   gcalConfig?: GcalConfig;
 }
 
@@ -97,6 +101,7 @@ const STATE_VAZIO: UserStateValor = {
   preferencias: { nome: '', hospitaisPreferidos: [] },
   escalasImportadas: [],
   propostasMontar: [],
+  escalasEquipe: [],
 };
 
 function mergeState(prev: UserStateValor, next: Partial<UserStateValor>): UserStateValor {
@@ -106,6 +111,7 @@ function mergeState(prev: UserStateValor, next: Partial<UserStateValor>): UserSt
     preferencias: next.preferencias ?? prev.preferencias,
     escalasImportadas: next.escalasImportadas ?? prev.escalasImportadas,
     propostasMontar: next.propostasMontar ?? prev.propostasMontar,
+    escalasEquipe: next.escalasEquipe ?? prev.escalasEquipe,
     gcalConfig:
       // setar como null/undefined zera (desconectar) · sem chave preserva
       'gcalConfig' in next ? next.gcalConfig ?? undefined : prev.gcalConfig,
@@ -153,6 +159,7 @@ export function useUserState(userId: string | null): UserStateAPI {
           preferencias: valor.preferencias,
           escalasImportadas: valor.escalasImportadas,
           propostasMontar: valor.propostasMontar.slice(0, MAX_PROPOSTAS_HISTORICO),
+          escalasEquipe: valor.escalasEquipe.slice(0, MAX_ESCALAS_EQUIPE),
           // null explícito propaga "desconectado" pros outros devices via realtime
           gcalConfig: valor.gcalConfig ?? null,
           updatedAt: new Date().toISOString(),
@@ -256,6 +263,7 @@ export function useUserState(userId: string | null): UserStateAPI {
               preferencias: blob.preferencias ?? STATE_VAZIO.preferencias,
               escalasImportadas: blob.escalasImportadas ?? [],
               propostasMontar: blob.propostasMontar ?? [],
+              escalasEquipe: blob.escalasEquipe ?? [],
               gcalConfig: blob.gcalConfig ?? undefined,
             }
           : // Primeiro acesso · começa vazio · App detecta hospitais={} e
@@ -297,6 +305,7 @@ export function useUserState(userId: string | null): UserStateAPI {
             preferencias: novoState.preferencias ?? prev.preferencias,
             escalasImportadas: novoState.escalasImportadas ?? prev.escalasImportadas,
             propostasMontar: novoState.propostasMontar ?? prev.propostasMontar,
+            escalasEquipe: novoState.escalasEquipe ?? prev.escalasEquipe,
             gcalConfig:
               // null explícito = desconectou em outro device · chave ausente =
               // blob antigo, preserva o local

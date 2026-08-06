@@ -28,6 +28,7 @@ const NAV_KEYS_VALIDOS: NavKey[] = [
   'mes',
   'lista',
   'montar',
+  'equipe',
   'hospitais',
   'financeiro',
   'sync',
@@ -70,6 +71,7 @@ const Sync = lazy(() => import('@/views/Sync').then((m) => ({ default: m.Sync })
 const Hospitais = lazy(() => import('@/views/Hospitais').then((m) => ({ default: m.Hospitais })));
 const Trocas = lazy(() => import('@/views/Trocas').then((m) => ({ default: m.Trocas })));
 const MontarEscala = lazy(() => import('@/views/MontarEscala').then((m) => ({ default: m.MontarEscala })));
+const EscalaEquipe = lazy(() => import('@/views/EscalaEquipe').then((m) => ({ default: m.EscalaEquipe })));
 const Usuario = lazy(() => import('@/views/Usuario').then((m) => ({ default: m.Usuario })));
 const Inbox = lazy(() => import('@/views/Inbox').then((m) => ({ default: m.Inbox })));
 const Auditoria = lazy(() => import('@/views/Auditoria').then((m) => ({ default: m.Auditoria })));
@@ -654,6 +656,26 @@ function ViewSwitch({
                 p,
                 ...userState.state.propostasMontar.filter((x) => x.id !== p.id),
               ].slice(0, 10),
+            })
+          }
+        />
+      );
+
+    case 'equipe':
+      return (
+        <EscalaEquipe
+          hospitais={state.hospitais}
+          escalasImportadas={state.escalasImportadas}
+          escalasEquipe={state.escalasEquipe}
+          onSalvar={(e) =>
+            // upsert por hospital+mês · a mais recente vai pra frente
+            userState.setState({
+              escalasEquipe: [
+                e,
+                ...userState.state.escalasEquipe.filter(
+                  (x) => !(x.hospitalId === e.hospitalId && x.mesISO === e.mesISO),
+                ),
+              ].slice(0, 6),
             })
           }
         />

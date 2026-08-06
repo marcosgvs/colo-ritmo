@@ -20,7 +20,8 @@ export type NavKey =
   | 'conflitos'
   | 'usuario'
   | 'inbox'
-  | 'auditoria';
+  | 'auditoria'
+  | 'equipe';
 
 interface NavItem {
   key: NavKey;
@@ -44,6 +45,7 @@ export const NAV_ITEMS: NavItem[] = [
   { key: 'mes',        label: 'mês',         icon: 'grid',     roles: ['medica', 'parceiro', 'admin'] },
   { key: 'lista',      label: 'lista',       icon: 'list',     roles: ['medica', 'parceiro', 'admin'] },
   { key: 'montar',     label: 'montar',      icon: 'sparkle',  roles: ['medica'] },
+  { key: 'equipe',     label: 'equipe',      icon: 'people',   roles: ['medica', 'admin'] },
   { key: 'hospitais',  label: 'hospitais',   icon: 'hospital', roles: ['medica'] },
   { key: 'financeiro', label: 'financeiro',  icon: 'coin',     roles: ['medica'] },
   { key: 'sync',       label: 'sincronizar', icon: 'sync',     roles: ['medica'] },
