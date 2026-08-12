@@ -4,5 +4,15 @@
     { "path": "./tsconfig.app.json" },
     { "path": "./tsconfig.node.json" },
     { "path": "./tsconfig.api.json" }
-  ]
+  ],
+  // O @vercel/node compila cada function lendo ESTE tsconfig (não o
+  // tsconfig.api.json) · sem o alias aqui, api/* que importa src/lib
+  // com "@/…" quebra o deploy com TS2307. O `tsc -b` local ignora
+  // compilerOptions em solution file, então isso não muda nada local.
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    }
+  }
 }
