@@ -372,6 +372,7 @@ const EMOJI_CATEGORIA: Record<string, string> = {
   'alimentação': '🍼',
   'eletrônicos': '📡',
   higiene: '🧷',
+  roupinhas: '👕',
 };
 
 interface CardItemProps {
@@ -551,12 +552,37 @@ function CardItem({ item, pontos, onAtualizar, onRemover, onRegistrarPreco }: Ca
         )}
         <button
           type="button"
+          aria-label={`tirar ${item.nome} da lista`}
+          title="remover da lista"
           onClick={() => {
             if (window.confirm(`tirar "${item.nome}" da lista?`)) void onRemover(item.id);
           }}
-          style={{ ...botaoFantasma, color: 'var(--coral-ink)', marginLeft: 'auto' }}
+          style={{
+            marginLeft: 'auto',
+            width: 32,
+            height: 32,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: 999,
+            border: 'none',
+            background: 'transparent',
+            color: 'var(--ink-3)',
+            cursor: 'pointer',
+          }}
         >
-          remover
+          <svg
+            width={15}
+            height={15}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.8}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13a1 1 0 001 1h8a1 1 0 001-1l1-13M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2" />
+          </svg>
         </button>
       </div>
 
