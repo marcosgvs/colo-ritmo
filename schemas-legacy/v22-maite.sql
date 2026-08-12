@@ -228,7 +228,8 @@ select cron.schedule(
   '0 12,21 * * *',
   $cron$
   select net.http_post(
-    url := 'https://colopediatria.com.br/api/cron/radar-precos',
+    -- radar vive dentro de /api/maite (função única · limite de 12 do Hobby)
+    url := 'https://colopediatria.com.br/api/maite?acao=radar',
     headers := jsonb_build_object(
       'Authorization', 'Bearer ' || (select value from public.app_settings where key = 'cron_secret'),
       'Content-Type', 'application/json'),

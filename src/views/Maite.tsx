@@ -209,7 +209,7 @@ function AdicionarPorLink({ onSalvar }: { onSalvar: (novo: NovoItemMaite) => Pro
     setExtraindo(true);
     setAvisos([]);
     try {
-      const resp = await fetch('/api/maite/extrair-produto', {
+      const resp = await fetch('/api/maite?acao=extrair', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
         body: JSON.stringify({ url: link }),
@@ -394,7 +394,7 @@ function CardItem({ item, pontos, onAtualizar, onRemover, onRegistrarPreco }: Ca
     if (!item.url) return;
     setAtualizando(true);
     try {
-      const resp = await fetch('/api/maite/extrair-produto', {
+      const resp = await fetch('/api/maite?acao=extrair', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
         body: JSON.stringify({ url: item.url }),
