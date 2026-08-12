@@ -137,8 +137,8 @@ export function Maite({ userId }: MaiteProps) {
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(330px, 1fr))',
-          gap: isMobile ? 12 : 18,
+          gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(340px, 1fr))',
+          gap: isMobile ? 14 : 22,
           marginTop: isMobile ? 16 : 24,
         }}
       >
@@ -182,7 +182,7 @@ function CardNumero({ rotulo, valor, corInk, sub }: { rotulo: string; valor: str
         background: 'var(--bg)',
         border: '1px solid var(--line)',
         borderRadius: 14,
-        padding: '16px 20px',
+        padding: '20px 24px',
       }}
     >
       <Eyebrow>{rotulo}</Eyebrow>
@@ -413,21 +413,21 @@ function CardItem({ item, pontos, onAtualizar, onRemover, onRegistrarPreco }: Ca
       style={{
         background: 'var(--bg)',
         border: `1px solid ${abaixoDoAlvo && !resolvido ? 'var(--sage)' : 'var(--line)'}`,
-        borderRadius: 16,
-        padding: 16,
+        borderRadius: 18,
+        padding: 22,
         display: 'flex',
         flexDirection: 'column',
-        gap: 12,
+        gap: 16,
         opacity: resolvido ? 0.72 : 1,
         boxShadow: 'var(--shadow-sm)',
       }}
     >
-      <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+      <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
         <div
           style={{
-            width: 56,
-            height: 56,
-            flex: '0 0 56px',
+            width: 62,
+            height: 62,
+            flex: '0 0 62px',
             borderRadius: 12,
             background: 'var(--bg-alt)',
             border: '1px solid var(--line)',
@@ -445,10 +445,10 @@ function CardItem({ item, pontos, onAtualizar, onRemover, onRegistrarPreco }: Ca
           )}
         </div>
         <div style={{ minWidth: 0, flex: 1 }}>
-          <div style={{ font: '600 14px/1.35 var(--font-body)', color: 'var(--ink)', overflowWrap: 'break-word' }}>
+          <div style={{ font: '600 14px/1.5 var(--font-body)', color: 'var(--ink)', overflowWrap: 'break-word' }}>
             {item.nome}
           </div>
-          <div style={{ marginTop: 4, font: '400 12px/1.4 var(--font-body)', color: 'var(--ink-3)' }}>
+          <div style={{ marginTop: 6, font: '400 12px/1.4 var(--font-body)', color: 'var(--ink-3)' }}>
             {item.url ? (
               <a href={item.url} target="_blank" rel="noreferrer" style={{ color: 'var(--lavender-ink)', textDecoration: 'none' }}>
                 {item.loja ?? 'abrir na loja'} ↗
@@ -460,8 +460,8 @@ function CardItem({ item, pontos, onAtualizar, onRemover, onRegistrarPreco }: Ca
         </div>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
-        <span style={{ font: '500 26px/1 var(--font-display)', color: abaixoDoAlvo ? 'var(--sage-ink)' : 'var(--ink)' }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
+        <span style={{ font: '500 28px/1 var(--font-display)', color: abaixoDoAlvo ? 'var(--sage-ink)' : 'var(--ink)' }}>
           {item.precoAtual != null ? fmtBRL(item.precoAtual) : '—'}
         </span>
         {item.precoTabela != null && item.precoAtual != null && item.precoTabela > item.precoAtual && (
@@ -472,7 +472,7 @@ function CardItem({ item, pontos, onAtualizar, onRemover, onRegistrarPreco }: Ca
         <Sparkline pontos={pontos} />
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <Pill kind={STATUS_KIND[item.status]}>{STATUS_LABEL[item.status]}</Pill>
         {editandoAlvo ? (
           <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
@@ -509,12 +509,22 @@ function CardItem({ item, pontos, onAtualizar, onRemover, onRegistrarPreco }: Ca
       </div>
 
       {item.obs && (
-        <div style={{ font: '400 12px/1.5 var(--font-body)', color: 'var(--ink-2)', background: 'var(--bg-alt)', borderRadius: 10, padding: '8px 10px' }}>
+        <div style={{ font: '400 12px/1.65 var(--font-body)', color: 'var(--ink-2)', background: 'var(--bg-alt)', borderRadius: 12, padding: '12px 14px' }}>
           {item.obs}
         </div>
       )}
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 'auto' }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          flexWrap: 'wrap',
+          marginTop: 'auto',
+          borderTop: '1px solid var(--line)',
+          paddingTop: 14,
+        }}
+      >
         <select
           value={item.status}
           onChange={(e) => void onAtualizar(item.id, { status: e.target.value as StatusMaite })}
