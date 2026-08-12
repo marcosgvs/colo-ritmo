@@ -8,7 +8,8 @@ export type IconName =
   | 'hospital'
   | 'sparkle'
   | 'sync'
-  | 'coin';
+  | 'coin'
+  | 'heart';
 
 interface NavIconProps {
   name: IconName;
@@ -98,6 +99,12 @@ export function NavIcon({ name }: NavIconProps) {
           <circle cx="12" cy="12" r="9" />
           <path d="M9 9h4a2 2 0 010 4h-3a2 2 0 000 4h5" />
           <path d="M12 6v2M12 16v2" />
+        </svg>
+      );
+    case 'heart':
+      return (
+        <svg {...props}>
+          <path d="M12 20s-7-4.6-9-9c-1.2-2.7.4-6 3.5-6 2 0 3.5 1.2 4.2 2.6.2.4.4.4.6 0C12 6.2 13.5 5 15.5 5c3.1 0 4.7 3.3 3.5 6-2 4.4-7 9-7 9z" />
         </svg>
       );
   }

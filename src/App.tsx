@@ -29,6 +29,7 @@ const NAV_KEYS_VALIDOS: NavKey[] = [
   'lista',
   'montar',
   'equipe',
+  'maite',
   'hospitais',
   'financeiro',
   'sync',
@@ -76,6 +77,7 @@ const Usuario = lazy(() => import('@/views/Usuario').then((m) => ({ default: m.U
 const Inbox = lazy(() => import('@/views/Inbox').then((m) => ({ default: m.Inbox })));
 const Auditoria = lazy(() => import('@/views/Auditoria').then((m) => ({ default: m.Auditoria })));
 const Time = lazy(() => import('@/views/Time').then((m) => ({ default: m.Time })));
+const Maite = lazy(() => import('@/views/Maite').then((m) => ({ default: m.Maite })));
 
 function ViewLoading() {
   return (
@@ -694,6 +696,12 @@ function ViewSwitch({
           onSalvarGcalConfig={(c) => userState.setState({ gcalConfig: c })}
         />
       );
+
+    case 'maite':
+      // lista compartilhada do casal · tabelas próprias, fora do user_state
+      // (o gate de carregando/erro lá em cima é do user_state; a Maite tem
+      // os estados dela no próprio hook)
+      return <Maite userId={userId} />;
 
     case 'inbox':
       return <Inbox />;

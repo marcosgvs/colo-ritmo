@@ -6,7 +6,9 @@
   "functions": {
     "api/extrair-escala.ts": { "maxDuration": 120 },
     "api/montar-escala.ts": { "maxDuration": 120 },
-    "api/regras-parse.ts": { "maxDuration": 60 }
+    "api/regras-parse.ts": { "maxDuration": 60 },
+    "api/maite/extrair-produto.ts": { "maxDuration": 60 },
+    "api/cron/radar-precos.ts": { "maxDuration": 120 }
   },
   "redirects": [
     { "source": "/", "destination": "/ritmo/", "permanent": false }
