@@ -1,4 +1,4 @@
-import type { Bloco, BlocoPlantao, HospitaisMap } from '@/types';
+import type { Bloco, BlocoPlantao, HospitaisMap } from '../types/index.js';
 
 /**
  * Conflito de agenda · só sobreposição.

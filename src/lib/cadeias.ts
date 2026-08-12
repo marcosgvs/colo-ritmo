@@ -1,4 +1,4 @@
-import type { Bloco } from '@/types';
+import type { Bloco } from '../types/index.js';
 import { adicionaDia } from './dates.js';
 
 /**

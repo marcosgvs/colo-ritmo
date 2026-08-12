@@ -1,4 +1,4 @@
-import type { Bloco, BlocoPlantao, Hospital, HospitaisMap } from '@/types';
+import type { Bloco, BlocoPlantao, Hospital, HospitaisMap } from '../types/index.js';
 import { fmtRange, fromISO, toISO } from './dates.js';
 
 /**

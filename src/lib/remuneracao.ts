@@ -3,7 +3,7 @@ import type {
   BlocoPlantao,
   Hospital,
   HospitaisMap,
-} from '@/types';
+} from '../types/index.js';
 import { fromISO } from './dates.js';
 
 /**
