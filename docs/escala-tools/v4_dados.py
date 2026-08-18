@@ -32,6 +32,15 @@ MINIMOS = {          # (manhã, tarde, noite)
     "sábado":  (10,  8, 7),
     "domingo": ( 9,  8, 7),
 }
+# regra em vigor até setembro/26 — medir jan–set pela regra nova seria cobrar do
+# passado algo que não existia (doc de referência §2)
+MINIMOS_ANTIGOS = {
+    "útil":    (11, 8, 7),
+    "sábado":  ( 9, 7, 6),
+    "domingo": ( 9, 7, 6),
+}
+VIGENCIA_NOVA = 10          # de outubro/26 em diante vale a regra nova
+
 NOTA_MINIMOS = ("Regra da Mari de 13/08/26, vale da escala de outubro em diante. "
                 "Substitui 11/8/7 e 9/7/6. A 10ª da manhã de sábado é sempre a "
                 "Janaina (8–13h); ela nunca faz domingo. Feriado escala como o dia "

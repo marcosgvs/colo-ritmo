@@ -266,10 +266,12 @@ def aba_config(wb):
             cel.font = Font(name=F, bold=True, size=9, color="FFFFFF")
             cel.fill = PatternFill("solid", fgColor=LAVI)
 
-    # cobertura mínima — linhas 4,5,6 são referenciadas pelas abas mensais
+    # cobertura mínima — DOIS blocos, porque a regra mudou em outubro/26.
+    # Linhas 4-6 = regra em vigor · linhas 9-11 = regra antiga (jan–set).
+    # As abas mensais apontam para o bloco da vigência do próprio mês.
     ws.cell(row=3, column=1, value="cobertura mínima por turno").font = Font(
         name=F, bold=True, size=11, color=LAVI)
-    cab(3, ["cobertura mínima", "manhã", "tarde", "noite"])
+    cab(3, ["em vigor · de out/26", "manhã", "tarde", "noite"])
     for i, tipo in enumerate(("útil", "sábado", "domingo")):
         m, t, n = D.MINIMOS[tipo]
         ws.cell(row=4 + i, column=1, value=tipo).font = Font(name=F, size=10, bold=True, color=INK)
@@ -281,12 +283,28 @@ def aba_config(wb):
     nota = ws.cell(row=4, column=6, value=D.NOTA_MINIMOS)
     nota.font = Font(name=F, size=9, color=INK2)
     nota.alignment = Alignment(wrap_text=True, vertical="top")
-    ws.merge_cells(start_row=4, start_column=6, end_row=6, end_column=7)
+    ws.merge_cells(start_row=4, start_column=6, end_row=7, end_column=7)
+    cab(8, ["até set/26 · histórico", "manhã", "tarde", "noite"])
+    for i, tipo in enumerate(("útil", "sábado", "domingo")):
+        m, t, n = D.MINIMOS_ANTIGOS[tipo]
+        ws.cell(row=9 + i, column=1, value=tipo).font = Font(name=F, size=10, color=INK2)
+        for j, v in enumerate((m, t, n)):
+            cel = ws.cell(row=9 + i, column=2 + j, value=v)
+            cel.font = Font(name=F, size=10, color=INK2)
+            cel.alignment = Alignment(horizontal="center")
+            cel.border = BOX
+    nota2 = ws.cell(row=9, column=6, value="Os meses de janeiro a setembro são medidos "
+                    "por ESTA regra. Cobrar deles o mínimo novo seria exigir do passado "
+                    "uma regra que ainda não existia.")
+    nota2.font = Font(name=F, size=9, italic=True, color=INK3)
+    nota2.alignment = Alignment(wrap_text=True, vertical="top")
+    ws.merge_cells(start_row=9, start_column=6, end_row=11, end_column=7)
 
     # tabela de códigos — linhas 9..20, referenciada pela aba SENIOR
-    ws.cell(row=8, column=1, value="tabela de códigos").font = Font(name=F, bold=True, size=11, color=LAVI)
-    cab(9, ["letra", "Senior", "horas", "conta manhã", "conta tarde", "conta noite", "turno"])
-    r = 10
+    ws.cell(row=13, column=1, value="tabela de códigos").font = Font(
+        name=F, bold=True, size=11, color=LAVI)
+    cab(14, ["letra", "Senior", "horas", "conta manhã", "conta tarde", "conta noite", "turno"])
+    r = 15
     for letra, (rot, hora, horas, cod, cm, ct, cn) in D.TURNOS.items():
         ws.cell(row=r, column=1, value=letra).font = Font(name=F, bold=True, size=10, color=INK)
         ws.cell(row=r, column=2, value=cod or "")
@@ -514,7 +532,8 @@ def aba_mes(wb, mes, DIAS, fim_cod, pessoas):
             c.alignment = Alignment(horizontal="center")
             data = dt.date(2026, mes, i + 1)
             # feriado escala como o dia da semana em que cai
-            tipo = 4 if data.weekday() < 5 else (5 if data.weekday() == 5 else 6)
+            base = 4 if mes >= D.VIGENCIA_NOVA else 9
+            tipo = base + (0 if data.weekday() < 5 else (1 if data.weekday() == 5 else 2))
             ref = f"CONFIG!${get_column_letter(2+idx)}${tipo}"
             cf = ws.cell(row=rf, column=C_D1 + i,
                          value=f"=MAX(0,{ref}-{col}{rl})")
@@ -657,7 +676,7 @@ def aba_senior(wb, pessoas, fim_cod):
             c.alignment = Alignment(horizontal="center")
 
     nomes = {a: n for a, n, *_ in D.ROSTER}
-    faixa_cod = f"CONFIG!$A$10:$B${fim_cod}"
+    faixa_cod = f"CONFIG!$A$15:$B${fim_cod}"
     for k, (apelido, _ch) in enumerate(pessoas):
         lin = R_P0 + k
         c = ws.cell(row=lin, column=C_MED, value=nomes.get(apelido, apelido))
@@ -959,6 +978,10 @@ def main():
     aba_senior(wb, pessoas, fim_cod)
     aba_validador(wb, DIAS, pessoas)
     abas_mes_vivo(wb, ns)
+    # painel de leitura: DADOS DASH alimenta os gráficos, DASHBOARD é a capa
+    import v4_dashboard as VD
+    VD.aba_dados(wb)
+    VD.aba_dashboard(wb, mes_vivo="OUT", nome_mes="outubro")
 
     destino = os.path.join(AQUI, "Escala UTI HCB 2026 - unificada v4.xlsx")
     wb.save(destino)
