@@ -167,7 +167,8 @@ PROCEDENCIA = {
     7:  ("senior", "códigos Senior"),
     8:  ("senior", "códigos Senior"),
     9:  ("senior", "códigos Senior"),
-    10: ("montado", "escala montada pelo escala_out_v3.py — cobertura 100%, 48 convocações por critério público"),
+    10: ("montado", "escala montada · cobertura 100% nos 31 dias · 48 convocações + 6 "
+                     "ajustes no feriado 12/10, todos com motivo escrito na aba CONVOCAÇÕES"),
     11: ("vazio", "a montar"),
     12: ("vazio", "a montar"),
 }

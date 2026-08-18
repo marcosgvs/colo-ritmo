@@ -36,14 +36,17 @@ from validador import auditar, noturnas_por_mes
 
 # ------------------------------------------------------------- identidade colo
 INK, INK2, INK3 = "3A2E2A", "6B5C56", "9A8A82"
-LINE, CREME = "EBE8E5", "FFFAF3"
+LINE, LINE2 = "EBE8E5", "DAD3CD"
+CREME, CREME2 = "FFFAF3", "FAF3E8"   # bg e surface dos tokens
 LAV, LAVI, LAVS = "A299CB", "5A4E8C", "ECEAF4"
 AQUA, AQUAS = "9AD8E1", "E8F6F8"
 SAND, SANDS = "E8C79A", "FBF1E1"
 CORAL, CORALI, CORALS = "E7A59C", "C77264", "FBE9E5"
 SAGE, SAGES = "A4D498", "ECF6E7"
 BLUES, PINK, OLIVES = "EAF2F9", "E79BC4", "F1EFE0"
-F = "Helvetica Neue"
+F = "Nunito"          # corpo e UI
+DISPLAY = "Fraunces"  # títulos
+MAO = "Caveat"        # sobretítulo à mão
 
 FILLS = {"M": SANDS, "T": BLUES, "D": SAND, "N": LAVI, "NT": LAV, "C": "FAEAF2",
          "J": AQUAS, "E": OLIVES, "A": LINE, "FE": AQUA, "LM": SAGE, "AB": PINK}
@@ -85,6 +88,9 @@ def carregar_dados():
             DIAS.setdefault(data, {}).setdefault(p, cel)   # códigos Senior têm prioridade
     # outubro: plano montado pelo v3
     ns = runpy.run_path(os.path.join(AQUI, "escala_out_v3.py"))
+    # camada de ajustes com motivo por escrito (ver ajustes_out.py)
+    import ajustes_out
+    ajustes_out.aplicar(ns["PLAN"])
     for apelido, por_dia in ns["PLAN"].items():
         for dia, letra in por_dia.items():
             data = dt.date(2026, 10, dia)
@@ -95,11 +101,25 @@ def carregar_dados():
 # ============================================================== abas
 def estilo_titulo(ws, texto, sub=""):
     c = ws.cell(row=1, column=1, value=texto)
-    c.font = Font(name=F, bold=True, size=15, color=LAVI)
+    c.font = Font(name=DISPLAY, bold=True, size=15, color=INK)
     if sub:
         s = ws.cell(row=1, column=4, value=sub)
-        s.font = Font(name=F, size=9, color=INK3)
+        s.font = Font(name=F, size=9, italic=True, color=INK3)
     ws.sheet_view.showGridLines = False
+
+
+def creme(ws, ate_linha, ate_coluna):
+    """pinta o creme por baixo de tudo — '#FFFAF3 · fundo de TUDO' nos tokens.
+
+    Roda ANTES dos preenchimentos específicos não daria certo (a ordem de escrita
+    é outra), então só pinta célula que ficou sem fill próprio.
+    """
+    vazio = ("00000000", None)
+    for r in range(1, ate_linha + 1):
+        for c in range(1, ate_coluna + 1):
+            cel = ws.cell(row=r, column=c)
+            if cel.fill is None or cel.fill.fgColor.rgb in vazio:
+                cel.fill = PatternFill("solid", fgColor=CREME)
 
 
 def aba_leiame(wb, rel_grade):
@@ -115,7 +135,7 @@ def aba_leiame(wb, rel_grade):
     def secao(titulo):
         nonlocal r
         c = ws.cell(row=r, column=1, value=titulo)
-        c.font = Font(name=F, bold=True, size=11, color=LAVI)
+        c.font = Font(name=DISPLAY, bold=True, size=11, color=LAVI)
         r += 1
 
     def linha(a, b="", cor=INK2, negrito=False):
@@ -210,6 +230,7 @@ def aba_leiame(wb, rel_grade):
         "a matriz aparece vazia. Abrir e escolher o mês em B1 resolve.",
     ):
         linha("·", falta)
+    creme(ws, r + 2, 8)
     return ws
 
 
@@ -239,6 +260,11 @@ def aba_cadastro(wb):
             cel.border = BOX
             if i == 4:
                 cel.fill = PatternFill("solid", fgColor=grupos.get(grupo, CREME))
+        if (r % 2) == 1:                      # banda quente alternada
+            for i in range(1, 9):
+                cel = ws.cell(row=r, column=i)
+                if cel.fill is None or cel.fill.fgColor.rgb in ("00000000", None):
+                    cel.fill = PatternFill("solid", fgColor=CREME2)
         ws.row_dimensions[r].height = 26
         r += 1
     r += 1
@@ -248,6 +274,7 @@ def aba_cadastro(wb):
         ws.cell(row=r, column=1, value=apelido).font = Font(name=F, size=9, bold=True, color=INK3)
         ws.cell(row=r, column=2, value=motivo).font = Font(name=F, size=9, color=INK3)
         r += 1
+    creme(ws, r + 2, 8)
     ws.freeze_panes = "C4"
     return ws
 
@@ -270,7 +297,7 @@ def aba_config(wb):
     # Linhas 4-6 = regra em vigor · linhas 9-11 = regra antiga (jan–set).
     # As abas mensais apontam para o bloco da vigência do próprio mês.
     ws.cell(row=3, column=1, value="cobertura mínima por turno").font = Font(
-        name=F, bold=True, size=11, color=LAVI)
+        name=DISPLAY, bold=True, size=11, color=LAVI)
     cab(3, ["em vigor · de out/26", "manhã", "tarde", "noite"])
     for i, tipo in enumerate(("útil", "sábado", "domingo")):
         m, t, n = D.MINIMOS[tipo]
@@ -302,7 +329,7 @@ def aba_config(wb):
 
     # tabela de códigos — linhas 9..20, referenciada pela aba SENIOR
     ws.cell(row=13, column=1, value="tabela de códigos").font = Font(
-        name=F, bold=True, size=11, color=LAVI)
+        name=DISPLAY, bold=True, size=11, color=LAVI)
     cab(14, ["letra", "Senior", "horas", "conta manhã", "conta tarde", "conta noite", "turno"])
     r = 15
     for letra, (rot, hora, horas, cod, cm, ct, cn) in D.TURNOS.items():
@@ -323,7 +350,7 @@ def aba_config(wb):
     # cota de fds em férias
     r += 1
     ws.cell(row=r, column=1, value="cota de fds em mês com férias").font = Font(
-        name=F, bold=True, size=11, color=LAVI)
+        name=DISPLAY, bold=True, size=11, color=LAVI)
     r += 1
     cab(r, ["CH semanal", "férias 2 sem", "férias 1 sem", "sem férias"])
     r += 1
@@ -338,7 +365,7 @@ def aba_config(wb):
     # feriados do ano — eram dado escondido no Python; agora vivem aqui
     r += 1
     ws.cell(row=r, column=1, value="feriados de 2026").font = Font(
-        name=F, bold=True, size=11, color=LAVI)
+        name=DISPLAY, bold=True, size=11, color=LAVI)
     nf = ws.cell(row=r, column=5, value=D.NOTA_FERIADOS)
     nf.font = Font(name=F, size=9, color=INK2)
     nf.alignment = Alignment(wrap_text=True, vertical="top")
@@ -361,7 +388,7 @@ def aba_config(wb):
 
     # regras duras
     r += 1
-    ws.cell(row=r, column=1, value="regras duras").font = Font(name=F, bold=True, size=11, color=LAVI)
+    ws.cell(row=r, column=1, value="regras duras").font = Font(name=DISPLAY, bold=True, size=11, color=LAVI)
     r += 1
     cab(r, ["regra", "o que é", "base", "tratamento", "nota"])
     ws.cell(row=r, column=2).value = "o que é"
@@ -378,6 +405,7 @@ def aba_config(wb):
         ws.merge_cells(start_row=r, start_column=5, end_row=r, end_column=7)
         ws.row_dimensions[r].height = 30
         r += 1
+    creme(ws, r + 2, 7)
     return ws, fim_cod
 
 
@@ -401,8 +429,8 @@ def aba_mes(wb, mes, DIAS, fim_cod, pessoas):
     ndias = (dt.date(2026, mes % 12 + 1, 1) - dt.timedelta(days=1)).day if mes < 12 else 31
 
     t = ws.cell(row=R_TIT, column=1, value=f"{MESES_LONGO[mes-1]} · 2026")
-    t.font = Font(name=F, bold=True, size=14, color=LAVI)
-    sub = ws.cell(row=R_TIT, column=C_D1, value=nota)
+    t.font = Font(name=DISPLAY, bold=True, size=14, color=INK)
+    sub = ws.cell(row=R_TIT, column=C_D1 + 6, value=nota)
     sub.font = Font(name=F, size=9, italic=True, color=INK3)
 
     ws.column_dimensions["A"].width = 14
@@ -545,6 +573,7 @@ def aba_mes(wb, mes, DIAS, fim_cod, pessoas):
             operator="greaterThan", formula=["0"],
             fill=PatternFill("solid", bgColor=CORAL),
             font=Font(name=F, size=8, bold=True, color="FFFFFF")))
+    creme(ws, linhas_falta[-1] + 2, C_TOT + len(COLS_TOT))
     ws.freeze_panes = f"{get_column_letter(C_D1)}{R_P0}"
     return ws
 
@@ -637,6 +666,7 @@ def aba_painel(wb, pessoas, oficial):
                      value=f'=IF({L}{lin}="","",IF({L}{lin}={get_column_letter(col+1)}{lin},"","⚠"))')
         cd.font = Font(name=F, size=9, bold=True, color=CORALI)
         cd.alignment = Alignment(horizontal="center")
+    creme(ws, R_P0 + len(pessoas) + 1, col + 4)
     ws.freeze_panes = "C8"
     return ws
 
@@ -646,7 +676,7 @@ def aba_senior(wb, pessoas, fim_cod):
     ws.sheet_properties.tabColor = SAND
     ws.sheet_view.showGridLines = False
     t = ws.cell(row=R_TIT, column=1, value="códigos Senior")
-    t.font = Font(name=F, bold=True, size=14, color=LAVI)
+    t.font = Font(name=DISPLAY, bold=True, size=14, color=INK)
     sel = ws.cell(row=R_TIT, column=C_CH, value="OUT")
     sel.font = Font(name=F, bold=True, size=13, color=CORALI)
     sel.fill = PatternFill("solid", fgColor=SANDS)
@@ -689,6 +719,7 @@ def aba_senior(wb, pessoas, fim_cod):
             cel.font = Font(name=F, size=8, color=INK)
             cel.alignment = Alignment(horizontal="center")
             cel.border = BOX
+    creme(ws, R_P0 + len(pessoas) + 1, C_DN)
     ws.freeze_panes = f"{get_column_letter(C_D1)}{R_P0}"
     return ws
 
@@ -757,7 +788,7 @@ def aba_validador(wb, DIAS, pessoas):
     def secao(titulo, cor, explicacao):
         nonlocal r
         c = ws.cell(row=r, column=1, value=titulo)
-        c.font = Font(name=F, bold=True, size=12, color=cor)
+        c.font = Font(name=DISPLAY, bold=True, size=12, color=cor)
         r += 1
         e = ws.cell(row=r, column=1, value=explicacao)
         e.font = Font(name=F, size=9, italic=True, color=INK2)
@@ -845,7 +876,7 @@ def aba_validador(wb, DIAS, pessoas):
 
     # adicional noturno
     c = ws.cell(row=r, column=1, value="ADICIONAL NOTURNO — horas em 22h–05h, por pessoa e mês")
-    c.font = Font(name=F, bold=True, size=12, color=LAVI)
+    c.font = Font(name=DISPLAY, bold=True, size=12, color=LAVI)
     r += 1
     e = ws.cell(row=r, column=1, value="Insumo da folha: a hora noturna vale 52min30s e o "
                 "adicional é de no mínimo 20% (art. 73 CLT). A noite de 19–07h cai inteira "
@@ -887,6 +918,7 @@ def aba_validador(wb, DIAS, pessoas):
         else:
             for i in range(1, 15):
                 ws.cell(row=r, column=i).value = None
+    creme(ws, r + 2, 14)
     ws.freeze_panes = "A4"
     return ws
 
@@ -916,6 +948,7 @@ def abas_mes_vivo(wb, ns):
         t.alignment = Alignment(wrap_text=True, vertical="top")
         for j in (1, 2, 3):
             ws.cell(row=i, column=j).border = BOX
+    creme(ws, len(atend) + 8, 3)
     ws.freeze_panes = "A5"
 
     ws2 = wb.create_sheet("CONVOCAÇÕES")
@@ -959,6 +992,45 @@ def abas_mes_vivo(wb, ns):
         for j in range(1, 5):
             ws2.cell(row=r, column=j).border = BOX
         r += 1
+    # ajustes do feriado, com o motivo colado em cada linha
+    import ajustes_out
+    r += 1
+    ws2.cell(row=r, column=1, value="ajustes do feriado 12/10").font = Font(
+        name=DISPLAY, bold=True, size=11, color=LAVI)
+    r += 1
+    for apelido, dia, letra, motivo in ajustes_out.AJUSTES:
+        ws2.cell(row=r, column=1, value=apelido).font = Font(
+            name=F, size=9, bold=True, color=INK)
+        cl = ws2.cell(row=r, column=2, value=f"{dia:02d}/10 {letra}")
+        cl.font = Font(name=F, size=9, bold=True, color=CORALI)
+        cl.alignment = Alignment(horizontal="center")
+        cm2 = ws2.cell(row=r, column=3, value=motivo)
+        cm2.font = Font(name=F, size=8, color=INK2)
+        cm2.alignment = Alignment(wrap_text=True, vertical="top")
+        ws2.merge_cells(start_row=r, start_column=3, end_row=r, end_column=4)
+        for j in range(1, 5):
+            ws2.cell(row=r, column=j).border = BOX
+        ws2.row_dimensions[r].height = 26
+        r += 1
+    r += 1
+    ws2.cell(row=r, column=1, value="o que NÃO foi atendido").font = Font(
+        name=DISPLAY, bold=True, size=11, color=CORALI)
+    r += 1
+    for tema, status, texto in ajustes_out.NAO_FEITO:
+        ws2.cell(row=r, column=1, value=tema).font = Font(
+            name=F, size=9, bold=True, color=INK)
+        cs = ws2.cell(row=r, column=2, value=status)
+        cs.font = Font(name=F, size=8, bold=True, color=CORALI)
+        cs.alignment = Alignment(wrap_text=True, vertical="top", horizontal="center")
+        ct2 = ws2.cell(row=r, column=3, value=texto)
+        ct2.font = Font(name=F, size=8, color=INK2)
+        ct2.alignment = Alignment(wrap_text=True, vertical="top")
+        ws2.merge_cells(start_row=r, start_column=3, end_row=r, end_column=4)
+        for j in range(1, 5):
+            ws2.cell(row=r, column=j).border = BOX
+        ws2.row_dimensions[r].height = 58
+        r += 1
+    creme(ws2, r + 2, 5)
     ws2.freeze_panes = "A6"
 
 
