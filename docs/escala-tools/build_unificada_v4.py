@@ -64,7 +64,11 @@ C_MED, C_CH = 1, 2
 C_D1 = 3                      # primeira coluna de dia (C)
 C_DN = C_D1 + 30              # última (AG) — sempre 31 colunas, geometria fixa
 COLS_TOT = ["CH mês", "fds", "SxN", "feriado", "meta", "saldo", "18h⚠", "N→T",
-            "cota fds", "fds⚠"]   # fds⚠ = excesso sobre a cota × fator do mês
+            "cota fds", "fds⚠", "sem⚠"]   # fds⚠ = excesso sobre cota × fator do mês
+# sem⚠ = maior jornada semanal da pessoa no mês. Teto de 44h (art. 7º XIII da
+# Constituição) e CH + 10h (art. 59 CLT, até 2h extra/dia). O mês pode fechar
+# na média e a semana estourar — em outubro isso aconteceu 39 vezes.
+JANELAS_SEMANA = [(0, 6), (7, 13), (14, 20), (21, 27), (28, 30)]
 C_TOT = C_DN + 1              # AH..AO
 R_TIT, R_DIA, R_DOW, R_FDS, R_SEX, R_FER, R_HDR, R_P0 = 1, 2, 3, 4, 5, 6, 7, 8
 
@@ -563,7 +567,10 @@ def aba_mes(wb, mes, DIAS, fim_cod, pessoas, r_cota):
              # se a pessoa carrega mais do que a fatia dela
              f'=IF({get_column_letter(C_TOT+8)}{lin}="","",'
              f'MAX(0,{get_column_letter(C_TOT+1)}{lin}-'
-             f'{get_column_letter(C_TOT+8)}{lin}*CONFIG!$E${r_cota}))']
+             f'{get_column_letter(C_TOT+8)}{lin}*CONFIG!$E${r_cota}))',
+             "=MAX(" + ",".join(
+                 f"SUMPRODUCT({expr_horas(lin, C_D1 + a2, C_D1 + b2)})"
+                 for a2, b2 in JANELAS_SEMANA) + ")"]
         for i, formula in enumerate(f):
             c = ws.cell(row=lin, column=C_TOT + i, value=formula)
             c.number_format = "0"      # hora aqui é inteira; meta já vem arredondada
@@ -605,6 +612,12 @@ def aba_mes(wb, mes, DIAS, fim_cod, pessoas, r_cota):
                          value=f"=MAX(0,{ref}-{col}{rl})")
             cf.font = Font(name=F, size=8, bold=True, color=CORALI)
             cf.alignment = Alignment(horizontal="center")
+    col_sem = get_column_letter(C_TOT + 10)
+    ws.conditional_formatting.add(
+        f"{col_sem}{R_P0}:{col_sem}{ultima}",
+        CellIsRule(operator="greaterThan", formula=["44"],
+                   fill=PatternFill("solid", bgColor=CORAL),
+                   font=Font(name=F, size=8, bold=True, color="FFFFFF")))
     col_exc = get_column_letter(C_TOT + 9)
     ws.conditional_formatting.add(
         f"{col_exc}{R_P0}:{col_exc}{ultima}",
@@ -1004,9 +1017,9 @@ def abas_mes_vivo(wb, ns):
     for ap, _d, _s in convoc:
         nconv[ap] = nconv.get(ap, 0) + 1
     import ajustes_out as AJ
-    av = ws2.cell(row=1, column=6, value=f"⚠ {AJ.APROVACAO['instancia']}: "
-                  f"{AJ.APROVACAO['status']} — {AJ.APROVACAO['enquanto_nao_aprovar']}")
-    av.font = Font(name=F, size=9, bold=True, color=CORALI)
+    av = ws2.cell(row=1, column=6, value=f"{AJ.APROVACAO['instancia']}: "
+                  f"{AJ.APROVACAO['status']}")
+    av.font = Font(name=F, size=9, italic=True, color=INK3)
     av.alignment = Alignment(wrap_text=True, vertical="top")
     ws2.merge_cells(start_row=1, start_column=6, end_row=3, end_column=10)
     exp = ws2.cell(row=2, column=1, value=(
@@ -1063,7 +1076,22 @@ def abas_mes_vivo(wb, ns):
         ws2.row_dimensions[r].height = 26
         r += 1
     r += 1
-    ws2.cell(row=r, column=1, value="o que NÃO foi atendido").font = Font(
+    ws2.cell(row=r, column=1, value="quem da rotina folga o feriado, e por quê").font = Font(
+        name=DISPLAY, bold=True, size=11, color=LAVI)
+    r += 1
+    for apelido, motivo in ajustes_out.FOLGAS:
+        ws2.cell(row=r, column=1, value=apelido).font = Font(
+            name=F, size=9, bold=True, color=INK)
+        cf2 = ws2.cell(row=r, column=3, value=motivo)
+        cf2.font = Font(name=F, size=8, color=INK2)
+        cf2.alignment = Alignment(wrap_text=True, vertical="top")
+        ws2.merge_cells(start_row=r, start_column=3, end_row=r, end_column=4)
+        for j in range(1, 5):
+            ws2.cell(row=r, column=j).border = BOX
+        ws2.row_dimensions[r].height = 26
+        r += 1
+    r += 1
+    ws2.cell(row=r, column=1, value="registro das decisões").font = Font(
         name=DISPLAY, bold=True, size=11, color=CORALI)
     r += 1
     for tema, status, texto in ajustes_out.NAO_FEITO:

@@ -92,6 +92,23 @@ def descanso_ok(ap, dia, turno):
     return True
 
 
+SEMANAS = [(1, 7), (8, 14), (15, 21), (22, 28), (29, 31)]
+TETO_CONSTITUCIONAL = 44          # art. 7º XIII da Constituição
+EXTRA_MAX = 10                    # art. 59 CLT: até 2h extra/dia
+
+
+def horas_semana(ap, dia):
+    ini, fim = next(w for w in SEMANAS if w[0] <= dia <= w[1])
+    return sum(HOURS.get(l, 0) for d, l in PLAN.get(ap, {}).items() if ini <= d <= fim)
+
+
+def teto_ok(ap, dia, turno):
+    """não criar semana acima do teto legal — o mês pode fechar e a semana estourar."""
+    ch = METAS.get(ap, 0)
+    novo = horas_semana(ap, dia) + HOURS.get(turno, 0)
+    return novo <= TETO_CONSTITUCIONAL and (not ch or novo <= ch + EXTRA_MAX)
+
+
 def pode_receber(ap, dia, turno):
     if ap in ROTINA or ap not in PLAN:
         return False
@@ -102,6 +119,8 @@ def pode_receber(ap, dia, turno):
     if turno not in TRANSFERIVEL or not eligible(ap, dia, turno):
         return False
     if not descanso_ok(ap, dia, turno):
+        return False
+    if not teto_ok(ap, dia, turno):
         return False
     # não estourar a própria cota ao receber
     alvo = alvo_fds(ap)
@@ -185,13 +204,30 @@ def estender_para_dia(dia, verbose=True):
 
 
 def fase2_feriado(verbose=True):
-    """12/10 sem a rotina, preenchido por plantonistas.
+    """12/10: primeiro a rotina pelo padrão do ano, depois plantonistas.
 
-    Tenta cada turno de forma independente: se a manhã não tem candidato elegível,
+    Entendimento corrigido em 18/08/26: a folga da manhã do feriado é pedido
+    INDIVIDUAL da MSalomão — o resto da rotina segue o padrão dos sete feriados
+    de 2026 (rotina na manhã, 4 a 6 pessoas). A política, com o motivo de cada
+    linha e de cada folga, vive em ajustes_out.py.
+
+    Cada turno é tentado de forma independente: se a manhã não tem candidato,
     isso não pode impedir a tarde de ser resolvida (era o bug da primeira versão).
     """
+    import ajustes_out
     postos, impossivel = [], []
     alvo = (14, 10, 7)
+    for apelido, dia, letra, _motivo in ajustes_out.AJUSTES:
+        if dia != FERIADO or PLAN.get(apelido, {}).get(dia):
+            continue
+        if any(PLAN[apelido].get(d) in AUSENTE for d in (dia,)):
+            continue
+        if not descanso_ok(apelido, dia, letra) or not teto_ok(apelido, dia, letra):
+            if verbose:
+                print(f"   ⚠ {apelido} barrado pela CLT (descanso/teto) — não escalado")
+            continue
+        PLAN[apelido][dia] = letra
+        postos.append((apelido, letra))
     for turno, idx in (("T", 1), ("M", 0), ("N", 2)):
         for _v in range(30):
             atual = cobertura(FERIADO)
@@ -210,7 +246,7 @@ def fase2_feriado(verbose=True):
             postos.append((cands[0][1], turno))
     if verbose:
         print(f"FASE 2 · feriado 12/10: {len(postos)} encaixes "
-              f"(rotina fora — o pedido da MSalomão vale)")
+              f"(rotina no padrão do ano · folga só da MSalomão, pedido individual)")
         for ap, t in postos:
             print(f"   {ap} → {t}")
         for t, q in impossivel:

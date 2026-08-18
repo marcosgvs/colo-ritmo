@@ -186,6 +186,7 @@ Calendário: 01/10 = quinta. Feriado: **12/10 N. Sra. Aparecida (segunda)**. Fds
 - Pool "já fez sexta-noite" a atualizar com as SN de setembro (Aline 4/09? — conferir grade: CaAbreu 4/09, JuliaFig 11+25/09, LuAlice, Marcia 2? — extrair da grade de setembro na hora de montar).
 - FDS extra: outubro é mês "sim" pra quem folgou em setembro (pool §3.4).
 - Aniversários: 29/10 Paula Abdo, 31/10 MayWobido (ambas sem folga de niver).
+- **MSalomão: folga na manhã do feriado 12/10 — pedido INDIVIDUAL** (corrigido pelo Marcos em 18/08/26: a leitura "rotineiros folgam a manhã do feriado" estava errada; os demais seguem o padrão do ano — rotina na manhã, como nos 7 feriados anteriores).
 - Feriado 12/10: usar contagem anual (aba FERIADO) — prioridade de folga = menor CH total + já fez todos; JuBrito pediu folga; Independência (07/09) foi o último contado.
 
 **Decisões do Marcos (17/08/26) para a montagem de outubro:**
