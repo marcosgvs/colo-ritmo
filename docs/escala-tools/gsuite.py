@@ -131,6 +131,21 @@ def converter_xlsx(caminho, nome=None, pasta_id=None):
     return f
 
 
+def atualizar_sheet(arquivo_id, caminho_xlsx):
+    """substitui o conteúdo de um Sheet nativo pelo xlsx, MANTENDO id e link.
+
+    Cuidado: isto sobrescreve. Só usar em aba que o gerador é dono — o mês vivo,
+    se alguém estiver preenchendo à mão, se perde.
+    """
+    from googleapiclient.http import MediaFileUpload
+    midia = MediaFileUpload(
+        caminho_xlsx,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        resumable=True)
+    return drive().files().update(fileId=arquivo_id, media_body=midia,
+                                  fields="id,name,modifiedTime").execute()
+
+
 if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else "teste"
     if cmd == "autorizar":

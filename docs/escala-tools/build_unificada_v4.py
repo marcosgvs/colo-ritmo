@@ -474,7 +474,7 @@ def aba_mes(wb, mes, DIAS, fim_cod, pessoas):
              f"=SUMPRODUCT(${L_D1}${R_FDS}:${L_DN}${R_FDS},{eh})",
              f'=SUMPRODUCT(${L_D1}${R_SEX}:${L_DN}${R_SEX},(${L_D1}{lin}:${L_DN}{lin}="N")*1)',
              f"=SUMPRODUCT(${L_D1}${R_FER}:${L_DN}${R_FER},{eh})",
-             f"={get_column_letter(C_CH)}{lin}*{semanas}",
+             f"=ROUND({get_column_letter(C_CH)}{lin}*{semanas},0)",
              f"={get_column_letter(C_TOT)}{lin}-{get_column_letter(C_TOT+4)}{lin}",
              f'=SUMPRODUCT((${L_D1}{lin}:${L_DN_1}{lin}="N")*'
              f'((${L_D2}{lin}:${L_DN}{lin}="M")+(${L_D2}{lin}:${L_DN}{lin}="E")'
@@ -482,7 +482,7 @@ def aba_mes(wb, mes, DIAS, fim_cod, pessoas):
              f'=SUMPRODUCT((${L_D1}{lin}:${L_DN_1}{lin}="N")*(${L_D2}{lin}:${L_DN}{lin}="T"))']
         for i, formula in enumerate(f):
             c = ws.cell(row=lin, column=C_TOT + i, value=formula)
-            c.number_format = "0" if i in (2, 6, 7) else "0.#"
+            c.number_format = "0"      # hora aqui é inteira; meta já vem arredondada
             c.font = Font(name=F, size=8, color=INK2 if i < 5 else INK)
             c.alignment = Alignment(horizontal="center")
             c.border = BOX
@@ -572,13 +572,13 @@ def aba_painel(wb, pessoas, oficial):
             for i, m in enumerate(MESES_PT):
                 cel = ws.cell(row=lin, column=col + i,
                               value=f"={m}!${get_column_letter(col_origem)}{lin}")
-                cel.number_format = "0" if rot == "sexta-noite" else "0.#"
+                cel.number_format = "0"
                 cel.font = Font(name=F, size=8, color=INK2)
                 cel.alignment = Alignment(horizontal="center")
             tot = ws.cell(row=lin, column=col + 12,
                           value=f"=SUM({get_column_letter(col)}{lin}:"
                                 f"{get_column_letter(col+11)}{lin})")
-            tot.number_format = "0" if rot == "sexta-noite" else "0.#"
+            tot.number_format = "0"
             tot.font = Font(name=F, size=8, bold=True, color=INK)
             tot.alignment = Alignment(horizontal="center")
             tot.fill = PatternFill("solid", fgColor=CREME)
