@@ -191,6 +191,10 @@ def aba_leiame(wb, rel_grade):
         ("JAN a DEZ", "a escala: matriz médico × dia. No rodapé, a lotação de cada turno em "
                       "cada dia e quanto falta pro mínimo. À direita, por pessoa: carga do mês, "
                       "fds, sexta-noite, feriado, meta, saldo e os dois alertas de jornada."),
+        ("OUT · DIA A DIA", "o mês em formato calendário: por dia e por turno, quem "
+                             "está onde, ausências e cobertura. É fórmula da aba do mês — "
+                             "trocou um plantão no dropdown, o dia a dia se refaz. Bom pra "
+                             "bater o olho e perceber o que está esquisito."),
         ("PAINEL ANO", "o comparativo do ano: saldo, fds, sexta-noite e feriado de cada pessoa "
                        "mês a mês, com acumulado. Onde existe a contagem manual antiga, ela "
                        "aparece ao lado pra conferência."),
@@ -459,8 +463,12 @@ def aba_mes(wb, mes, DIAS, fim_cod, pessoas, r_cota):
 
     t = ws.cell(row=R_TIT, column=1, value=f"{MESES_LONGO[mes-1]} · 2026")
     t.font = Font(name=DISPLAY, bold=True, size=14, color=INK)
-    sub = ws.cell(row=R_TIT, column=C_D1 + 6, value=nota)
-    sub.font = Font(name=F, size=9, italic=True, color=INK3)
+    t.comment = openpyxl.comments.Comment(f"De onde vem este mês: {nota}", "colo ritmo")
+    # legenda compacta sempre à vista — pra ninguém precisar decorar as siglas
+    sub = ws.cell(row=R_TIT, column=C_D1 + 6, value=(
+        "M manhã 7–13 · T tarde 13–19 · D dia 7–19 · N noite 19–7 · NT noitinha · "
+        "C chefia 10h · J Janaina 8–13 · E CEP · FE férias · LM licença · AB abono"))
+    sub.font = Font(name=F, size=8, italic=True, color=INK3)
 
     ws.column_dimensions["A"].width = 14
     ws.column_dimensions["B"].width = 5
@@ -778,6 +786,97 @@ def aba_senior(wb, pessoas, fim_cod):
             cel.border = BOX
     creme(ws, R_P0 + len(pessoas) + 1, C_DN)
     ws.freeze_panes = f"{get_column_letter(C_D1)}{R_P0}"
+    return ws
+
+
+def aba_dia_a_dia(wb, mes=10):
+    """o mês em formato calendário: por dia, por turno, quem está onde.
+
+    Tudo FÓRMULA sobre a aba do mês (FILTER + TEXTJOIN, que existem no Google
+    Sheets e no Excel 365): trocou um plantão no dropdown da matriz, este
+    calendário se refaz. Serve pra "perceber o que tá esquisito" — pedido do
+    Marcos em 18/08/26.
+    """
+    nome_mes = MESES_PT[mes - 1]
+    ws = wb.create_sheet(f"{nome_mes} · DIA A DIA",
+                         wb.sheetnames.index(nome_mes) + 1)
+    ws.sheet_properties.tabColor = CORALI
+    ws.sheet_view.showGridLines = False
+    t = ws.cell(row=1, column=1, value=f"{MESES_LONGO[mes-1]} · dia a dia")
+    t.font = Font(name=DISPLAY, bold=True, size=14, color=INK)
+    sub = ws.cell(row=1, column=4, value=(
+        "cada célula lista quem está no turno — é fórmula da aba do mês: "
+        "mudou lá, muda aqui na hora"))
+    sub.font = Font(name=F, size=9, italic=True, color=INK3)
+    ndias = (dt.date(2026, mes % 12 + 1, 1) - dt.timedelta(days=1)).day
+
+    colunas = [("dia", 5), ("", 5), ("manhã", 24), ("tarde", 24), ("noite", 24),
+               ("ausências", 16), ("cobertura", 13)]
+    for i, (h, w) in enumerate(colunas, start=1):
+        c = ws.cell(row=3, column=i, value=h)
+        c.font = Font(name=F, bold=True, size=9, color="FFFFFF")
+        c.fill = PatternFill("solid", fgColor=LAVI)
+        c.alignment = Alignment(horizontal="center")
+        ws.column_dimensions[get_column_letter(i)].width = w
+
+    nomes_rng = f"{nome_mes}!$A${R_P0}:$A${R_P0+65}"
+    def col_dia(d):
+        return get_column_letter(C_D1 + d - 1)
+
+    def formula_turno(d, letras):
+        col = col_dia(d)
+        rng = f"{nome_mes}!{col}${R_P0}:{col}${R_P0+65}"
+        cond = "+".join(f'({rng}="{l}")' for l in letras)
+        return (f'=IFERROR(TEXTJOIN(CHAR(10),TRUE,'
+                f'FILTER({nomes_rng},({cond})>0)),"—")')
+
+    for d in range(1, ndias + 1):
+        r = 3 + d
+        data = dt.date(2026, mes, d)
+        fds = data.weekday() >= 5
+        info_fer = D.FERIADOS_2026.get((mes, d))
+        cd = ws.cell(row=r, column=1, value=d)
+        cd.font = Font(name=F, bold=True, size=11,
+                       color="FFFFFF" if info_fer else INK)
+        cd.alignment = Alignment(horizontal="center", vertical="top")
+        rotulo = info_fer[1] if info_fer else WD_PT[data.weekday()]
+        cw = ws.cell(row=r, column=2, value=rotulo)
+        cw.font = Font(name=F, size=9, bold=bool(info_fer),
+                       color="FFFFFF" if info_fer else (CORALI if fds else INK3))
+        cw.alignment = Alignment(horizontal="center", vertical="top")
+        if info_fer:
+            cd.fill = PatternFill("solid", fgColor=CORAL)
+            cw.fill = PatternFill("solid", fgColor=CORALI)
+        elif fds:
+            for cc in (cd, cw):
+                cc.fill = PatternFill("solid", fgColor=LAVS)
+        for j, letras in ((3, ("M", "D", "C", "J")), (4, ("T", "D", "C")),
+                          (5, ("N", "NT"))):
+            cel = ws.cell(row=r, column=j, value=formula_turno(d, letras))
+            cel.font = Font(name=F, size=8, color=INK)
+            cel.alignment = Alignment(wrap_text=True, vertical="top")
+            cel.border = BOX
+            if fds or info_fer:
+                cel.fill = PatternFill("solid", fgColor=CREME2)
+        aus = ws.cell(row=r, column=6, value=formula_turno(d, ("FE", "LM", "AB")))
+        aus.font = Font(name=F, size=8, color=INK3)
+        aus.alignment = Alignment(wrap_text=True, vertical="top")
+        aus.border = BOX
+        col = col_dia(d)
+        # "M18 T12 N9 ✓" — sem denominador enganoso: quando sobra gente, o
+        # x/(x+falta) da versão anterior mostrava "18/18" como se o alvo fosse 18
+        f_falta = (f'{nome_mes}!{col}${R_P0+70}+{nome_mes}!{col}${R_P0+71}'
+                   f'+{nome_mes}!{col}${R_P0+72}')
+        cov = ws.cell(row=r, column=7, value=(
+            f'="M"&{nome_mes}!{col}${R_P0+67}&" T"&{nome_mes}!{col}${R_P0+68}'
+            f'&" N"&{nome_mes}!{col}${R_P0+69}'
+            f'&IF({f_falta}=0," ✓"," ⚠ falta "&({f_falta}))'))
+        cov.font = Font(name=F, size=8, color=INK2)
+        cov.alignment = Alignment(wrap_text=True, vertical="top")
+        cov.border = BOX
+        ws.row_dimensions[r].height = 150
+    creme(ws, 3 + ndias + 2, 8)
+    ws.freeze_panes = "C4"
     return ws
 
 
@@ -1124,6 +1223,7 @@ def main():
     _cfg, fim_cod, r_cota = aba_config(wb)
     for mes in range(1, 13):
         aba_mes(wb, mes, DIAS, fim_cod, pessoas, r_cota)
+    aba_dia_a_dia(wb, mes=10)
     aba_painel(wb, pessoas, oficial)
     aba_senior(wb, pessoas, fim_cod)
     aba_validador(wb, DIAS, pessoas)

@@ -116,6 +116,35 @@ def limpar_graficos(sid, dash_id):
     return pedidos
 
 
+LEGENDA = ("M manhã 7–13h · T tarde 13–19h · D dia 7–19h (12h) · N noite 19–7h (12h) · "
+           "NT noitinha 19–1h · C chefia 10h · J Janaina 8–13h · E CEP 4h · A administrativo · "
+           "FE férias · LM licença · AB abono de aniversário")
+CODIGOS_VALIDOS = ["M", "T", "D", "N", "NT", "C", "J", "E", "A", "P", "R", "FE", "LM", "AB"]
+MENSAIS = ["JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"]
+
+
+def dropdowns(ids):
+    """dropdown em toda célula de plantão das 12 mensais, com a legenda como
+    mensagem de ajuda — clicar na célula mostra o que cada sigla significa e a
+    setinha abre a lista pra trocar. strict=False: valor fora da lista vira
+    aviso, não bloqueio (a Mari manda na escala, não o validador)."""
+    pedidos = []
+    for m in MENSAIS:
+        if m not in ids:
+            continue
+        pedidos.append({"setDataValidation": {
+            "range": {"sheetId": ids[m], "startRowIndex": 7, "endRowIndex": 73,
+                      "startColumnIndex": 2, "endColumnIndex": 33},
+            "rule": {
+                "condition": {"type": "ONE_OF_LIST",
+                              "values": [{"userEnteredValue": c} for c in CODIGOS_VALIDOS]},
+                "inputMessage": LEGENDA,
+                "strict": False,
+                "showCustomUi": True,
+            }}})
+    return pedidos
+
+
 def montar(sid=ARQUIVO_ID):
     ids = ids_das_abas(sid)
     dash, dados = ids["DASHBOARD"], ids["DADOS DASH"]
@@ -123,6 +152,7 @@ def montar(sid=ARQUIVO_ID):
     meses = faixa(dados, D0, 0, D1, 1)
 
     pedidos = limpar_graficos(sid, dash)
+    pedidos += dropdowns(ids)
 
     # 1 · a história do ano: os alertas de 18h caíram depois de abril
     pedidos.append(grafico(
