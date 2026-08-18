@@ -98,12 +98,12 @@ def aba_dados(wb):
     """agregados por mês — fonte dos gráficos. Fica oculta."""
     ws = wb.create_sheet("DADOS DASH")
     _sem_grade(ws)
-    _txt(ws, "A1", "agregados por mês · fonte dos gráficos do painel",
+    _txt(ws, "A1", "Agregados por mês · Fonte dos gráficos do painel",
          tam=11, negrito=True, cor=LAVI)
-    _txt(ws, "A2", "aba de apoio: não digitar nada aqui, tudo é fórmula das abas mensais",
+    _txt(ws, "A2", "Aba de apoio: não digitar nada aqui, tudo é fórmula das abas mensais",
          tam=9, italico=True, cor=INK3)
-    cabec = ["mês", "alertas 18h", "buracos", "dias completos", "manhã",
-             "tarde", "noite", "noites", "horas noturnas", "fora da meta"]
+    cabec = ["Mês", "Alertas 18h", "Buracos", "Dias completos", "Manhã",
+             "Tarde", "Noite", "Noites", "Horas noturnas", "Fora da meta"]
     for i, h in enumerate(cabec, start=1):
         c = _txt(ws, ws.cell(row=4, column=i), h, tam=9, negrito=True, cor="FFFFFF",
                  alin="center", wrap=True)
@@ -139,10 +139,10 @@ def aba_dados(wb):
 
     # distribuição do saldo no mês vivo — o trabalho aqui é POLARIDADE
     # (abaixo/acima da meta), então as faixas são divergentes em volta do zero
-    _txt(ws, "A20", "distribuição do saldo · outubro", tam=10, negrito=True, cor=LAVI)
-    _txt(ws, ws.cell(row=21, column=1), "faixa", tam=9, negrito=True, cor="FFFFFF").fill = \
+    _txt(ws, "A20", "Distribuição do saldo · Outubro", tam=10, negrito=True, cor=LAVI)
+    _txt(ws, ws.cell(row=21, column=1), "Faixa", tam=9, negrito=True, cor="FFFFFF").fill = \
         PatternFill("solid", fgColor=LAVI)
-    for j, rot in enumerate(("devendo", "a mais")):
+    for j, rot in enumerate(("Devendo", "A mais")):
         c = _txt(ws, ws.cell(row=21, column=2 + j), rot, tam=9, negrito=True,
                  cor="FFFFFF", alin="center")
         c.fill = PatternFill("solid", fgColor=LAVI)
@@ -214,13 +214,13 @@ def aba_dashboard(wb, mes_vivo="OUT", nome_mes="outubro"):
         ws.row_dimensions[r].height = h
 
     # ---------------- cabeçalho
-    _txt(ws, "B2", "colo ritmo · hospital da criança de brasília",
+    _txt(ws, "B2", "Colo Ritmo · Hospital da Criança de Brasília",
          fonte=MAO, tam=13, cor=LAV)
     ws.merge_cells("B3:H3")
-    _txt(ws, "B3", f"painel da escala · {nome_mes} de 2026",
+    _txt(ws, "B3", f"Painel da escala · {nome_mes.capitalize()} de 2026",
          fonte=DISPLAY, tam=22, negrito=True, cor=INK)
     ws.merge_cells("B5:H5")
-    _txt(ws, "B5", "toda contagem aqui é fórmula das abas mensais — digitou um código na "
+    _txt(ws, "B5", "Toda contagem aqui é fórmula das abas mensais — digitou um código na "
                    "escala, este painel se refaz sozinho.", tam=9, italico=True, cor=INK3)
     _bloco(ws, 2, 2, 2, 14, fundo=None, borda=False)
     for c in range(2, 15):
@@ -228,7 +228,7 @@ def aba_dashboard(wb, mes_vivo="OUT", nome_mes="outubro"):
 
     # ---------------- fila de KPIs · o mês que vai publicar
     ws.row_dimensions[8].height = 20
-    _txt(ws, "B8", f"o mês que vai publicar · {nome_mes}", fonte=DISPLAY, tam=12,
+    _txt(ws, "B8", f"O mês que vai publicar · {nome_mes.capitalize()}", fonte=DISPLAY, tam=12,
          negrito=True, cor=LAVI)
     for r, h in ((9, 14), (10, 20), (11, 20), (12, 26)):
         ws.row_dimensions[r].height = h
@@ -256,7 +256,7 @@ def aba_dashboard(wb, mes_vivo="OUT", nome_mes="outubro"):
 
     # nota do feriado — entendimento corrigido em 18/08/26
     ws.row_dimensions[13].height = 26
-    av = _txt(ws, "B13", "feriado 12/10: folga da MSalomão atendida (pedido "
+    av = _txt(ws, "B13", "Feriado 12/10: folga da MSalomão atendida (pedido "
               "individual — a leitura 'rotina inteira folga' estava errada). Os "
               "demais rotineiros seguem o padrão dos 7 feriados do ano. Motivos "
               "linha a linha na aba CONVOCAÇÕES.",
@@ -267,20 +267,20 @@ def aba_dashboard(wb, mes_vivo="OUT", nome_mes="outubro"):
 
     # ---------------- o ano
     ws.row_dimensions[14].height = 24
-    _txt(ws, "B14", "o ano · para comparar", fonte=DISPLAY, tam=12, negrito=True, cor=LAVI)
-    _txt(ws, "B15", "as regras duras apertaram junto com a mudança de abril, e funcionou: "
+    _txt(ws, "B14", "O ano · Para comparar", fonte=DISPLAY, tam=12, negrito=True, cor=LAVI)
+    _txt(ws, "B15", "As regras duras apertaram junto com a mudança de abril, e funcionou: "
                     "os alertas de 18h caíram de ~15 por mês para ~2.",
          tam=9, italico=True, cor=INK2)
     ws.merge_cells("B15:J15")
 
     # tabela do ano (também é a "table view" dos gráficos)
     r0 = 17
-    cabec = ["mês", "alertas 18h", "buracos", "dias completos",
-             "manhã", "tarde", "noite", "horas noturnas"]
-    tip_tab = {"alertas 18h": "alertas 18h dash", "buracos": "buracos dash",
-               "dias completos": "dias completos dash", "manhã": "lotação dash",
-               "tarde": "lotação dash", "noite": "lotação dash",
-               "horas noturnas": "noturnas dash"}
+    cabec = ["Mês", "Alertas 18h", "Buracos", "Dias completos",
+             "Manhã", "Tarde", "Noite", "Horas noturnas"]
+    tip_tab = {"Alertas 18h": "alertas 18h dash", "Buracos": "buracos dash",
+               "Dias completos": "dias completos dash", "Manhã": "lotação dash",
+               "Tarde": "lotação dash", "Noite": "lotação dash",
+               "Horas noturnas": "noturnas dash"}
     for i, h in enumerate(cabec):
         c = _txt(ws, ws.cell(row=r0, column=2 + i), h, tam=8, negrito=True,
                  cor="FFFFFF", alin="center", wrap=True)
@@ -288,7 +288,7 @@ def aba_dashboard(wb, mes_vivo="OUT", nome_mes="outubro"):
         _tip(c, tip_tab.get(h, ""))
     for k, mes in enumerate(MESES):
         r = r0 + 1 + k
-        _txt(ws, ws.cell(row=r, column=2), mes.lower(), tam=9, negrito=True, cor=INK)
+        _txt(ws, ws.cell(row=r, column=2), mes.capitalize(), tam=9, negrito=True, cor=INK)
         for i, col_dados in enumerate("BCDEFGI"):
             cel = ws.cell(row=r, column=3 + i,
                           value=f"='DADOS DASH'!{col_dados}{5+k}")

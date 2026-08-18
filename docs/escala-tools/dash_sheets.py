@@ -157,38 +157,38 @@ def montar(sid=ARQUIVO_ID):
     # 1 · a história do ano: os alertas de 18h caíram depois de abril
     pedidos.append(grafico(
         dash, dados,
-        "alertas de 18h por mês",
-        "noite emendando manhã, com 2h de descanso ou menos · o alvo é zero (art. 66 CLT)",
+        "Alertas de 18h por mês",
+        "Noite emendando manhã, com 2h de descanso ou menos · o alvo é zero (art. 66 CLT)",
         "COLUMN", meses,
         [_serie(dados, 1, D0, D1, VD.ERR, rotulo_pontos=True)],
-        ancora=(30, 1), largura=620, altura=260, eixo_y="casos"))
+        ancora=(30, 1), largura=620, altura=260, eixo_y="Casos"))
 
     # 2 · buracos de cobertura por mês
     pedidos.append(grafico(
         dash, dados,
-        "buracos de cobertura por mês",
-        "soma do que faltou pro mínimo · cada mês medido pela regra que valia na época",
+        "Buracos de cobertura por mês",
+        "Soma do que faltou para o mínimo · cada mês medido pela regra que valia na época",
         "COLUMN", meses,
         [_serie(dados, 2, D0, D1, VD.LAVI, rotulo_pontos=True)],
-        ancora=(30, 9), largura=620, altura=260, eixo_y="horas-turno"))
+        ancora=(30, 9), largura=620, altura=260, eixo_y="Horas-turno"))
 
     # 3 · lotação média por turno — ordem do dia, rampa clara→escura
     pedidos.append(grafico(
         dash, dados,
-        "lotação média por turno",
-        "manhã, tarde e noite ao longo do ano · a tarde é o gargalo estrutural",
+        "Lotação média por turno",
+        "Manhã, tarde e noite ao longo do ano · a tarde é o gargalo estrutural",
         "LINE", meses,
         [_serie(dados, 4, D0, D1, VD.RAMPA[0], com_cabecalho=True),
          _serie(dados, 5, D0, D1, VD.RAMPA[1], com_cabecalho=True),
          _serie(dados, 6, D0, D1, VD.RAMPA[2], com_cabecalho=True)],
         ancora=(45, 1), largura=620, altura=260, legenda="BOTTOM_LEGEND",
-        eixo_y="pessoas por turno", com_cabecalho=True))
+        eixo_y="Pessoas por turno", com_cabecalho=True))
 
     # 4 · distribuição do saldo: polaridade, divergente em volta do zero
     pedidos.append(grafico(
         dash, dados,
-        "distribuição do saldo · outubro",
-        "quantas pessoas estão devendo horas e quantas fizeram a mais",
+        "Distribuição do saldo · Outubro",
+        "Quantas pessoas estão devendo horas e quantas fizeram a mais",
         "BAR", faixa(dados, 21, 0, 29, 1),
         # duas séries = o divergente ganha as duas cores; uma série só no Sheets
         # não aceita cor por ponto
@@ -198,7 +198,7 @@ def montar(sid=ARQUIVO_ID):
                 com_cabecalho=True)],
         # mais alto: com 7 categorias o Sheets começa a pular rótulo do eixo
         ancora=(45, 9), largura=620, altura=300, legenda="BOTTOM_LEGEND",
-        eixo_y="pessoas", com_cabecalho=True))
+        eixo_y="Pessoas", com_cabecalho=True))
     return pedidos, ids
 
 

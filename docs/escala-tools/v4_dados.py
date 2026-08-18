@@ -93,7 +93,7 @@ TOOLTIPS = {
     "falta":    "Quanto falta para o mínimo do dia (CONFIG — cada mês é medido pela regra "
                 "que valia na época; feriado exige o mínimo do dia da semana em que cai). "
                 "Vermelho = buraco de cobertura.",
-    "grupo":    "chefia e rotina fazem manhãs seg–sex e a CH deles não entra nas "
+    "grupo":    "Chefia e rotina fazem manhãs seg–sex e a CH deles não entra nas "
                 "contagens de plantão · administrativo não pega plantão.",
     "sexta-noite ficha": "Posição da pessoa no rodízio de sexta-noite: sim/não, "
                 "quantas por mês, ou condição especial (ex.: só quando o marido não "
@@ -132,14 +132,14 @@ TOOLTIPS = {
 
 # ---------------------------------------------------- a ordem de montar (dica)
 DICA_ORDEM = [
-    ("1º · fins de semana",
+    ("1º · Fins de semana",
      "Começa sempre pelos fds: preenche e deixa o mais justo possível. É o turno "
      "mais disputado e o que mais gera dívida — resolver por último significa "
      "despejar o resto em quem sobrou."),
-    ("2º · feriado",
+    ("2º · Feriado",
      "Depois o feriado, que escala como o dia da semana em que cai e não reduz a "
      "lotação exigida."),
-    ("3º · resto da semana",
+    ("3º · Resto da semana",
      "Por último os dias úteis, que têm o maior pool de gente elegível e por isso "
      "são os mais fáceis de fechar."),
 ]
@@ -251,19 +251,19 @@ FORA_DO_ROSTER = [
 
 # --------------------------------------------------------------- procedência
 PROCEDENCIA = {
-    1:  ("grade", "reconstruído da grade 'ESCALA FINAL JANEIRO 2026' — a grade começa no dia 2"),
-    2:  ("senior", "códigos Senior (códigos antigos 110/82/83)"),
-    3:  ("senior", "códigos Senior (códigos antigos 110/82/83)"),
-    4:  ("senior", "códigos Senior — mudança de abril: passa a 2/40/41"),
-    5:  ("grade", "reconstruído da grade; dias 1–2 vêm do arquivo de abril; DIA 3 NÃO EXISTE em nenhum arquivo"),
-    6:  ("grade", "reconstruído da grade 'Escala junho - UTI HCB'"),
-    7:  ("senior", "códigos Senior"),
-    8:  ("senior", "códigos Senior"),
-    9:  ("senior", "códigos Senior"),
-    10: ("montado", "escala montada · cobertura 100% nos 31 dias · 48 convocações + 6 "
+    1:  ("grade", "Reconstruído da grade 'ESCALA FINAL JANEIRO 2026' — a grade começa no dia 2"),
+    2:  ("senior", "Códigos Senior (códigos antigos 110/82/83)"),
+    3:  ("senior", "Códigos Senior (códigos antigos 110/82/83)"),
+    4:  ("senior", "Códigos Senior — mudança de abril: passa a 2/40/41"),
+    5:  ("grade", "Reconstruído da grade; dias 1–2 vêm do arquivo de abril; DIA 3 NÃO EXISTE em nenhum arquivo"),
+    6:  ("grade", "Reconstruído da grade 'Escala junho - UTI HCB'"),
+    7:  ("senior", "Códigos Senior"),
+    8:  ("senior", "Códigos Senior"),
+    9:  ("senior", "Códigos Senior"),
+    10: ("montado", "Escala montada · cobertura 100% nos 31 dias · 48 convocações + 6 "
                      "ajustes no feriado 12/10, todos com motivo escrito na aba CONVOCAÇÕES"),
-    11: ("vazio", "a montar"),
-    12: ("vazio", "a montar"),
+    11: ("vazio", "A montar"),
+    12: ("vazio", "A montar"),
 }
 AVISO_GRADE = ("Meses reconstruídos da grade têm FIDELIDADE MENOR: a grade lista nomes por "
                "turno, não códigos. 10h de chefia (47), 4h de CEP (6) e 5h da Janaina (78) "

@@ -63,8 +63,8 @@ MESES_LONGO = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julh
 C_MED, C_CH = 1, 2
 C_D1 = 3                      # primeira coluna de dia (C)
 C_DN = C_D1 + 30              # última (AG) — sempre 31 colunas, geometria fixa
-COLS_TOT = ["CH mês", "fds", "SxN", "feriado", "meta", "saldo", "18h⚠", "N→T",
-            "cota fds", "fds⚠", "sem⚠"]   # fds⚠ = excesso sobre cota × fator do mês
+COLS_TOT = ["CH mês", "FDS", "SxN", "Feriado", "Meta", "Saldo", "18h⚠", "N→T",
+            "Cota FDS", "FDS⚠", "Sem⚠"]   # fds⚠ = excesso sobre cota × fator do mês
 # sem⚠ = maior jornada semanal da pessoa no mês. Teto de 44h (art. 7º XIII da
 # Constituição) e CH + 10h (art. 59 CLT, até 2h extra/dia). O mês pode fechar
 # na média e a semana estourar — em outubro isso aconteceu 39 vezes.
@@ -107,7 +107,7 @@ def carregar_dados():
 # ============================================================== abas
 def _tip(cel, chave):
     """cola o tooltip do dicionário central como comentário (nota no Sheets)."""
-    texto = D.TOOLTIPS.get(chave)
+    texto = D.TOOLTIPS.get(chave) or D.TOOLTIPS.get(str(chave).lower())
     if texto:
         cm = openpyxl.comments.Comment(texto, "colo ritmo")
         cm.width, cm.height = 320, 130
@@ -141,7 +141,7 @@ def creme(ws, ate_linha, ate_coluna):
 def aba_leiame(wb, rel_grade):
     ws = wb.create_sheet("LEIA-ME")
     ws.sheet_properties.tabColor = PINK
-    estilo_titulo(ws, "escala UTI HCB · 2026 — planilha unificada v4")
+    estilo_titulo(ws, "Escala UTI HCB · 2026 — Planilha Unificada v4")
     ws.column_dimensions["A"].width = 16
     ws.column_dimensions["B"].width = 30
     for col in "CDEFGH":
@@ -164,13 +164,13 @@ def aba_leiame(wb, rel_grade):
             ws.merge_cells(start_row=r, start_column=2, end_row=r, end_column=8)
         r += 1
 
-    secao("o que é")
+    secao("O que é")
     linha("", "O ano inteiro num arquivo: 12 abas mensais com a escala real, o painel "
               "comparativo do ano, a tradução pros códigos do Senior e o validador das "
               "regras que são lei. Tudo o que é contagem é fórmula — digitou o código na "
               "aba do mês, a cobertura, a carga horária, o saldo e os alertas se refazem sozinhos.")
     r += 1
-    secao("legenda dos códigos")
+    secao("Legenda dos códigos")
     ws.cell(row=r, column=1, value="código").font = Font(name=F, bold=True, size=9, color="FFFFFF")
     for i, t in enumerate(("turno", "horário", "horas", "Senior")):
         ws.cell(row=r, column=2 + i, value=t).font = Font(name=F, bold=True, size=9, color="FFFFFF")
@@ -186,45 +186,46 @@ def aba_leiame(wb, rel_grade):
         for i, v in enumerate((rot, hora, horas if horas else "—", cod or "—")):
             ws.cell(row=r, column=2 + i, value=v).font = Font(name=F, size=10, color=INK2)
         r += 1
-    linha("antigos", "Até abril de 2026 os códigos eram outros: "
+    linha("Antigos", "Até abril de 2026 os códigos eram outros: "
           + " · ".join(f"{k} = {v}" for k, v in D.CODIGOS_ANTIGOS.items())
           + ". A mudança de abril passou a usar 2/40/41.")
     r += 1
 
-    secao("as abas")
+    secao("As abas")
     for nome, desc in (
-        ("CADASTRO", "quem é quem: carga horária, restrições duras, sexta-noite e fds extra. "
+        ("CADASTRO", "Quem é quem: carga horária, restrições duras, sexta-noite e fds extra. "
                      "É a fonte dos nomes de todas as abas mensais."),
-        ("CONFIG", "as regras como dado: cobertura mínima, cota de fds em mês com férias, "
-                   "tabela de códigos e as regras duras com o artigo da CLF. Mudou aqui, "
+        ("CONFIG", "As regras como dado: cobertura mínima, cota de fds em mês com férias, "
+                   "tabela de códigos e as regras duras com o artigo da CLT. Mudou aqui, "
                    "mudou na planilha toda."),
-        ("JAN a DEZ", "a escala: matriz médico × dia. No rodapé, a lotação de cada turno em "
+        ("JAN a DEZ", "A escala: matriz médico × dia. No rodapé, a lotação de cada turno em "
                       "cada dia e quanto falta pro mínimo. À direita, por pessoa: carga do mês, "
                       "fds, sexta-noite, feriado, meta, saldo e os dois alertas de jornada."),
-        ("OUT · DIA A DIA", "o mês em formato calendário: por dia e por turno, quem "
+        ("OUT · DIA A DIA", "O mês em formato calendário: por dia e por turno, quem "
                              "está onde, ausências e cobertura. É fórmula da aba do mês — "
                              "trocou um plantão no dropdown, o dia a dia se refaz. Bom pra "
                              "bater o olho e perceber o que está esquisito."),
-        ("PAINEL ANO", "o comparativo do ano: saldo, fds, sexta-noite e feriado de cada pessoa "
+        ("PAINEL ANO", "O comparativo do ano: saldo, fds, sexta-noite e feriado de cada pessoa "
                        "mês a mês, com acumulado. Onde existe a contagem manual antiga, ela "
                        "aparece ao lado pra conferência."),
-        ("SENIOR", "escolha o mês em B1 e a matriz inteira sai traduzida nos códigos do RH, "
+        ("SENIOR", "Escolha o mês em B1 e a matriz inteira sai traduzida nos códigos do RH, "
                    "pronta pra lançar."),
-        ("VALIDADOR", "o que fere regra dura, separado em ESTRUTURAL (é a forma do contrato, "
+        ("VALIDADOR", "O que fere regra dura, separado em ESTRUTURAL (é a forma do contrato, "
                       "decisão de política) e PONTUAL (erro daquele mês)."),
-        ("ATENDIMENTO / CONVOCAÇÕES", "o mês vivo: o que foi atendido de cada pedido e por quê, "
-                                      "e quem foi convocado fora da preferência, com o critério público."),
+        ("ATENDIMENTO", "O mês vivo: o que foi atendido de cada pedido, e por quê."),
+        ("CONVOCAÇÕES", "Quem foi convocado fora da preferência, com o critério público — "
+                        "e as decisões do feriado, incluindo o que não foi atendido."),
     ):
         linha(nome, desc, negrito=True)
     r += 1
 
-    secao("a ordem de montar · dica")
+    secao("A ordem de montar · dica")
     linha("", D.NOTA_DICA, cor=INK2)
     for titulo, texto in D.DICA_ORDEM:
         linha(titulo, texto, negrito=True)
     r += 1
 
-    secao("de onde vem cada mês — leia antes de comparar")
+    secao("De onde vem cada mês — leia antes de comparar")
     for mes in range(1, 13):
         origem, nota = D.PROCEDENCIA[mes]
         cor = {"senior": SAGES, "grade": SANDS, "montado": LAVS, "vazio": LINE}[origem]
@@ -240,7 +241,7 @@ def aba_leiame(wb, rel_grade):
     r += 1
     linha("atenção", D.AVISO_GRADE, cor=CORALI)
     r += 1
-    secao("o que ainda falta")
+    secao("O que ainda falta")
     for falta in (
         "Maio dia 3 não existe em nenhum arquivo recebido — a coluna fica vazia.",
         "Janeiro começa no dia 2: a grade recebida não tem o dia 1º.",
@@ -263,13 +264,13 @@ def aba_leiame(wb, rel_grade):
 def aba_cadastro(wb):
     ws = wb.create_sheet("CADASTRO")
     ws.sheet_properties.tabColor = AQUA
-    estilo_titulo(ws, "cadastro · quem é quem",
+    estilo_titulo(ws, "Cadastro · Quem é quem",
                   f"{len(D.ROSTER)} pessoas ativas")
-    cabecalhos = ["médico", "nome completo", "CH", "grupo", "restrições duras",
-                  "sexta-noite", "fds extra", "observações"]
+    cabecalhos = ["Médico", "Nome completo", "CH", "Grupo", "Restrições duras",
+                  "Sexta-noite", "FDS extra", "Observações"]
     larguras = [14, 22, 5, 15, 58, 16, 14, 52]
-    chaves_cad = {"CH": "CH", "grupo": "grupo", "sexta-noite": "sexta-noite ficha",
-                  "fds extra": "fds extra ficha", "médico": "médico"}
+    chaves_cad = {"CH": "CH", "Grupo": "grupo", "Sexta-noite": "sexta-noite ficha",
+                  "FDS extra": "fds extra ficha", "Médico": "médico"}
     for i, (h, w) in enumerate(zip(cabecalhos, larguras), start=1):
         cel = ws.cell(row=3, column=i, value=h)
         cel.font = Font(name=F, bold=True, size=9, color="FFFFFF")
@@ -298,7 +299,7 @@ def aba_cadastro(wb):
         ws.row_dimensions[r].height = 26
         r += 1
     r += 1
-    ws.cell(row=r, column=1, value="fora do roster").font = Font(name=F, bold=True, size=10, color=CORALI)
+    ws.cell(row=r, column=1, value="Fora do roster").font = Font(name=F, bold=True, size=10, color=CORALI)
     r += 1
     for apelido, motivo in D.FORA_DO_ROSTER:
         ws.cell(row=r, column=1, value=apelido).font = Font(name=F, size=9, bold=True, color=INK3)
@@ -312,8 +313,8 @@ def aba_cadastro(wb):
 def aba_config(wb):
     ws = wb.create_sheet("CONFIG")
     ws.sheet_properties.tabColor = SAGE
-    estilo_titulo(ws, "config · as regras como dado",
-                  "mudou aqui, muda na planilha toda")
+    estilo_titulo(ws, "Config · As regras como dado",
+                  "Mudou aqui, muda na planilha toda")
     for col, w in zip("ABCDEFG", (18, 13, 13, 13, 13, 44, 44)):
         ws.column_dimensions[col].width = w
 
@@ -326,9 +327,9 @@ def aba_config(wb):
     # cobertura mínima — DOIS blocos, porque a regra mudou em outubro/26.
     # Linhas 4-6 = regra em vigor · linhas 9-11 = regra antiga (jan–set).
     # As abas mensais apontam para o bloco da vigência do próprio mês.
-    ws.cell(row=3, column=1, value="cobertura mínima por turno").font = Font(
+    ws.cell(row=3, column=1, value="Cobertura mínima por turno").font = Font(
         name=DISPLAY, bold=True, size=11, color=LAVI)
-    cab(3, ["em vigor · de out/26", "manhã", "tarde", "noite"])
+    cab(3, ["Em vigor · de out/26", "Manhã", "Tarde", "Noite"])
     for i, tipo in enumerate(("útil", "sábado", "domingo")):
         m, t, n = D.MINIMOS[tipo]
         ws.cell(row=4 + i, column=1, value=tipo).font = Font(name=F, size=10, bold=True, color=INK)
@@ -341,7 +342,7 @@ def aba_config(wb):
     nota.font = Font(name=F, size=9, color=INK2)
     nota.alignment = Alignment(wrap_text=True, vertical="top")
     ws.merge_cells(start_row=4, start_column=6, end_row=7, end_column=7)
-    cab(8, ["até set/26 · histórico", "manhã", "tarde", "noite"])
+    cab(8, ["Até set/26 · histórico", "Manhã", "Tarde", "Noite"])
     for i, tipo in enumerate(("útil", "sábado", "domingo")):
         m, t, n = D.MINIMOS_ANTIGOS[tipo]
         ws.cell(row=9 + i, column=1, value=tipo).font = Font(name=F, size=10, color=INK2)
@@ -358,9 +359,9 @@ def aba_config(wb):
     ws.merge_cells(start_row=9, start_column=6, end_row=11, end_column=7)
 
     # tabela de códigos — linhas 9..20, referenciada pela aba SENIOR
-    ws.cell(row=13, column=1, value="tabela de códigos").font = Font(
+    ws.cell(row=13, column=1, value="Tabela de códigos").font = Font(
         name=DISPLAY, bold=True, size=11, color=LAVI)
-    cab(14, ["letra", "Senior", "horas", "conta manhã", "conta tarde", "conta noite", "turno"])
+    cab(14, ["Letra", "Senior", "Horas", "Conta manhã", "Conta tarde", "Conta noite", "Turno"])
     for cc in range(4, 7):
         _tip(ws.cell(row=14, column=cc), "conta-flags")
     r = 15
@@ -381,10 +382,10 @@ def aba_config(wb):
 
     # cota de fds em férias
     r += 1
-    ws.cell(row=r, column=1, value="cota de fds em mês com férias").font = Font(
+    ws.cell(row=r, column=1, value="Cota de FDS em mês com férias").font = Font(
         name=DISPLAY, bold=True, size=11, color=LAVI)
     r += 1
-    cab(r, ["CH semanal", "férias 2 sem", "férias 1 sem", "sem férias"])
+    cab(r, ["CH semanal", "Férias 2 sem", "Férias 1 sem", "Sem férias"])
     r += 1
     r_cota = r                      # as abas mensais apontam para cá
     fl = ws.cell(row=r - 2, column=6, value=(
@@ -396,7 +397,7 @@ def aba_config(wb):
     fl.font = Font(name=F, size=9, italic=True, color=INK2)
     fl.alignment = Alignment(wrap_text=True, vertical="top")
     ws.merge_cells(start_row=r - 2, start_column=6, end_row=r + 2, end_column=7)
-    cfat = ws.cell(row=r - 1, column=5, value="fator do mês")
+    cfat = ws.cell(row=r - 1, column=5, value="Fator do mês")
     cfat.font = Font(name=F, size=9, bold=True, color=INK)
     _tip(cfat, "fator")
     cf_fator = ws.cell(row=r, column=5, value=1.141)
@@ -414,14 +415,14 @@ def aba_config(wb):
 
     # feriados do ano — eram dado escondido no Python; agora vivem aqui
     r += 1
-    ws.cell(row=r, column=1, value="feriados de 2026").font = Font(
+    ws.cell(row=r, column=1, value="Feriados de 2026").font = Font(
         name=DISPLAY, bold=True, size=11, color=LAVI)
     nf = ws.cell(row=r, column=5, value=D.NOTA_FERIADOS)
     nf.font = Font(name=F, size=9, color=INK2)
     nf.alignment = Alignment(wrap_text=True, vertical="top")
     ws.merge_cells(start_row=r, start_column=5, end_row=r + 5, end_column=7)
     r += 1
-    cab(r, ["data", "sigla", "feriado"])
+    cab(r, ["Data", "Sigla", "Feriado"])
     r += 1
     for (mes, dia), (nome_f, sigla) in sorted(D.FERIADOS_2026.items()):
         data = dt.date(2026, mes, dia)
@@ -438,9 +439,9 @@ def aba_config(wb):
 
     # regras duras
     r += 1
-    ws.cell(row=r, column=1, value="regras duras").font = Font(name=DISPLAY, bold=True, size=11, color=LAVI)
+    ws.cell(row=r, column=1, value="Regras duras").font = Font(name=DISPLAY, bold=True, size=11, color=LAVI)
     r += 1
-    cab(r, ["regra", "o que é", "base", "tratamento", "nota"])
+    cab(r, ["Regra", "O que é", "Base", "Tratamento", "Nota"])
     ws.cell(row=r, column=2).value = "o que é"
     r += 1
     cores = {"ALERTA": CORALS, "REGISTRO": OLIVES, "CÁLCULO": AQUAS, "PREFERÊNCIA": CREME}
@@ -478,13 +479,14 @@ def aba_mes(wb, mes, DIAS, fim_cod, pessoas, r_cota):
     ws.sheet_view.showGridLines = False
     ndias = (dt.date(2026, mes % 12 + 1, 1) - dt.timedelta(days=1)).day if mes < 12 else 31
 
-    t = ws.cell(row=R_TIT, column=1, value=f"{MESES_LONGO[mes-1]} · 2026")
+    t = ws.cell(row=R_TIT, column=1, value=f"{MESES_LONGO[mes-1].capitalize()} · 2026")
     t.font = Font(name=DISPLAY, bold=True, size=14, color=INK)
     t.comment = openpyxl.comments.Comment(f"De onde vem este mês: {nota}", "colo ritmo")
     # legenda compacta sempre à vista — pra ninguém precisar decorar as siglas
     sub = ws.cell(row=R_TIT, column=C_D1 + 6, value=(
-        "M manhã 7–13 · T tarde 13–19 · D dia 7–19 · N noite 19–7 · NT noitinha · "
-        "C chefia 10h · J Janaina 8–13 · E CEP · FE férias · LM licença · AB abono"))
+        "Legenda: M manhã 7–13 · T tarde 13–19 · D dia 7–19 · N noite 19–7 · "
+        "NT noitinha · C chefia 10h · J Janaina 8–13 · E CEP · FE férias · "
+        "LM licença · AB abono"))
     sub.font = Font(name=F, size=8, italic=True, color=INK3)
 
     ws.column_dimensions["A"].width = 14
@@ -530,7 +532,7 @@ def aba_mes(wb, mes, DIAS, fim_cod, pessoas, r_cota):
                                         R_FER: "máscara feriado"}[r])
 
     # cabeçalho da matriz
-    for col, txt in ((C_MED, "médico"), (C_CH, "CH")):
+    for col, txt in ((C_MED, "Médico"), (C_CH, "CH")):
         c = ws.cell(row=R_HDR, column=col, value=txt)
         c.font = Font(name=F, bold=True, size=9, color="FFFFFF")
         c.fill = PatternFill("solid", fgColor=LAVI)
@@ -612,7 +614,7 @@ def aba_mes(wb, mes, DIAS, fim_cod, pessoas, r_cota):
     # os grupos derivam dos flags da tabela de turnos (CONFIG colunas "conta ...").
     # Não repetir a lista à mão: foi assim que P/R entraram na cobertura sem querer.
     grupos = [(rot, [k for k, v in D.TURNOS.items() if v[4 + i]], i)
-              for i, rot in enumerate(("manhã", "tarde", "noite"))]
+              for i, rot in enumerate(("Manhã", "Tarde", "Noite"))]
     linhas_falta = []
     for gi, (rot, letras, idx) in enumerate(grupos):
         rl = r + gi
@@ -620,7 +622,7 @@ def aba_mes(wb, mes, DIAS, fim_cod, pessoas, r_cota):
         cl.font = Font(name=F, size=9, bold=True, color=LAVI)
         _tip(cl, "cob-turno")
         rf = r + 3 + gi
-        cf0 = ws.cell(row=rf, column=C_MED, value=f"falta {rot}")
+        cf0 = ws.cell(row=rf, column=C_MED, value=f"Falta {rot.lower()}")
         cf0.font = Font(name=F, size=9, bold=True, color=CORALI)
         _tip(cf0, "falta")
         linhas_falta.append(rf)
@@ -666,11 +668,11 @@ def aba_mes(wb, mes, DIAS, fim_cod, pessoas, r_cota):
 def aba_painel(wb, pessoas, oficial):
     ws = wb.create_sheet("PAINEL ANO")
     ws.sheet_properties.tabColor = LAVI
-    estilo_titulo(ws, "painel do ano · o comparativo",
-                  "cada número vem da aba do mês — não se digita nada aqui")
+    estilo_titulo(ws, "Painel do ano · O comparativo",
+                  "Cada número vem da aba do mês — não se digita nada aqui")
     ws.column_dimensions["A"].width = 14
     ws.column_dimensions["B"].width = 5
-    ws.cell(row=R_HDR, column=C_MED, value="médico").font = Font(
+    ws.cell(row=R_HDR, column=C_MED, value="Médico").font = Font(
         name=F, bold=True, size=9, color="FFFFFF")
     ws.cell(row=R_HDR, column=C_MED).fill = PatternFill("solid", fgColor=LAVI)
     ws.cell(row=R_HDR, column=C_CH, value="CH").font = Font(
@@ -678,12 +680,12 @@ def aba_painel(wb, pessoas, oficial):
     ws.cell(row=R_HDR, column=C_CH).fill = PatternFill("solid", fgColor=LAVI)
 
     # 4 blocos de 13 colunas (12 meses + total)
-    blocos = [("saldo do mês (h)", C_TOT + 5, LAVS),
-              ("fds (h)", C_TOT + 1, AQUAS),
-              ("sexta-noite", C_TOT + 2, SANDS),
-              ("feriado (h)", C_TOT + 3, CORALS)]
-    chave_bloco = {"saldo do mês (h)": "saldo-bloco", "fds (h)": "fds-bloco",
-                   "sexta-noite": "sxn-bloco", "feriado (h)": "feriado-bloco"}
+    blocos = [("Saldo do mês (h)", C_TOT + 5, LAVS),
+              ("FDS (h)", C_TOT + 1, AQUAS),
+              ("Sexta-noite", C_TOT + 2, SANDS),
+              ("Feriado (h)", C_TOT + 3, CORALS)]
+    chave_bloco = {"Saldo do mês (h)": "saldo-bloco", "FDS (h)": "fds-bloco",
+                   "Sexta-noite": "sxn-bloco", "Feriado (h)": "feriado-bloco"}
     col = 3
     inicio_bloco = {}
     for rot, col_origem, cor in blocos:
@@ -698,7 +700,7 @@ def aba_painel(wb, pessoas, oficial):
             c.fill = PatternFill("solid", fgColor=cor)
             c.alignment = Alignment(horizontal="center")
             ws.column_dimensions[get_column_letter(col + i)].width = 5.4
-        c = ws.cell(row=R_HDR, column=col + 12, value="ano")
+        c = ws.cell(row=R_HDR, column=col + 12, value="Ano")
         c.font = Font(name=F, bold=True, size=8, color="FFFFFF")
         c.fill = PatternFill("solid", fgColor=LAVI)
         c.alignment = Alignment(horizontal="center")
@@ -721,7 +723,7 @@ def aba_painel(wb, pessoas, oficial):
         col += 14
 
     # conferência com a contagem manual antiga
-    ws.cell(row=R_DOW, column=col, value="conferência · contagem manual antiga").font = Font(
+    ws.cell(row=R_DOW, column=col, value="Conferência · contagem manual antiga").font = Font(
         name=F, bold=True, size=10, color=CORALI)
     ws.merge_cells(start_row=R_DOW, start_column=col, end_row=R_DOW, end_column=col + 3)
     chave_conf = {"SxN oficial": "sxn-oficial", "SxN calc": "sxn-calc", "difere?": "difere"}
@@ -745,8 +747,8 @@ def aba_painel(wb, pessoas, oficial):
         cel = ws.cell(row=lin, column=col, value=sxn_of if tem_oficial else None)
         cel.font = Font(name=F, size=8, color=INK3)
         cel.alignment = Alignment(horizontal="center")
-        base = get_column_letter(inicio_bloco["sexta-noite"])
-        fim = get_column_letter(inicio_bloco["sexta-noite"] + 11)
+        base = get_column_letter(inicio_bloco["Sexta-noite"])
+        fim = get_column_letter(inicio_bloco["Sexta-noite"] + 11)
         cc = ws.cell(row=lin, column=col + 1, value=f"=SUM({base}{lin}:{fim}{lin})")
         cc.font = Font(name=F, size=8, color=INK2)
         cc.alignment = Alignment(horizontal="center")
@@ -764,7 +766,7 @@ def aba_senior(wb, pessoas, fim_cod):
     ws = wb.create_sheet("SENIOR")
     ws.sheet_properties.tabColor = SAND
     ws.sheet_view.showGridLines = False
-    t = ws.cell(row=R_TIT, column=1, value="códigos Senior")
+    t = ws.cell(row=R_TIT, column=1, value="Códigos Senior")
     t.font = Font(name=DISPLAY, bold=True, size=14, color=INK)
     sel = ws.cell(row=R_TIT, column=C_CH, value="OUT")
     sel.font = Font(name=F, bold=True, size=13, color=CORALI)
@@ -775,13 +777,13 @@ def aba_senior(wb, pessoas, fim_cod):
     ws.add_data_validation(dv)
     dv.add(sel)
     inst = ws.cell(row=R_TIT, column=C_D1,
-                   value="escolha o mês na célula ao lado — a matriz inteira se traduz "
-                         "nos códigos do RH, pronta pra lançar no Senior")
+                   value="Escolha o mês na célula ao lado — a matriz inteira se traduz "
+                         "nos códigos do RH, pronta para lançar no Senior")
     inst.font = Font(name=F, size=9, italic=True, color=INK3)
 
     ws.column_dimensions["A"].width = 22
     ws.column_dimensions["B"].width = 6
-    for col, txt in ((C_MED, "médico"), (C_CH, "mês")):
+    for col, txt in ((C_MED, "Médico"), (C_CH, "Mês")):
         c = ws.cell(row=R_HDR, column=col, value=txt)
         c.font = Font(name=F, bold=True, size=9, color="FFFFFF")
         c.fill = PatternFill("solid", fgColor=LAVI)
@@ -826,17 +828,17 @@ def aba_dia_a_dia(wb, mes=10):
                          wb.sheetnames.index(nome_mes) + 1)
     ws.sheet_properties.tabColor = CORALI
     ws.sheet_view.showGridLines = False
-    t = ws.cell(row=1, column=1, value=f"{MESES_LONGO[mes-1]} · dia a dia")
+    t = ws.cell(row=1, column=1, value=f"{MESES_LONGO[mes-1].capitalize()} · Dia a dia")
     t.font = Font(name=DISPLAY, bold=True, size=14, color=INK)
     sub = ws.cell(row=1, column=4, value=(
-        "cada célula lista quem está no turno — é fórmula da aba do mês: "
+        "Cada célula lista quem está no turno — é fórmula da aba do mês: "
         "mudou lá, muda aqui na hora"))
     sub.font = Font(name=F, size=9, italic=True, color=INK3)
     ndias = (dt.date(2026, mes % 12 + 1, 1) - dt.timedelta(days=1)).day
 
-    colunas = [("dia", 5), ("", 5), ("manhã", 24), ("tarde", 24), ("noite", 24),
-               ("ausências", 16), ("cobertura", 13)]
-    chave_cal = {"cobertura": "cobertura-cal", "ausências": "ausencias-cal"}
+    colunas = [("Dia", 5), ("", 5), ("Manhã", 24), ("Tarde", 24), ("Noite", 24),
+               ("Ausências", 16), ("Cobertura", 13)]
+    chave_cal = {"Cobertura": "cobertura-cal", "Ausências": "ausencias-cal"}
     for i, (h, w) in enumerate(colunas, start=1):
         c = ws.cell(row=3, column=i, value=h)
         c.font = Font(name=F, bold=True, size=9, color="FFFFFF")
@@ -943,8 +945,8 @@ def contagem_oficial_sxn():
 def aba_validador(wb, DIAS, pessoas):
     ws = wb.create_sheet("VALIDADOR")
     ws.sheet_properties.tabColor = CORALI
-    estilo_titulo(ws, "validador · o que fere regra dura",
-                  "estrutural = a forma do contrato · pontual = erro daquele mês")
+    estilo_titulo(ws, "Validador · O que fere regra dura",
+                  "Estrutural = a forma do contrato · Pontual = erro daquele mês")
     for col, w in zip("ABCDEF", (15, 13, 13, 62, 17, 30)):
         ws.column_dimensions[col].width = w
 
@@ -982,8 +984,8 @@ def aba_validador(wb, DIAS, pessoas):
 
     def cabecalho():
         nonlocal r
-        for i, h in enumerate(("médico", "grupo", "quando", "o que acontece",
-                               "base", "tratamento"), start=1):
+        for i, h in enumerate(("Médico", "Grupo", "Quando", "O que acontece",
+                               "Base", "Tratamento"), start=1):
             c = ws.cell(row=r, column=i, value=h)
             c.font = Font(name=F, bold=True, size=8, color="FFFFFF")
             c.fill = PatternFill("solid", fgColor=LAVI)
@@ -1070,7 +1072,7 @@ def aba_validador(wb, DIAS, pessoas):
     ws.row_dimensions[r].height = 24
     r += 2
     noturnas = noturnas_por_mes(DIAS, [p for p, _ in pessoas])
-    ws.cell(row=r, column=1, value="médico").font = Font(name=F, bold=True, size=8, color="FFFFFF")
+    ws.cell(row=r, column=1, value="Médico").font = Font(name=F, bold=True, size=8, color="FFFFFF")
     ws.cell(row=r, column=1).fill = PatternFill("solid", fgColor=LAVI)
     for i, m in enumerate(MESES_PT):
         cc = ws.cell(row=r, column=2 + i, value=m)
@@ -1078,7 +1080,7 @@ def aba_validador(wb, DIAS, pessoas):
         cc.fill = PatternFill("solid", fgColor=LAVI)
         cc.alignment = Alignment(horizontal="center")
         ws.column_dimensions[get_column_letter(2 + i)].width = 6
-    ws.cell(row=r, column=14, value="ano").font = Font(name=F, bold=True, size=8, color="FFFFFF")
+    ws.cell(row=r, column=14, value="Ano").font = Font(name=F, bold=True, size=8, color="FFFFFF")
     ws.cell(row=r, column=14).fill = PatternFill("solid", fgColor=CORALI)
     r += 1
     for pessoa, _ch in pessoas:
@@ -1110,12 +1112,12 @@ def abas_mes_vivo(wb, ns):
     atend = _atend_do_v3()
     ws = wb.create_sheet("ATENDIMENTO")
     ws.sheet_properties.tabColor = PINK
-    estilo_titulo(ws, "atendimento e justificativas · outubro 2026")
+    estilo_titulo(ws, "Atendimento e justificativas · Outubro de 2026")
     sub = ws.cell(row=2, column=1, value="Cobertura 100% nos 31 dias · convocações na aba "
                   "ao lado · critério público, sem favoritismo")
     sub.font = Font(name=F, size=10, italic=True, color=INK2)
-    for j, (h, w) in enumerate(zip(["quem / o quê", "status",
-                                    "justificativa (critério público)"],
+    for j, (h, w) in enumerate(zip(["Quem / o quê", "Status",
+                                    "Justificativa (critério público)"],
                                    [22, 16, 120]), start=1):
         c = ws.cell(row=4, column=j, value=h)
         c.font = Font(name=F, bold=True, size=9, color="FFFFFF")
@@ -1136,18 +1138,12 @@ def abas_mes_vivo(wb, ns):
 
     ws2 = wb.create_sheet("CONVOCAÇÕES")
     ws2.sheet_properties.tabColor = CORALI
-    estilo_titulo(ws2, "convocações · outubro 2026",
-                  "quem entrou fora da própria preferência, e por qual critério")
+    estilo_titulo(ws2, "Convocações · Outubro de 2026")
     convoc = ns.get("CONVOC", [])
     nconv = {}
     for ap, _d, _s in convoc:
         nconv[ap] = nconv.get(ap, 0) + 1
     import ajustes_out as AJ
-    av = ws2.cell(row=1, column=6, value=f"{AJ.APROVACAO['instancia']}: "
-                  f"{AJ.APROVACAO['status']}")
-    av.font = Font(name=F, size=9, italic=True, color=INK3)
-    av.alignment = Alignment(wrap_text=True, vertical="top")
-    ws2.merge_cells(start_row=1, start_column=6, end_row=3, end_column=10)
     exp = ws2.cell(row=2, column=1, value=(
         f"{len(convoc)} convocações. Critério público, na ordem: 1º quem estava abaixo da "
         "própria carga no mês; 2º quem tinha menos convocações. Impedimento com motivo "
@@ -1156,8 +1152,11 @@ def abas_mes_vivo(wb, ns):
         "prioridade nas preferências."))
     exp.font = Font(name=F, size=10, color=INK2)
     exp.alignment = Alignment(wrap_text=True, vertical="top")
-    ws2.merge_cells(start_row=2, start_column=1, end_row=3, end_column=5)
-    for j, (h, w) in enumerate(zip(["médico", "convocações", "dias", "crédito em novembro"],
+    # 3 linhas de altura de verdade: o merge de 2 linhas cortava o texto no meio
+    ws2.merge_cells(start_row=2, start_column=1, end_row=4, end_column=5)
+    for rr in (2, 3, 4):
+        ws2.row_dimensions[rr].height = 17
+    for j, (h, w) in enumerate(zip(["Médico", "Convocações", "Dias", "Crédito em novembro"],
                                    [16, 12, 46, 22]), start=1):
         c = ws2.cell(row=5, column=j, value=h)
         c.font = Font(name=F, bold=True, size=9, color="FFFFFF")
@@ -1184,7 +1183,7 @@ def abas_mes_vivo(wb, ns):
     # ajustes do feriado, com o motivo colado em cada linha
     import ajustes_out
     r += 1
-    ws2.cell(row=r, column=1, value="ajustes do feriado 12/10").font = Font(
+    ws2.cell(row=r, column=1, value="Ajustes do feriado 12/10").font = Font(
         name=DISPLAY, bold=True, size=11, color=LAVI)
     r += 1
     for apelido, dia, letra, motivo in ajustes_out.AJUSTES:
@@ -1202,7 +1201,7 @@ def abas_mes_vivo(wb, ns):
         ws2.row_dimensions[r].height = 26
         r += 1
     r += 1
-    ws2.cell(row=r, column=1, value="quem da rotina folga o feriado, e por quê").font = Font(
+    ws2.cell(row=r, column=1, value="Quem da rotina folga o feriado, e por quê").font = Font(
         name=DISPLAY, bold=True, size=11, color=LAVI)
     r += 1
     for apelido, motivo in ajustes_out.FOLGAS:
@@ -1217,7 +1216,7 @@ def abas_mes_vivo(wb, ns):
         ws2.row_dimensions[r].height = 26
         r += 1
     r += 1
-    ws2.cell(row=r, column=1, value="registro das decisões").font = Font(
+    ws2.cell(row=r, column=1, value="Registro das decisões").font = Font(
         name=DISPLAY, bold=True, size=11, color=CORALI)
     r += 1
     for tema, status, texto in ajustes_out.NAO_FEITO:
