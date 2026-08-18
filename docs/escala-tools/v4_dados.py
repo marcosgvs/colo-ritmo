@@ -55,6 +55,24 @@ COTA_FDS_FERIAS = [
 ]
 
 # ------------------------------------------------------------- regras duras
+# ---------------------------------------------------- a ordem de montar (dica)
+DICA_ORDEM = [
+    ("1º · fins de semana",
+     "Começa sempre pelos fds: preenche e deixa o mais justo possível. É o turno "
+     "mais disputado e o que mais gera dívida — resolver por último significa "
+     "despejar o resto em quem sobrou."),
+    ("2º · feriado",
+     "Depois o feriado, que escala como o dia da semana em que cai e não reduz a "
+     "lotação exigida."),
+    ("3º · resto da semana",
+     "Por último os dias úteis, que têm o maior pool de gente elegível e por isso "
+     "são os mais fáceis de fechar."),
+]
+NOTA_DICA = ("Dica do Marcos, 17/08/26. Vale como algoritmo, não só como conselho: o "
+             "remontar_fds.py executa nesta ordem. E cuidado com mês de 5 sábados — a "
+             "demanda de fds passa da soma das cotas do grupo e o excesso tem que ser "
+             "dividido em proporção, porque zerar é aritmeticamente impossível.")
+
 REGRAS_DURAS = [
     ("interjornada", "11h entre o fim de uma jornada e o início da seguinte",
      "art. 66 CLT", "ALERTA",

@@ -64,7 +64,7 @@ C_MED, C_CH = 1, 2
 C_D1 = 3                      # primeira coluna de dia (C)
 C_DN = C_D1 + 30              # última (AG) — sempre 31 colunas, geometria fixa
 COLS_TOT = ["CH mês", "fds", "SxN", "feriado", "meta", "saldo", "18h⚠", "N→T",
-            "cota fds", "fds⚠"]
+            "cota fds", "fds⚠"]   # fds⚠ = excesso sobre a cota × fator do mês
 C_TOT = C_DN + 1              # AH..AO
 R_TIT, R_DIA, R_DOW, R_FDS, R_SEX, R_FER, R_HDR, R_P0 = 1, 2, 3, 4, 5, 6, 7, 8
 
@@ -88,11 +88,12 @@ def carregar_dados():
         for p, cel in pessoas.items():
             DIAS.setdefault(data, {}).setdefault(p, cel)   # códigos Senior têm prioridade
     # outubro: plano montado pelo v3
-    ns = runpy.run_path(os.path.join(AQUI, "escala_out_v3.py"))
-    # camada de ajustes com motivo por escrito (ver ajustes_out.py)
-    import ajustes_out
-    ajustes_out.aplicar(ns["PLAN"])
-    for apelido, por_dia in ns["PLAN"].items():
+    # ORDEM DA MONTAGEM (dica do Marcos): fds primeiro e o mais justo possível,
+    # depois o feriado, depois o resto da semana. remontar_fds.py faz nessa ordem.
+    import remontar_fds
+    plano, _mov = remontar_fds.rodar(verbose=False)
+    ns = remontar_fds.NS
+    for apelido, por_dia in plano.items():
         for dia, letra in por_dia.items():
             data = dt.date(2026, 10, dia)
             DIAS.setdefault(data, {})[apelido] = (letra, "montado")
@@ -197,6 +198,12 @@ def aba_leiame(wb, rel_grade):
                                       "e quem foi convocado fora da preferência, com o critério público."),
     ):
         linha(nome, desc, negrito=True)
+    r += 1
+
+    secao("a ordem de montar · dica")
+    linha("", D.NOTA_DICA, cor=INK2)
+    for titulo, texto in D.DICA_ORDEM:
+        linha(titulo, texto, negrito=True)
     r += 1
 
     secao("de onde vem cada mês — leia antes de comparar")
@@ -356,6 +363,22 @@ def aba_config(wb):
     cab(r, ["CH semanal", "férias 2 sem", "férias 1 sem", "sem férias"])
     r += 1
     r_cota = r                      # as abas mensais apontam para cá
+    fl = ws.cell(row=r - 2, column=6, value=(
+        "Em mês de 5 fins de semana a demanda de fds passa da soma das cotas do "
+        "grupo e zerar o excesso é aritmeticamente impossível. Outubro/26: demanda "
+        "1704h contra 1494h de cota somada — 210h que não têm de onde sair. O alvo "
+        "de cada pessoa passa a ser a cota vezes o fator abaixo, para que o excesso "
+        "inevitável seja dividido em proporção e não despejado em quem tem menos veto."))
+    fl.font = Font(name=F, size=9, italic=True, color=INK2)
+    fl.alignment = Alignment(wrap_text=True, vertical="top")
+    ws.merge_cells(start_row=r - 2, start_column=6, end_row=r + 2, end_column=7)
+    ws.cell(row=r - 1, column=5, value="fator do mês").font = Font(
+        name=F, size=9, bold=True, color=INK)
+    cf_fator = ws.cell(row=r, column=5, value=1.141)
+    cf_fator.font = Font(name=F, size=11, bold=True, color=LAVI)
+    cf_fator.number_format = "0.000"
+    cf_fator.alignment = Alignment(horizontal="center")
+    cf_fator.border = BOX
     for ch, duas, uma, sem in D.COTA_FDS_FERIAS:
         for j, v in enumerate((ch, duas, uma, sem)):
             cel = ws.cell(row=r, column=1 + j, value=v)
@@ -535,8 +558,12 @@ def aba_mes(wb, mes, DIAS, fim_cod, pessoas, r_cota):
              f'MATCH(${get_column_letter(C_CH)}{lin},CONFIG!$A${r_cota}:$A${r_cota+2},0),'
              f'IF(COUNTIF(${L_D1}{lin}:${L_DN}{lin},"FE")>=10,1,'
              f'IF(COUNTIF(${L_D1}{lin}:${L_DN}{lin},"FE")>=1,2,3))),"")',
+             # alerta contra o ALVO proporcional (cota × fator do mês), não contra a
+             # cota crua: em mês de 5 fds o excesso é inevitável e o que importa é
+             # se a pessoa carrega mais do que a fatia dela
              f'=IF({get_column_letter(C_TOT+8)}{lin}="","",'
-             f'MAX(0,{get_column_letter(C_TOT+1)}{lin}-{get_column_letter(C_TOT+8)}{lin}))']
+             f'MAX(0,{get_column_letter(C_TOT+1)}{lin}-'
+             f'{get_column_letter(C_TOT+8)}{lin}*CONFIG!$E${r_cota}))']
         for i, formula in enumerate(f):
             c = ws.cell(row=lin, column=C_TOT + i, value=formula)
             c.number_format = "0"      # hora aqui é inteira; meta já vem arredondada
