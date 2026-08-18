@@ -55,6 +55,81 @@ COTA_FDS_FERIAS = [
 ]
 
 # ------------------------------------------------------------- regras duras
+# ------------------------------------------------------------- tooltips
+# Texto de cada sigla/coluna abreviada. O gerador cola isto como comentário da
+# célula (vira "nota" no Google Sheets, aparece no hover) — pra ninguém precisar
+# decorar e pra planilha não virar um mar de texto explicativo visível.
+TOOLTIPS = {
+    "médico":   "Apelido usado na escala. O nome completo está no CADASTRO e na aba SENIOR.",
+    "CH":       "Carga horária semanal contratada, em horas.",
+    "CH mês":   "Horas trabalhadas no mês — soma de todos os turnos lançados na linha. "
+                "Recalcula sozinho ao digitar ou trocar um código.",
+    "fds":      "Horas trabalhadas em sábados e domingos no mês.",
+    "SxN":      "Sextas-noite no mês (a noite que COMEÇA na sexta às 19h). Alimenta o "
+                "rodízio anual: quem fez entra na lista \u201cjá fez, não lançar\u201d.",
+    "feriado":  "Horas trabalhadas em feriado no mês. A equalização é ANUAL: no próximo "
+                "feriado, a prioridade de folga é de quem tem menor CH total e já fez todos.",
+    "meta":     "Quanto a pessoa deveria trabalhar no mês: CH semanal × semanas do mês, "
+                "arredondado.",
+    "saldo":    "CH mês menos meta. Positivo = horas a mais · negativo = devendo (vira "
+                "banco e compensa no mês seguinte).",
+    "18h⚠":     "Vezes em que a noite (19–7h) emendou com a manhã seguinte com 2h ou "
+                "menos de descanso — jornada de 18h. PROIBIDO: o art. 66 da CLT exige 11h "
+                "entre jornadas. O alvo é zero; era ~15/mês até abril e caiu pra ~2.",
+    "N→T":      "Noite (19–7h) seguida da tarde do dia seguinte (13–19h): 18h de trabalho "
+                "com 6h de pausa. Prática aceita do serviço (decisão de 17/08/26) — fica "
+                "registrada, sem alarme.",
+    "cota fds": "Horas de fim de semana que cabem à pessoa no mês: 36h→36 · 30h→30 · "
+                "24h→24, reduzida se houver férias (tabela no CONFIG). 40h é caso a caso "
+                "— fica em branco.",
+    "fds⚠":     "Excesso sobre a cota × fator do mês. Em mês de 5 fins de semana a soma "
+                "das cotas do grupo não cobre a demanda — o alvo justo passa a ser a cota "
+                "× o fator (CONFIG). Vermelho = carregando mais que a fatia proporcional.",
+    "sem⚠":     "Maior jornada semanal da pessoa no mês. Vermelho acima de 44h — teto do "
+                "art. 7º XIII da Constituição. O mês pode fechar na média e uma semana "
+                "estourar mesmo assim.",
+    "cob-turno": "Quantas pessoas cobrem o turno em cada dia. D (dia 12h) e C (chefia) "
+                "contam na manhã E na tarde; J (Janaina 8–13h) conta na manhã.",
+    "falta":    "Quanto falta para o mínimo do dia (CONFIG — cada mês é medido pela regra "
+                "que valia na época; feriado exige o mínimo do dia da semana em que cai). "
+                "Vermelho = buraco de cobertura.",
+    "grupo":    "chefia e rotina fazem manhãs seg–sex e a CH deles não entra nas "
+                "contagens de plantão · administrativo não pega plantão.",
+    "sexta-noite ficha": "Posição da pessoa no rodízio de sexta-noite: sim/não, "
+                "quantas por mês, ou condição especial (ex.: só quando o marido não "
+                "está de plantão).",
+    "fds extra ficha": "Pool do fds extra obrigatório, mês sim/mês não. \u201cSIM "
+                "obrigatório\u201d = entra sempre que for o mês dela.",
+    "conta-flags": "1 = lançar este código cobre a lotação daquele turno. É daqui que "
+                "as contagens das abas mensais derivam — mudou aqui, muda o rodapé de "
+                "todos os meses.",
+    "fator":    "Demanda de fds do mês ÷ soma das cotas do grupo. Acima de 1 = o mês "
+                "pede mais fim de semana do que as cotas somadas oferecem (outubro/26: "
+                "5 sábados → 1,141). O alvo justo de cada um = cota × este fator.",
+    "saldo-bloco": "CH do mês menos a meta, mês a mês. Positivo fez a mais, negativo "
+                "ficou devendo. A coluna ANO acumula.",
+    "fds-bloco": "Horas de fim de semana por mês, com o acumulado do ano.",
+    "sxn-bloco": "Sextas-noite por mês (noite que começa na sexta) — o insumo do rodízio.",
+    "feriado-bloco": "Horas de feriado por mês. A equalização anual usa o total: quem "
+                "menos fez, trabalha o próximo.",
+    "sxn-oficial": "O que a contagem MANUAL da escalista registrou em 2026 (planilha "
+                "antiga). Serve de conferência histórica.",
+    "sxn-calc": "O que ESTA planilha calcula a partir das grades. ",
+    "difere":   "⚠ quando a contagem manual e a calculada divergem. Os erros de contagem "
+                "à mão eram assumidos e compensados no mês seguinte — é normal haver ⚠.",
+    "alertas 18h dash": "Casos de noite emendando manhã (≤2h de descanso) no mês inteiro. "
+                "Art. 66 CLT — o alvo é zero.",
+    "buracos dash": "Soma de tudo que faltou para o mínimo, nos três turnos, no mês "
+                "inteiro (pessoas × turno × dia). Zero = escala completa.",
+    "dias completos dash": "Dias em que os TRÊS turnos bateram o mínimo.",
+    "lotação dash": "Média de pessoas por turno nos dias do mês.",
+    "noturnas dash": "Horas dentro da janela 22h–05h — insumo do adicional noturno "
+                "(art. 73 CLT: hora noturna vale 52min30s, adicional mínimo de 20%).",
+    "cobertura-cal": "M/T/N = quantas pessoas em cada turno do dia · ✓ = os três mínimos "
+                "batidos · ⚠ = falta gente.",
+    "ausencias-cal": "Férias (FE), licenças (LM) e abonos (AB) do dia.",
+}
+
 # ---------------------------------------------------- a ordem de montar (dica)
 DICA_ORDEM = [
     ("1º · fins de semana",

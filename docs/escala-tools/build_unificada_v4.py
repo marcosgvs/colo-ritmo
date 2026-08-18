@@ -105,6 +105,16 @@ def carregar_dados():
 
 
 # ============================================================== abas
+def _tip(cel, chave):
+    """cola o tooltip do dicionário central como comentário (nota no Sheets)."""
+    texto = D.TOOLTIPS.get(chave)
+    if texto:
+        cm = openpyxl.comments.Comment(texto, "colo ritmo")
+        cm.width, cm.height = 320, 130
+        cel.comment = cm
+    return cel
+
+
 def estilo_titulo(ws, texto, sub=""):
     c = ws.cell(row=1, column=1, value=texto)
     c.font = Font(name=DISPLAY, bold=True, size=15, color=INK)
@@ -258,12 +268,16 @@ def aba_cadastro(wb):
     cabecalhos = ["médico", "nome completo", "CH", "grupo", "restrições duras",
                   "sexta-noite", "fds extra", "observações"]
     larguras = [14, 22, 5, 15, 58, 16, 14, 52]
+    chaves_cad = {"CH": "CH", "grupo": "grupo", "sexta-noite": "sexta-noite ficha",
+                  "fds extra": "fds extra ficha", "médico": "médico"}
     for i, (h, w) in enumerate(zip(cabecalhos, larguras), start=1):
         cel = ws.cell(row=3, column=i, value=h)
         cel.font = Font(name=F, bold=True, size=9, color="FFFFFF")
         cel.fill = PatternFill("solid", fgColor=LAVI)
         cel.alignment = Alignment(horizontal="left", vertical="center")
         ws.column_dimensions[get_column_letter(i)].width = w
+        if h in chaves_cad:
+            _tip(cel, chaves_cad[h])
     grupos = {"chefia": "FAEAF2", "rotina": "FAEAF2", "30h": AQUAS,
               "36h": SANDS, "24h": CREME, "administrativo": LINE}
     r = 4
@@ -347,6 +361,8 @@ def aba_config(wb):
     ws.cell(row=13, column=1, value="tabela de códigos").font = Font(
         name=DISPLAY, bold=True, size=11, color=LAVI)
     cab(14, ["letra", "Senior", "horas", "conta manhã", "conta tarde", "conta noite", "turno"])
+    for cc in range(4, 7):
+        _tip(ws.cell(row=14, column=cc), "conta-flags")
     r = 15
     for letra, (rot, hora, horas, cod, cm, ct, cn) in D.TURNOS.items():
         ws.cell(row=r, column=1, value=letra).font = Font(name=F, bold=True, size=10, color=INK)
@@ -380,8 +396,9 @@ def aba_config(wb):
     fl.font = Font(name=F, size=9, italic=True, color=INK2)
     fl.alignment = Alignment(wrap_text=True, vertical="top")
     ws.merge_cells(start_row=r - 2, start_column=6, end_row=r + 2, end_column=7)
-    ws.cell(row=r - 1, column=5, value="fator do mês").font = Font(
-        name=F, size=9, bold=True, color=INK)
+    cfat = ws.cell(row=r - 1, column=5, value="fator do mês")
+    cfat.font = Font(name=F, size=9, bold=True, color=INK)
+    _tip(cfat, "fator")
     cf_fator = ws.cell(row=r, column=5, value=1.141)
     cf_fator.font = Font(name=F, size=11, bold=True, color=LAVI)
     cf_fator.number_format = "0.000"
@@ -517,9 +534,10 @@ def aba_mes(wb, mes, DIAS, fim_cod, pessoas, r_cota):
         c = ws.cell(row=R_HDR, column=col, value=txt)
         c.font = Font(name=F, bold=True, size=9, color="FFFFFF")
         c.fill = PatternFill("solid", fgColor=LAVI)
+        _tip(c, txt)
     for i, txt in enumerate(COLS_TOT):
         col = C_TOT + i
-        c = ws.cell(row=R_HDR, column=col, value=txt)
+        c = _tip(ws.cell(row=R_HDR, column=col, value=txt), txt)
         c.font = Font(name=F, bold=True, size=8, color="FFFFFF")
         c.fill = PatternFill("solid", fgColor=LAVI if i < 6 else CORALI)
         c.alignment = Alignment(horizontal="center", wrap_text=True)
@@ -598,11 +616,13 @@ def aba_mes(wb, mes, DIAS, fim_cod, pessoas, r_cota):
     linhas_falta = []
     for gi, (rot, letras, idx) in enumerate(grupos):
         rl = r + gi
-        ws.cell(row=rl, column=C_MED, value=rot).font = Font(
-            name=F, size=9, bold=True, color=LAVI)
+        cl = ws.cell(row=rl, column=C_MED, value=rot)
+        cl.font = Font(name=F, size=9, bold=True, color=LAVI)
+        _tip(cl, "cob-turno")
         rf = r + 3 + gi
-        ws.cell(row=rf, column=C_MED, value=f"falta {rot}").font = Font(
-            name=F, size=9, bold=True, color=CORALI)
+        cf0 = ws.cell(row=rf, column=C_MED, value=f"falta {rot}")
+        cf0.font = Font(name=F, size=9, bold=True, color=CORALI)
+        _tip(cf0, "falta")
         linhas_falta.append(rf)
         for i in range(ndias):
             col = get_column_letter(C_D1 + i)
@@ -662,11 +682,14 @@ def aba_painel(wb, pessoas, oficial):
               ("fds (h)", C_TOT + 1, AQUAS),
               ("sexta-noite", C_TOT + 2, SANDS),
               ("feriado (h)", C_TOT + 3, CORALS)]
+    chave_bloco = {"saldo do mês (h)": "saldo-bloco", "fds (h)": "fds-bloco",
+                   "sexta-noite": "sxn-bloco", "feriado (h)": "feriado-bloco"}
     col = 3
     inicio_bloco = {}
     for rot, col_origem, cor in blocos:
-        ws.cell(row=R_DOW, column=col, value=rot).font = Font(
-            name=F, bold=True, size=10, color=LAVI)
+        cb = ws.cell(row=R_DOW, column=col, value=rot)
+        cb.font = Font(name=F, bold=True, size=10, color=LAVI)
+        _tip(cb, chave_bloco.get(rot, ""))
         ws.merge_cells(start_row=R_DOW, start_column=col, end_row=R_DOW, end_column=col + 12)
         inicio_bloco[rot] = col
         for i, m in enumerate(MESES_PT):
@@ -701,10 +724,11 @@ def aba_painel(wb, pessoas, oficial):
     ws.cell(row=R_DOW, column=col, value="conferência · contagem manual antiga").font = Font(
         name=F, bold=True, size=10, color=CORALI)
     ws.merge_cells(start_row=R_DOW, start_column=col, end_row=R_DOW, end_column=col + 3)
+    chave_conf = {"SxN oficial": "sxn-oficial", "SxN calc": "sxn-calc", "difere?": "difere"}
     for i, h in enumerate(("SxN oficial", "SxN calc", "difere?", "")):
         if not h:
             continue
-        c = ws.cell(row=R_HDR, column=col + i, value=h)
+        c = _tip(ws.cell(row=R_HDR, column=col + i, value=h), chave_conf.get(h, ""))
         c.font = Font(name=F, bold=True, size=8, color="FFFFFF")
         c.fill = PatternFill("solid", fgColor=CORALI)
         c.alignment = Alignment(horizontal="center", wrap_text=True)
@@ -812,12 +836,15 @@ def aba_dia_a_dia(wb, mes=10):
 
     colunas = [("dia", 5), ("", 5), ("manhã", 24), ("tarde", 24), ("noite", 24),
                ("ausências", 16), ("cobertura", 13)]
+    chave_cal = {"cobertura": "cobertura-cal", "ausências": "ausencias-cal"}
     for i, (h, w) in enumerate(colunas, start=1):
         c = ws.cell(row=3, column=i, value=h)
         c.font = Font(name=F, bold=True, size=9, color="FFFFFF")
         c.fill = PatternFill("solid", fgColor=LAVI)
         c.alignment = Alignment(horizontal="center")
         ws.column_dimensions[get_column_letter(i)].width = w
+        if h in chave_cal:
+            _tip(c, chave_cal[h])
 
     nomes_rng = f"{nome_mes}!$A${R_P0}:$A${R_P0+65}"
     def col_dia(d):

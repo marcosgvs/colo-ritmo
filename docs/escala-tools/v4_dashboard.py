@@ -170,12 +170,29 @@ def aba_dados(wb):
     return ws
 
 
+def _tip(cel, chave):
+    import v4_dados as _D
+    from openpyxl.comments import Comment
+    texto = _D.TOOLTIPS.get(chave)
+    if texto:
+        cm = Comment(texto, "colo ritmo")
+        cm.width, cm.height = 320, 130
+        cel.comment = cm
+    return cel
+
+
+TIP_TILE = {"buracos de cobertura no mês": "buracos dash",
+            "dias completos": "dias completos dash",
+            "alertas de 18h": "alertas 18h dash",
+            "horas noturnas": "noturnas dash"}
+
+
 def _tile(ws, r1, c1, r2, c2, rotulo, formula, formato="0", nota="",
           cor_num=LAVI, fundo=BG_ALT, tam_num=26):
     """cartão de KPI: rótulo pequeno em cima, número grande, nota embaixo."""
     _bloco(ws, r1, c1, r2, c2, fundo=fundo)
-    _txt(ws, ws.cell(row=r1, column=c1), rotulo.upper(), tam=8, negrito=True,
-         cor=INK3, alin="center")
+    _tip(_txt(ws, ws.cell(row=r1, column=c1), rotulo.upper(), tam=8, negrito=True,
+              cor=INK3, alin="center"), TIP_TILE.get(rotulo.lower(), ""))
     ws.merge_cells(start_row=r1 + 1, start_column=c1, end_row=r1 + 2, end_column=c2)
     n = ws.cell(row=r1 + 1, column=c1, value=formula)
     n.font = Font(name=DISPLAY, size=tam_num, bold=True, color=cor_num)
@@ -260,10 +277,15 @@ def aba_dashboard(wb, mes_vivo="OUT", nome_mes="outubro"):
     r0 = 17
     cabec = ["mês", "alertas 18h", "buracos", "dias completos",
              "manhã", "tarde", "noite", "horas noturnas"]
+    tip_tab = {"alertas 18h": "alertas 18h dash", "buracos": "buracos dash",
+               "dias completos": "dias completos dash", "manhã": "lotação dash",
+               "tarde": "lotação dash", "noite": "lotação dash",
+               "horas noturnas": "noturnas dash"}
     for i, h in enumerate(cabec):
         c = _txt(ws, ws.cell(row=r0, column=2 + i), h, tam=8, negrito=True,
                  cor="FFFFFF", alin="center", wrap=True)
         c.fill = PatternFill("solid", fgColor=LAVI)
+        _tip(c, tip_tab.get(h, ""))
     for k, mes in enumerate(MESES):
         r = r0 + 1 + k
         _txt(ws, ws.cell(row=r, column=2), mes.lower(), tam=9, negrito=True, cor=INK)
