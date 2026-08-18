@@ -317,6 +317,30 @@ def aba_config(wb):
             cel.border = BOX
         r += 1
 
+    # feriados do ano — eram dado escondido no Python; agora vivem aqui
+    r += 1
+    ws.cell(row=r, column=1, value="feriados de 2026").font = Font(
+        name=F, bold=True, size=11, color=LAVI)
+    nf = ws.cell(row=r, column=5, value=D.NOTA_FERIADOS)
+    nf.font = Font(name=F, size=9, color=INK2)
+    nf.alignment = Alignment(wrap_text=True, vertical="top")
+    ws.merge_cells(start_row=r, start_column=5, end_row=r + 5, end_column=7)
+    r += 1
+    cab(r, ["data", "sigla", "feriado"])
+    r += 1
+    for (mes, dia), (nome_f, sigla) in sorted(D.FERIADOS_2026.items()):
+        data = dt.date(2026, mes, dia)
+        cel = ws.cell(row=r, column=1, value=f"{dia:02d}/{mes:02d} ({WD_PT[data.weekday()]})")
+        cel.font = Font(name=F, size=9, bold=True, color=INK)
+        sg = ws.cell(row=r, column=2, value=sigla)
+        sg.font = Font(name=F, size=9, bold=True, color="FFFFFF")
+        sg.fill = PatternFill("solid", fgColor=CORALI)
+        sg.alignment = Alignment(horizontal="center")
+        ws.cell(row=r, column=3, value=nome_f).font = Font(name=F, size=9, color=INK2)
+        for c in range(1, 4):
+            ws.cell(row=r, column=c).border = BOX
+        r += 1
+
     # regras duras
     r += 1
     ws.cell(row=r, column=1, value="regras duras").font = Font(name=F, bold=True, size=11, color=LAVI)
@@ -376,15 +400,25 @@ def aba_mes(wb, mes, DIAS, fim_cod, pessoas):
             continue
         data = dt.date(2026, mes, i + 1)
         fds = 1 if data.weekday() >= 5 else 0
-        feriado = 1 if (mes, i + 1) in D.FERIADOS_2026 else 0
+        info_fer = D.FERIADOS_2026.get((mes, i + 1))
+        feriado = 1 if info_fer else 0
         cd = ws.cell(row=R_DIA, column=col, value=i + 1)
         cd.font = Font(name=F, bold=True, size=9, color=INK)
         cd.alignment = Alignment(horizontal="center")
-        cw = ws.cell(row=R_DOW, column=col, value=WD_PT[data.weekday()])
-        cw.font = Font(name=F, size=8, color=CORALI if (fds or feriado) else INK3)
+        # no feriado a coluna mostra a sigla do feriado em vez do dia da semana:
+        # é a informação que muda a decisão, e o dia da semana se deduz do número
+        rotulo = info_fer[1] if feriado else WD_PT[data.weekday()]
+        cw = ws.cell(row=R_DOW, column=col, value=rotulo)
+        cw.font = Font(name=F, size=8, bold=bool(feriado),
+                       color="FFFFFF" if feriado else (CORALI if fds else INK3))
         cw.alignment = Alignment(horizontal="center")
         if feriado:
-            cd.fill = PatternFill("solid", fgColor=CORALS)
+            cd.fill = PatternFill("solid", fgColor=CORAL)
+            cd.font = Font(name=F, bold=True, size=9, color="FFFFFF")
+            cw.fill = PatternFill("solid", fgColor=CORALI)
+            cd.comment = openpyxl.comments.Comment(
+                f"{info_fer[0]} — feriado.\n\nEscala como {WD_PT[data.weekday()]}: "
+                f"a lotação exigida NÃO cai.", "colo ritmo")
         elif fds:
             cd.fill = PatternFill("solid", fgColor=LAVS)
         ws.cell(row=R_FDS, column=col, value=fds)

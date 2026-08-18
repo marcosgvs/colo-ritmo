@@ -168,10 +168,24 @@ AVISO_GRADE = ("Meses reconstruídos da grade têm FIDELIDADE MENOR: a grade lis
                "horária desses meses fica subestimada pra chefia. Manhã+tarde no mesmo dia "
                "foi lido como 12h dia. Anotações BHN (dispensa) foram excluídas; BHP conta.")
 
+# feriado: (nome, sigla curta que cabe na coluna do dia)
 FERIADOS_2026 = {
-    (1, 1): "Confraternização", (2, 16): "Carnaval", (2, 17): "Carnaval",
-    (4, 3): "Paixão", (4, 21): "Tiradentes", (5, 1): "Trabalhador",
-    (6, 4): "Corpus Christi", (9, 7): "Independência", (10, 12): "N. Sra. Aparecida",
-    (11, 2): "Finados", (11, 15): "República", (11, 20): "Consciência Negra",
-    (12, 25): "Natal",
+    (1, 1):   ("Confraternização", "1ºjan"),
+    (2, 16):  ("Carnaval", "carn"),
+    (2, 17):  ("Carnaval", "carn"),
+    (4, 3):   ("Paixão", "paix"),
+    (4, 21):  ("Tiradentes", "tira"),
+    (5, 1):   ("Dia do Trabalhador", "trab"),
+    (6, 4):   ("Corpus Christi", "corp"),
+    (9, 7):   ("Independência", "indep"),
+    (10, 12): ("N. Sra. Aparecida", "N.Sra"),
+    (11, 2):  ("Finados", "finad"),
+    (11, 15): ("Proclamação da República", "repúb"),
+    (11, 20): ("Consciência Negra", "consc"),
+    (12, 25): ("Natal", "natal"),
 }
+NOTA_FERIADOS = ("Feriado escala como o DIA DA SEMANA em que cai — não reduz a lotação "
+                 "exigida (doc de referência §2). Confirmado na prática: nos sete feriados "
+                 "de 2026 até setembro a manhã rodou com 15 a 20 pessoas, e a rotina/chefia "
+                 "trabalhou em todos eles (4 a 6 pessoas). O que muda no feriado é a "
+                 "contabilidade, que tem coluna própria e equalização anual.")
