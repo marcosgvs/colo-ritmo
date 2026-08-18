@@ -63,7 +63,8 @@ MESES_LONGO = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julh
 C_MED, C_CH = 1, 2
 C_D1 = 3                      # primeira coluna de dia (C)
 C_DN = C_D1 + 30              # última (AG) — sempre 31 colunas, geometria fixa
-COLS_TOT = ["CH mês", "fds", "SxN", "feriado", "meta", "saldo", "18h⚠", "N→T"]
+COLS_TOT = ["CH mês", "fds", "SxN", "feriado", "meta", "saldo", "18h⚠", "N→T",
+            "cota fds", "fds⚠"]
 C_TOT = C_DN + 1              # AH..AO
 R_TIT, R_DIA, R_DOW, R_FDS, R_SEX, R_FER, R_HDR, R_P0 = 1, 2, 3, 4, 5, 6, 7, 8
 
@@ -354,6 +355,7 @@ def aba_config(wb):
     r += 1
     cab(r, ["CH semanal", "férias 2 sem", "férias 1 sem", "sem férias"])
     r += 1
+    r_cota = r                      # as abas mensais apontam para cá
     for ch, duas, uma, sem in D.COTA_FDS_FERIAS:
         for j, v in enumerate((ch, duas, uma, sem)):
             cel = ws.cell(row=r, column=1 + j, value=v)
@@ -406,7 +408,7 @@ def aba_config(wb):
         ws.row_dimensions[r].height = 30
         r += 1
     creme(ws, r + 2, 7)
-    return ws, fim_cod
+    return ws, fim_cod, r_cota
 
 
 def _atend_do_v3():
@@ -419,7 +421,7 @@ def _atend_do_v3():
     return ns["ATEND"]
 
 
-def aba_mes(wb, mes, DIAS, fim_cod, pessoas):
+def aba_mes(wb, mes, DIAS, fim_cod, pessoas, r_cota):
     nome = MESES_PT[mes - 1]
     ws = wb.create_sheet(nome)
     origem, nota = D.PROCEDENCIA[mes]
@@ -525,7 +527,16 @@ def aba_mes(wb, mes, DIAS, fim_cod, pessoas):
              f'=SUMPRODUCT((${L_D1}{lin}:${L_DN_1}{lin}="N")*'
              f'((${L_D2}{lin}:${L_DN}{lin}="M")+(${L_D2}{lin}:${L_DN}{lin}="E")'
              f'+(${L_D2}{lin}:${L_DN}{lin}="C")+(${L_D2}{lin}:${L_DN}{lin}="D")))',
-             f'=SUMPRODUCT((${L_D1}{lin}:${L_DN_1}{lin}="N")*(${L_D2}{lin}:${L_DN}{lin}="T"))']
+             f'=SUMPRODUCT((${L_D1}{lin}:${L_DN_1}{lin}="N")*(${L_D2}{lin}:${L_DN}{lin}="T"))',
+             # cota de fds: base pela CH, reduzida conforme as semanas de férias no mês.
+             # A regra vive em CONFIG; aqui só se aponta pra lá. CH fora da tabela
+             # (40h) fica em branco de propósito: o doc diz "40h segue caso a caso".
+             f'=IFERROR(INDEX(CONFIG!$B${r_cota}:$D${r_cota+2},'
+             f'MATCH(${get_column_letter(C_CH)}{lin},CONFIG!$A${r_cota}:$A${r_cota+2},0),'
+             f'IF(COUNTIF(${L_D1}{lin}:${L_DN}{lin},"FE")>=10,1,'
+             f'IF(COUNTIF(${L_D1}{lin}:${L_DN}{lin},"FE")>=1,2,3))),"")',
+             f'=IF({get_column_letter(C_TOT+8)}{lin}="","",'
+             f'MAX(0,{get_column_letter(C_TOT+1)}{lin}-{get_column_letter(C_TOT+8)}{lin}))']
         for i, formula in enumerate(f):
             c = ws.cell(row=lin, column=C_TOT + i, value=formula)
             c.number_format = "0"      # hora aqui é inteira; meta já vem arredondada
@@ -567,6 +578,12 @@ def aba_mes(wb, mes, DIAS, fim_cod, pessoas):
                          value=f"=MAX(0,{ref}-{col}{rl})")
             cf.font = Font(name=F, size=8, bold=True, color=CORALI)
             cf.alignment = Alignment(horizontal="center")
+    col_exc = get_column_letter(C_TOT + 9)
+    ws.conditional_formatting.add(
+        f"{col_exc}{R_P0}:{col_exc}{ultima}",
+        CellIsRule(operator="greaterThan", formula=["0"],
+                   fill=PatternFill("solid", bgColor=CORAL),
+                   font=Font(name=F, size=8, bold=True, color="FFFFFF")))
     for rf in linhas_falta:
         faixa = f"{L_D1}{rf}:{L_DN}{rf}"
         ws.conditional_formatting.add(faixa, CellIsRule(
@@ -959,6 +976,12 @@ def abas_mes_vivo(wb, ns):
     nconv = {}
     for ap, _d, _s in convoc:
         nconv[ap] = nconv.get(ap, 0) + 1
+    import ajustes_out as AJ
+    av = ws2.cell(row=1, column=6, value=f"⚠ {AJ.APROVACAO['instancia']}: "
+                  f"{AJ.APROVACAO['status']} — {AJ.APROVACAO['enquanto_nao_aprovar']}")
+    av.font = Font(name=F, size=9, bold=True, color=CORALI)
+    av.alignment = Alignment(wrap_text=True, vertical="top")
+    ws2.merge_cells(start_row=1, start_column=6, end_row=3, end_column=10)
     exp = ws2.cell(row=2, column=1, value=(
         f"{len(convoc)} convocações. Critério público, na ordem: 1º quem estava abaixo da "
         "própria carga no mês; 2º quem tinha menos convocações. Impedimento com motivo "
@@ -1043,9 +1066,9 @@ def main():
     wb.remove(wb.active)
     aba_leiame(wb, rel_grade)
     aba_cadastro(wb)
-    _cfg, fim_cod = aba_config(wb)
+    _cfg, fim_cod, r_cota = aba_config(wb)
     for mes in range(1, 13):
-        aba_mes(wb, mes, DIAS, fim_cod, pessoas)
+        aba_mes(wb, mes, DIAS, fim_cod, pessoas, r_cota)
     aba_painel(wb, pessoas, oficial)
     aba_senior(wb, pessoas, fim_cod)
     aba_validador(wb, DIAS, pessoas)

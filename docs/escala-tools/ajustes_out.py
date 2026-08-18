@@ -37,6 +37,28 @@ AJUSTES = [
     # bloqueio 42/42/36 ("AV 2:1"), que 6h a mais na semana quebraria.
 ]
 
+# ---------------------------------------------------------------- governança
+# A dra. Selma é a instância de exceção do serviço para acordos de hora extra,
+# mudança de fixo, banco de horas e ponto (doc de referência §4). Os ajustes acima
+# são exatamente isso: hora extra para gente da rotina, fora do padrão semanal
+# dela, sem que ninguém tenha pedido. Ou seja:
+APROVACAO = {
+    "instancia": "dra. Selma",
+    "status": "PENDENTE — NÃO APROVADO",
+    "por_que_precisa": "os 6 ajustes são hora extra e mudança de fixo para pessoas "
+                       "da rotina que não pediram para trabalhar o feriado. Pelo §4 "
+                       "do doc, acordo de hora extra e mudança de fixo passam pela "
+                       "dra. Selma.",
+    "ninguem_pediu": "nenhuma das 6 pessoas pediu esse plantão. A rotina, ao "
+                     "contrário, pediu FOLGA na manhã do feriado — pedido da "
+                     "MSalomão, que abrangia os rotineiros como grupo, não só a "
+                     "Milena. Dos 7 da rotina, 4 foram escalados (Pabdo, Amelio, "
+                     "Milena, Murilo) e 3 ficaram de folga (Fred, MSalomão, DebAlves).",
+    "enquanto_nao_aprovar": "a escala fecha 14/10/7 no papel, mas as 6 linhas do "
+                            "feriado são PROPOSTA, não fato. Se a dra. Selma não "
+                            "aprovar, 12/10 volta a 9 de manhã e o buraco reaparece.",
+}
+
 # o que NÃO foi feito, e por quê — a outra metade da prestação de contas
 NAO_FEITO = [
     ("MSalomão pediu que a rotina folgasse a manhã do feriado 12/10",
@@ -47,6 +69,19 @@ NAO_FEITO = [
      "cai e não reduz a lotação. A folga foi para quem o próprio critério do serviço "
      "indica: Fred, que fez todos os 7 feriados do ano. MSalomão e DebAlves também "
      "folgam, por causa do bloqueio 42/42/36."),
+    ("APROVAÇÃO DA DRA. SELMA",
+     "PENDENTE",
+     "Os 6 ajustes do feriado são hora extra e mudança de fixo para gente da rotina "
+     "que NÃO pediu esse plantão — e pelo §4 do doc de referência isso passa pela "
+     "dra. Selma. Ela ainda não aprovou. Até aprovar, essas 6 linhas são PROPOSTA e "
+     "não fato: se forem recusadas, 12/10 volta a 9 de manhã contra os 14 exigidos."),
+    ("Quem da rotina pediu para trabalhar o feriado",
+     "NINGUÉM",
+     "Nenhuma das 6 pessoas pediu. A rotina pediu o contrário: FOLGA na manhã do "
+     "feriado, pedido da MSalomão que abrangia os rotineiros como grupo e não só a "
+     "Milena. Dos 7 da rotina, 4 foram escalados (Pabdo, Amelio, Milena, Murilo) e 3 "
+     "ficaram de folga (Fred por já ter feito os 7 feriados do ano; MSalomão e "
+     "DebAlves pelo bloqueio 42/42/36)."),
     ("Preferências atropeladas neste ajuste",
      "6 pessoas",
      "Pabdo, Amelio, Milena, Murilo, Grayce e Marcia entraram no feriado sem terem "

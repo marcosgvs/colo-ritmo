@@ -237,6 +237,17 @@ def aba_dashboard(wb, mes_vivo="OUT", nome_mes="outubro"):
           f'+COUNTIF({M}!${C_D1}${R_P0}:${C_DN}${R_ULT},"NT")*3',
           nota="janela 22h–05h · insumo do adicional noturno", fundo=AQUAS)
 
+    # aviso de aprovação pendente: o painel não pode dar por resolvido o que
+    # depende de uma instância que ainda não disse sim
+    ws.row_dimensions[13].height = 30
+    av = _txt(ws, "B13", "⚠ as 6 linhas do feriado 12/10 são PROPOSTA: dependem da "
+              "aprovação da dra. Selma (hora extra e mudança de fixo, §4 do doc). "
+              "Se não aprovar, 12/10 volta a 9 de manhã e o buraco reaparece.",
+              tam=9, negrito=True, cor=ERR, wrap=True)
+    ws.merge_cells("B13:N13")
+    for c in range(2, 15):
+        ws.cell(row=13, column=c).fill = PatternFill("solid", fgColor=CORALS)
+
     # ---------------- o ano
     ws.row_dimensions[14].height = 24
     _txt(ws, "B14", "o ano · para comparar", fonte=DISPLAY, tam=12, negrito=True, cor=LAVI)
