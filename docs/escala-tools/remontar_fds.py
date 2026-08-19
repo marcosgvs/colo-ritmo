@@ -44,6 +44,96 @@ ROTINA_REGRA = {"Fred", "Milena", "Pabdo", "MSalomão", "DebAlves", "Vinicius",
                 "Amelio", "Murilo"}
 # ausência real não codificada no plano (BHN): não preencher estes dias
 AUSENTE_ROTINA = {"Amelio": set(range(24, 32))}
+
+# ------------------------------------------------------------ remontagem completa
+# (Marcos, 18/08/26: "vamos repreencher tudo utilizando essas novas informações")
+CONVOC_ANTIGAS = NS["CONVOC"]
+
+# compromissos das fichas de setembro: horas mínimas na S1 parcial (01–04)
+S1_METAS = {"Danielle": 24, "Fabiula": 12, "JuBrito": 12, "Leomara": 24,
+            "Heloa": 24, "Pedro": 24, "Raylander": 30}
+# Ernesto (→24h) fica FORA de propósito: a paridade 15/15 autoral dele é
+# fds 09/11 e 23/25, e a S1 não tem quarta — o compromisso não é executável
+# dentro das janelas declaradas. Vai como pendência nomeada para a Mari.
+NOVAS = []            # todas as convocações da remontagem: (ap, dia, turno, fase)
+
+
+def despir_convocacoes(verbose=True):
+    """volta o plano à base autoral pura: remove as 48 convocações antigas,
+    feitas sob as regras velhas (rotina contava em fds e tarde)."""
+    n = 0
+    for ap, d, turno in CONVOC_ANTIGAS:
+        if PLAN.get(ap, {}).get(d) == turno:
+            del PLAN[ap][d]
+            n += 1
+    if verbose:
+        print(f"REMONTAGEM · {n} convocações antigas removidas — base autoral pura")
+    return n
+
+
+def fase0b_setembro(verbose=True):
+    """compromissos das fichas de setembro na S1 parcial (01–04) + teto legal.
+
+    A preferência autoral também obedece à lei: quem estourar CH+10h na semana
+    perde o excedente (caso Fabiula: 4 noites autorais na semana 1 = 48h > 46h).
+    """
+    mov, pendencias = [], []
+    # teto sobre a base autoral
+    for ap in list(PLAN):
+        if ap in ROTINA_REGRA:
+            continue
+        ch = METAS.get(ap, 0)
+        if not ch:
+            continue
+        for ini, fim in SEMANAS:
+            for _v in range(6):
+                h = sum(HOURS.get(l, 0) for d, l in PLAN[ap].items()
+                        if ini <= d <= fim and l in TRANSFERIVEL)
+                if h <= TETO_CONSTITUCIONAL:
+                    break
+                # tira o turno mais tardio da semana que não seja compromisso de S1
+                cands = sorted((d for d, l in PLAN[ap].items()
+                                if ini <= d <= fim and l in TRANSFERIVEL), reverse=True)
+                alvo_s1 = S1_METAS.get(ap, 0)
+                for d in cands:
+                    h_s1 = sum(HOURS.get(l, 0) for dd, l in PLAN[ap].items() if dd <= 4)
+                    if d <= 4 and h_s1 - HOURS.get(PLAN[ap][d], 0) < alvo_s1:
+                        continue
+                    mov.append((ap, d, PLAN[ap][d], "teto: semana autoral acima de 44h"))
+                    del PLAN[ap][d]
+                    break
+                else:
+                    break
+    # completar S1 até a meta, dentro das janelas
+    for ap, meta in S1_METAS.items():
+        for _v in range(4):
+            h = sum(HOURS.get(l, 0) for d, l in PLAN.get(ap, {}).items() if d <= 4)
+            if h >= meta:
+                break
+            feito = False
+            for d in (1, 2, 3, 4):
+                if d in PLAN.get(ap, {}):
+                    continue
+                for turno in ("N", "D", "M", "T"):
+                    if (turno in TRANSFERIVEL and eligible(ap, d, turno)
+                            and descanso_ok(ap, d, turno) and teto_ok(ap, d, turno)):
+                        PLAN[ap][d] = turno
+                        NOVAS.append((ap, d, turno, "compromisso de setembro"))
+                        feito = True
+                        break
+                if feito:
+                    break
+            if not feito:
+                pendencias.append((ap, meta, h))
+                break
+    if verbose:
+        print(f"FASE 0b · setembro: {sum(1 for x in NOVAS if x[3]=='compromisso de setembro')} "
+              f"encaixes de S1 · {len(mov)} cortes por teto legal")
+        for ap, d, l, m in mov:
+            print(f"   corte: {ap} {d:02d}/10 {l} — {m}")
+        for ap, meta, h in pendencias:
+            print(f"   ⚠ pendência: {ap} S1 em {h}h, meta {meta}h — sem slot elegível")
+    return mov, pendencias
 AUSENTE = {"FE", "LM"}
 # só estes são transferíveis. J (5h Janaina), E (CEP), C (10h chefia), A
 # (administrativo), P (paliativo), R (CRO) e AB (abono de aniversário) são
@@ -106,8 +196,12 @@ def descanso_ok(ap, dia, turno):
 
 
 SEMANAS = [(1, 7), (8, 14), (15, 21), (22, 28), (29, 31)]
-TETO_CONSTITUCIONAL = 44          # art. 7º XIII da Constituição
-EXTRA_MAX = 10                    # art. 59 CLT: até 2h extra/dia
+# Teto semanal = SÓ o constitucional (art. 7º XIII). O "CH+10h" da 1ª versão
+# aplicava o art. 59 (2h extra/dia) a plantão 12x36, o que não corresponde: em
+# regime de plantão, semana de 36h com CH de 24h é prática normal, compensada
+# no banco — o corte por CH+10h chegou a propor 50 cortes em preferências
+# autorais, o que é errado. 44h é a linha dura; o resto é contabilidade mensal.
+TETO_CONSTITUCIONAL = 44
 
 
 def horas_semana(ap, dia):
@@ -116,10 +210,8 @@ def horas_semana(ap, dia):
 
 
 def teto_ok(ap, dia, turno):
-    """não criar semana acima do teto legal — o mês pode fechar e a semana estourar."""
-    ch = METAS.get(ap, 0)
-    novo = horas_semana(ap, dia) + HOURS.get(turno, 0)
-    return novo <= TETO_CONSTITUCIONAL and (not ch or novo <= ch + EXTRA_MAX)
+    """não criar semana acima de 44h — o mês pode fechar e a semana estourar."""
+    return horas_semana(ap, dia) + HOURS.get(turno, 0) <= TETO_CONSTITUCIONAL
 
 
 def pode_receber(ap, dia, turno):
@@ -206,6 +298,7 @@ def fase1a_preencher_fds(verbose=True):
                 cands.sort()
                 PLAN[cands[0][1]][dia] = turno
                 postos.append((cands[0][1], dia, turno, rodada))
+                NOVAS.append((cands[0][1], dia, turno, "fim de semana"))
     if verbose:
         print(f"FASE 1a · fds preenchido: {len(postos)} encaixes "
               f"({sum(1 for x in postos if x[3]=='relaxada')} acima do alvo de cota, "
@@ -363,6 +456,7 @@ def fase3_semana(verbose=True):
                 break
             PLAN[cands[0][1]][dia] = turno
             postos.append((cands[0][1], dia, turno))
+            NOVAS.append((cands[0][1], dia, turno, "dia útil"))
     if verbose:
         print(f"FASE 3 · resto da semana: {len(postos)} encaixes")
         for ap, dia, t in postos:
@@ -370,8 +464,86 @@ def fase3_semana(verbose=True):
     return postos
 
 
+def fase4_ajuste_fino(verbose=True):
+    """dois movimentos que o preenchimento puro não faz:
+    (a) troca de turno no MESMO dia: sai de turno com sobra, entra no que falta;
+    (b) migração entre dias: mesmo turno, sai de dia com sobra pra dia com falta.
+    Sempre respeitando janela declarada, descanso e teto — e sem abrir buraco novo."""
+    moves = []
+    for _rodada in range(12):
+        mudou = False
+        for dia in range(1, 32):
+            m, t, n = cobertura(dia)
+            alvo = (14, 10, 7) if dia == FERIADO else mins(dia)
+            deficits = [("M", alvo[0]-m), ("T", alvo[1]-t), ("N", alvo[2]-n)]
+            for turno, falta in deficits:
+                if falta <= 0:
+                    continue
+                # (a) mesmo dia, turno com sobra → turno com falta
+                feito = False
+                for outro, idx in (("M", 0), ("T", 1), ("N", 2)):
+                    if outro == turno:
+                        continue
+                    sobra = (m, t, n)[idx] - alvo[idx]
+                    if sobra <= 0:
+                        continue
+                    for ap, pd in PLAN.items():
+                        if ap in ROTINA or pd.get(dia) != outro:
+                            continue
+                        pd_backup = pd.pop(dia)
+                        if (eligible(ap, dia, turno) and descanso_ok(ap, dia, turno)
+                                and teto_ok(ap, dia, turno)):
+                            pd[dia] = turno
+                            moves.append((ap, dia, f"{outro}→{turno}", "mesmo dia"))
+                            feito = True
+                            break
+                        pd[dia] = pd_backup
+                    if feito:
+                        break
+                if feito:
+                    mudou = True
+                    break
+                # (b) mesmo turno, vindo de dia com sobra
+                for origem in range(1, 32):
+                    if origem == dia:
+                        continue
+                    mo, to, no = cobertura(origem)
+                    ao = (14, 10, 7) if origem == FERIADO else mins(origem)
+                    idx = {"M": 0, "T": 1, "N": 2}[turno]
+                    if (mo, to, no)[idx] - ao[idx] <= 0:
+                        continue
+                    for ap, pd in PLAN.items():
+                        if ap in ROTINA or pd.get(origem) != turno or dia in pd:
+                            continue
+                        del pd[origem]
+                        if (eligible(ap, dia, turno) and descanso_ok(ap, dia, turno)
+                                and teto_ok(ap, dia, turno)):
+                            pd[dia] = turno
+                            moves.append((ap, f"{origem:02d}→{dia:02d}", turno, "migração"))
+                            feito = True
+                            break
+                        pd[origem] = turno
+                    if feito:
+                        break
+                if feito:
+                    mudou = True
+                    break
+            if mudou:
+                break
+        if not mudou:
+            break
+    if verbose:
+        print(f"FASE 4 · ajuste fino: {len(moves)} remanejamentos")
+        for ap, d, t, tipo in moves:
+            print(f"   {tipo}: {ap} {d} {t}")
+    return moves
+
+
 def rodar(verbose=True):
+    NOVAS.clear()
+    despir_convocacoes(verbose)
     m0 = fase0_rotina(verbose)
+    m0b, pend_set = fase0b_setembro(verbose)
     m1a, buracos_fds = fase1a_preencher_fds(verbose)
     if verbose:
         print(f"injustiça inicial (soma dos desvios de cota): {injusticas()}h")
@@ -380,8 +552,15 @@ def rodar(verbose=True):
         print(f"injustiça depois da fase 1: {injusticas()}h\n")
     m2, imp = fase2_feriado(verbose)
     m3 = fase3_semana(verbose)
-    return PLAN, {"rotina": m0, "fds_preenchido": m1a, "buracos_fds": buracos_fds,
-                  "fds": m1, "feriado": m2, "impossivel": imp, "semana": m3}
+    m4 = fase4_ajuste_fino(verbose)
+    # segunda passada de justiça: as fases 2–4 adicionam fds depois da primeira,
+    # e sem isso o preenchimento despeja tudo em quem tem menos veto
+    m1bis = fase1_fds(verbose)
+    m4bis = fase4_ajuste_fino(verbose)
+    return PLAN, {"rotina": m0, "setembro": m0b, "pend_setembro": pend_set,
+                  "fds_preenchido": m1a, "buracos_fds": buracos_fds,
+                  "fds": m1, "feriado": m2, "impossivel": imp, "semana": m3, "ajuste_fino": m4, "justica_bis": m1bis, "fino_bis": m4bis,
+                  "novas": list(NOVAS)}
 
 
 if __name__ == "__main__":

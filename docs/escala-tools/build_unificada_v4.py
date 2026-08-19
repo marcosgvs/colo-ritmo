@@ -95,8 +95,9 @@ def carregar_dados():
     # ORDEM DA MONTAGEM (dica do Marcos): fds primeiro e o mais justo possível,
     # depois o feriado, depois o resto da semana. remontar_fds.py faz nessa ordem.
     import remontar_fds
-    plano, _mov = remontar_fds.rodar(verbose=False)
+    plano, mov = remontar_fds.rodar(verbose=False)
     ns = remontar_fds.NS
+    ns["_mov"] = mov
     for apelido, por_dia in plano.items():
         for dia, letra in por_dia.items():
             data = dt.date(2026, 10, dia)
@@ -1108,7 +1109,7 @@ def aba_validador(wb, DIAS, pessoas):
     return ws
 
 
-def abas_mes_vivo(wb, ns):
+def abas_mes_vivo(wb, ns, mov=None):
     atend = _atend_do_v3()
     ws = wb.create_sheet("ATENDIMENTO")
     ws.sheet_properties.tabColor = PINK
@@ -1139,17 +1140,18 @@ def abas_mes_vivo(wb, ns):
     ws2 = wb.create_sheet("CONVOCAÇÕES")
     ws2.sheet_properties.tabColor = CORALI
     estilo_titulo(ws2, "Convocações · Outubro de 2026")
-    convoc = ns.get("CONVOC", [])
+    novas = (mov or {}).get("novas", [])
+    convoc = [(ap, d, t) for ap, d, t, _fase in novas]
+    fase_de = {(ap, d, t): fase for ap, d, t, fase in novas}
     nconv = {}
     for ap, _d, _s in convoc:
         nconv[ap] = nconv.get(ap, 0) + 1
     import ajustes_out as AJ
     exp = ws2.cell(row=2, column=1, value=(
-        f"{len(convoc)} convocações. Critério público, na ordem: 1º quem estava abaixo da "
-        "própria carga no mês; 2º quem tinha menos convocações. Impedimento com motivo "
-        "declarado (outro serviço, filhos, viagem, atestado) é intocável — ninguém foi "
-        "convocado contra impedimento real. Toda convocação gera CRÉDITO no mês seguinte: "
-        "prioridade nas preferências."))
+        f"{len(convoc)} convocações da remontagem de 18/08, sob as regras novas (rotina só "
+        "manhã em dia útil e nunca FDS · teto de 44h/semana · compromissos de setembro). "
+        "Critério público: entra primeiro quem está mais abaixo do próprio alvo. Impedimento "
+        "com motivo declarado é intocável. Toda convocação gera CRÉDITO no mês seguinte."))
     exp.font = Font(name=F, size=10, color=INK2)
     exp.alignment = Alignment(wrap_text=True, vertical="top")
     # 3 linhas de altura de verdade: o merge de 2 linhas cortava o texto no meio
@@ -1166,7 +1168,9 @@ def abas_mes_vivo(wb, ns):
     wd = ns["wd"]
     for ap, n in sorted(nconv.items(), key=lambda x: (-x[1], x[0])):
         dias_txt = " · ".join(
-            f"{d:02d}/{WD_PT[wd(d)]} {s}" for a2, d, s in sorted(convoc, key=lambda x: x[1])
+            f"{d:02d}/{WD_PT[wd(d)]} {s}"
+            + (" (set)" if fase_de.get((a2, d, s)) == "compromisso de setembro" else "")
+            for a2, d, s in sorted(convoc, key=lambda x: x[1])
             if a2 == ap)
         ws2.cell(row=r, column=1, value=ap).font = Font(name=F, size=9, bold=True, color=INK)
         cn = ws2.cell(row=r, column=2, value=n)
@@ -1253,7 +1257,7 @@ def main():
     aba_painel(wb, pessoas, oficial)
     aba_senior(wb, pessoas, fim_cod)
     aba_validador(wb, DIAS, pessoas)
-    abas_mes_vivo(wb, ns)
+    abas_mes_vivo(wb, ns, ns.get("_mov"))
     # painel de leitura: DADOS DASH alimenta os gráficos, DASHBOARD é a capa
     import v4_dashboard as VD
     VD.aba_dados(wb)

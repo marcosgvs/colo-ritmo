@@ -52,6 +52,30 @@ NAO_FEITO = [
      "2026 — nunca dependeu de aprovação especial. O que teria exigido a dra. "
      "Selma (§4) era hora extra fora do padrão para quem tinha pedido folga; com "
      "o entendimento corrigido, ninguém que pediu folga está escalado."),
+    ("Compromissos de setembro — pendências",
+     "3 pessoas",
+     "Ernesto (S1 para 24h): NÃO EXECUTÁVEL — a paridade 15/15 autoral dele é fds "
+     "09/11 e 23/25, e a S1 parcial não tem quarta; precisa de decisão da escalista. "
+     "Leomara e Pedro: completados até 18h de 24h — o restante não tem slot dentro "
+     "das janelas declaradas. Danielle, JuBrito, Heloá e Fabiula: cumpridos."),
+    ("Cortes por teto de 44h/semana",
+     "13 cortes",
+     "Preferências autorais que passavam de 44h na mesma semana (art. 7º XIII) "
+     "perderam o excedente — a lei ganha da preferência. Casos: Fabiula (2), "
+     "IsaRibeiro (2), Kariny (2), Beatriz, CaAbreu, Danielle, LeLemos, Mayana, "
+     "Raylander, Yuji. O corte escolhe o turno mais tardio da semana que não seja "
+     "compromisso de S1."),
+    ("Equidade de FDS — caso Raphael",
+     "+30h sobre o alvo",
+     "O preenchimento das noites de fim de semana concentrou no Raphael (60h contra "
+     "alvo de 30h): ele é dos únicos elegíveis e livres para noite de sábado e "
+     "domingo. Duas passadas de justiça não acharam para quem transferir. Vira "
+     "crédito/compensação em novembro, como a contagem anual sempre tratou."),
+    ("Buracos remanescentes",
+     "18/10 (domingo)",
+     "Tarde 7 de 8 e noite 6 de 7 — sem candidato elegível dentro das janelas "
+     "declaradas, mesmo relaxando cota. Opções da escalista: troca negociada, "
+     "convocação fora das janelas declaradas, ou aceitar (6 era o mínimo antigo)."),
     ("Preferências atropeladas neste ajuste",
      "4 pessoas",
      "Pabdo, Amelio, Milena e Murilo entraram no feriado sem terem pedido — como "

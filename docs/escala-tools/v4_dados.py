@@ -183,8 +183,8 @@ REGRAS_DURAS = [
 # ----------------------------------------------------------------- roster
 # apelido, nome completo, CH, grupo, restrições duras, SN, FE, observação
 ROSTER = [
-    ("Fred", "Frederico Pires", 36, "chefia", "dias úteis apenas manhã · nunca FDS (regra 18/08/26)", "não", "não", "CH zerada nas contagens de plantão · o 10h de chefia (47) de seg+ter virou manhã"),
-    ("Milena", "Milena", 36, "chefia", "dias úteis apenas manhã · nunca FDS (regra 18/08/26)", "não", "não", "o 10h de chefia (47) de qui virou manhã"),
+    ("Fred", "Frederico Pires", 36, "chefia", "dias úteis apenas manhã · nunca FDS (regra 18/08/26)", "não", "não", "CH zerada nas contagens de plantão · o 10h de chefia (47) é lançado depois pela coordenação"),
+    ("Milena", "Milena", 36, "chefia", "dias úteis apenas manhã · nunca FDS (regra 18/08/26)", "não", "não", "o 10h de chefia (47) é lançado depois pela coordenação"),
     ("Pabdo", "Paula Abdo", 36, "chefia", "dias úteis apenas manhã · nunca FDS (regra 18/08/26)", "não", "não", "aniversário 29/10, sem folga"),
     ("MSalomão", "Marina Salomão", 40, "chefia", "dias úteis apenas manhã · nunca FDS (regra 18/08/26)", "não", "não", "folga 12/10 (pedido individual) · bloqueio 42/42/36 e rodízio FDS 15/15 com Vinicius REVOGADOS pela regra de 18/08"),
     ("DebAlves", "Deborah Alves", 40, "chefia", "dias úteis apenas manhã · nunca FDS (regra 18/08/26)", "não", "não", "tardes de completude e bloqueio 42/42/36 REVOGADOS pela regra de 18/08"),
@@ -267,8 +267,9 @@ PROCEDENCIA = {
     7:  ("senior", "Códigos Senior"),
     8:  ("senior", "Códigos Senior"),
     9:  ("senior", "Códigos Senior"),
-    10: ("montado", "Escala montada · cobertura 100% nos 31 dias · 48 convocações + 6 "
-                     "ajustes no feriado 12/10, todos com motivo escrito na aba CONVOCAÇÕES"),
+    10: ("montado", "REMONTADA em 18/08 sob as regras novas (rotina só manhã e nunca FDS · "
+                     "teto 44h · compromissos de setembro) · convocações e pendências na aba "
+                     "CONVOCAÇÕES · buracos remanescentes aparecem em vermelho na linha Falta"),
     11: ("vazio", "A montar"),
     12: ("vazio", "A montar"),
 }
