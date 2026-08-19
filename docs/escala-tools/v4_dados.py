@@ -149,6 +149,13 @@ NOTA_DICA = ("Dica do Marcos, 17/08/26. Vale como algoritmo, não só como conse
              "dividido em proporção, porque zerar é aritmeticamente impossível.")
 
 REGRAS_DURAS = [
+    ("rotina só manhã", "Fred, Milena, Pabdo, MSalomão, DebAlves, Vinicius, Amelio e "
+     "Murilo: dias úteis apenas pela manhã, e nunca aos fins de semana",
+     "decisão Marcos 18/08/26", "ALERTA",
+     "Revoga o rodízio 15/15 MSalomão↔Vinicius, o sábado noturno 15/15 do Murilo, "
+     "o bloqueio 42/42/36 e as tardes de completude da DebAlves. O feriado segue a "
+     "política própria (contagem anual). Janaina NÃO é rotina: seg–sáb 8–13h dela "
+     "continua, e a 10ª manhã de sábado é dela por regra de cobertura."),
     ("interjornada", "11h entre o fim de uma jornada e o início da seguinte",
      "art. 66 CLT", "ALERTA",
      "Descanso abaixo de 11h gera hora extra indenizável e autuação do MTE."),
@@ -176,14 +183,14 @@ REGRAS_DURAS = [
 # ----------------------------------------------------------------- roster
 # apelido, nome completo, CH, grupo, restrições duras, SN, FE, observação
 ROSTER = [
-    ("Fred", "Frederico Pires", 36, "chefia", "seg+ter 10h chefia; qua+qui manhã", "não", "não", "CH zerada nas contagens de plantão"),
-    ("Milena", "Milena", 36, "chefia", "seg/ter/qua manhã; qui 10h chefia", "não", "não", ""),
-    ("Pabdo", "Paula Abdo", 36, "chefia", "rotina/coordenação", "não", "não", "aniversário 29/10, sem folga"),
-    ("MSalomão", "Marina Salomão", 40, "chefia", "manhãs seg–sex; PROIBIDO dom noite emendando (18h invertido) → sáb noite; NÃO sexta tarde", "não", "não", "bloqueio 42/42/36 · rodízio fds 15/15 com Vinicius, contínuo no ano · abre outubro com 42h"),
-    ("DebAlves", "Deborah Alves", 40, "chefia", "manhãs seg–sex + tardes p/ completar (ter, senão qui)", "não", "não", "bloqueio 42/42/36 · cota fds 24h"),
-    ("Vinicius", "Vinicius Bezerra", 36, "chefia", "manhãs seg–sex + fds 15/15 com MSalomão", "não", "sim", "bloqueio 30/42 · FÉRIAS 12–26/10"),
-    ("Amelio", "Fernanda Amelio", 36, "chefia", "SEM NOTURNOS (atestado desde abr/25); seg–sex manhãs", "não", "não", "fora 24–31/10 (BHN)"),
-    ("Murilo", "Murilo", 36, "rotina", "rotina onco manhãs; fds 15/15 sábado noturno", "não", "não", "voltou de licença"),
+    ("Fred", "Frederico Pires", 36, "chefia", "dias úteis apenas manhã · nunca FDS (regra 18/08/26)", "não", "não", "CH zerada nas contagens de plantão · o 10h de chefia (47) de seg+ter virou manhã"),
+    ("Milena", "Milena", 36, "chefia", "dias úteis apenas manhã · nunca FDS (regra 18/08/26)", "não", "não", "o 10h de chefia (47) de qui virou manhã"),
+    ("Pabdo", "Paula Abdo", 36, "chefia", "dias úteis apenas manhã · nunca FDS (regra 18/08/26)", "não", "não", "aniversário 29/10, sem folga"),
+    ("MSalomão", "Marina Salomão", 40, "chefia", "dias úteis apenas manhã · nunca FDS (regra 18/08/26)", "não", "não", "folga 12/10 (pedido individual) · bloqueio 42/42/36 e rodízio FDS 15/15 com Vinicius REVOGADOS pela regra de 18/08"),
+    ("DebAlves", "Deborah Alves", 40, "chefia", "dias úteis apenas manhã · nunca FDS (regra 18/08/26)", "não", "não", "tardes de completude e bloqueio 42/42/36 REVOGADOS pela regra de 18/08"),
+    ("Vinicius", "Vinicius Bezerra", 36, "chefia", "dias úteis apenas manhã · nunca FDS (regra 18/08/26)", "não", "sim", "FÉRIAS 12–26/10 · bloqueio 30/42 e rodízio 15/15 REVOGADOS pela regra de 18/08"),
+    ("Amelio", "Fernanda Amelio", 36, "chefia", "dias úteis apenas manhã · nunca FDS (regra 18/08/26) · SEM NOTURNOS (atestado)", "não", "não", "fora 24–31/10 (BHN)"),
+    ("Murilo", "Murilo", 36, "rotina", "rotina onco: dias úteis apenas manhã · nunca FDS (regra 18/08/26)", "não", "não", "sábado noturno 15/15 REVOGADO pela regra de 18/08"),
     ("Janaina", "Janaina Rabelo", 30, "30h", "SÓ 8–13h (código 78); sem noturnos; seg–sáb", "não", "não", "é sempre a 10ª da manhã de sábado; NUNCA domingo"),
     ("Aline", "Aline Saliba", 40, "36h", "CEP 4h: 1ª terça manhã do mês; demais semanas seg ou qui", "não", "sim", "36 assist + 4 CEP · FÉRIAS 19/10–02/11"),
     ("CaAbreu", "Camila Abreu", 36, "36h", "fixa qua dia (+seg dia); NÃO qui noite", "não", "sim", ""),

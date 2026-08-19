@@ -34,8 +34,8 @@ FOLGAS = [
                  "o grupo)"),
     ("Fred",     "fez os 7 feriados de 2026 — pelo critério do doc §3.4, a "
                  "prioridade de folga é dele"),
-    ("DebAlves", "bloqueio 42/42/36 (AV 2:1): 6h a mais nesta semana quebrariam a "
-                 "alternância"),
+    ("DebAlves", "fez 5 de 7 feriados e a cobertura do dia já fecha sem ela "
+                 "(o bloqueio 42/42/36, motivo original, foi revogado em 18/08)"),
     ("Vinicius", "férias 12–26/10"),
 ]
 

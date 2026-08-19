@@ -32,8 +32,18 @@ eligible, cota_fds = NS["eligible"], NS["cota_fds"]
 
 FERIADO = 12
 DIAS_FDS = [d for d in range(1, 32) if wd(d) >= 5]
+# quem nunca RECEBE plantão de redistribuição (rotina + Janaina, que tem padrão próprio)
 ROTINA = {"Fred", "Milena", "Pabdo", "MSalomão", "DebAlves", "Vinicius", "Amelio",
           "Murilo", "Janaina"}
+# REGRA DA ROTINA (Marcos, 18/08/26): dias úteis apenas pela manhã · nunca fim de
+# semana. Revoga o rodízio 15/15 MSalomão↔Vinicius, o sábado noturno 15/15 do
+# Murilo, o bloqueio 42/42/36 e as tardes de completude da DebAlves. O feriado
+# segue a política própria (contagem anual, ajustes_out). Janaina NÃO é rotina:
+# o contrato dela é seg–sáb 8–13h e a 10ª manhã de sábado é dela por regra.
+ROTINA_REGRA = {"Fred", "Milena", "Pabdo", "MSalomão", "DebAlves", "Vinicius",
+                "Amelio", "Murilo"}
+# ausência real não codificada no plano (BHN): não preencher estes dias
+AUSENTE_ROTINA = {"Amelio": set(range(24, 32))}
 AUSENTE = {"FE", "LM"}
 # só estes são transferíveis. J (5h Janaina), E (CEP), C (10h chefia), A
 # (administrativo), P (paliativo), R (CRO) e AB (abono de aniversário) são
@@ -57,7 +67,8 @@ def horas_fds(ap):
 def _fator_excesso():
     demanda = sum((10*6 + 8*6 + 7*12) if wd(d) == 5 else (9*6 + 8*6 + 7*12)
                   for d in DIAS_FDS)
-    oferta = sum(cota_fds(a) for a in PLAN)
+    # a rotina saiu do fim de semana (regra 18/08): a oferta é só dos plantonistas
+    oferta = sum(cota_fds(a) for a in PLAN if a not in ROTINA_REGRA)
     return max(1.0, demanda / oferta) if oferta else 1.0
 
 
@@ -65,7 +76,9 @@ FATOR = _fator_excesso()
 
 
 def alvo_fds(ap):
-    """cota + a fatia proporcional do excesso que o mês obriga."""
+    """cota + a fatia proporcional do excesso que o mês obriga. Rotina: zero."""
+    if ap in ROTINA_REGRA:
+        return 0
     c = cota_fds(ap)
     return c * FATOR if c else 0
 
@@ -127,6 +140,81 @@ def pode_receber(ap, dia, turno):
     if alvo and dia in DIAS_FDS and horas_fds(ap) + HOURS.get(turno, 0) > alvo + 6:
         return False
     return True
+
+
+def fase0_rotina(verbose=True):
+    """aplica a regra da rotina: dia útil só manhã, fim de semana nunca."""
+    mov = {"removidos": [], "convertidos": [], "preenchidos": []}
+    for ap in ROTINA_REGRA:
+        pd = PLAN.get(ap, {})
+        for d in sorted(pd):
+            l = pd[d]
+            if l in AUSENTE or d == FERIADO:
+                continue
+            if wd(d) >= 5:
+                del pd[d]
+                mov["removidos"].append((ap, d, l))
+            elif l != "M":
+                pd[d] = "M"
+                mov["convertidos"].append((ap, d, l))
+        for d in range(1, 32):
+            if wd(d) >= 5 or d == FERIADO or d in pd:
+                continue
+            if d in AUSENTE_ROTINA.get(ap, set()):
+                continue
+            pd[d] = "M"
+            mov["preenchidos"].append((ap, d))
+    if verbose:
+        print(f"FASE 0 · regra da rotina: {len(mov['removidos'])} fds removidos · "
+              f"{len(mov['convertidos'])} convertidos p/ manhã · "
+              f"{len(mov['preenchidos'])} dias úteis completados")
+    return mov
+
+
+def fase1a_preencher_fds(verbose=True):
+    """tapa os buracos de fim de semana que a saída da rotina abriu.
+
+    Duas rodadas: primeiro respeitando o alvo proporcional de cota; se sobrar
+    buraco, cobertura ganha de cota (hierarquia A1) e o alvo é ignorado — mas
+    elegibilidade, descanso e teto da CLT nunca são.
+    """
+    postos, sem_gente = [], []
+    for rodada in ("estrita", "relaxada"):
+        for dia in DIAS_FDS:
+            for _v in range(20):
+                m, t, n = cobertura(dia)
+                alvo = mins(dia)
+                faltas = [(x, q) for x, q in
+                          (("M", alvo[0]-m), ("T", alvo[1]-t), ("N", alvo[2]-n)) if q > 0]
+                if not faltas:
+                    break
+                turno = faltas[0][0]
+                cands = []
+                for ap in PLAN:
+                    if rodada == "estrita":
+                        ok = pode_receber(ap, dia, turno)
+                    else:
+                        ok = (ap not in ROTINA and dia not in PLAN.get(ap, {})
+                              and turno in TRANSFERIVEL and eligible(ap, dia, turno)
+                              and descanso_ok(ap, dia, turno) and teto_ok(ap, dia, turno))
+                    if ok:
+                        cands.append((horas_fds(ap) - alvo_fds(ap), ap))
+                if not cands:
+                    if rodada == "relaxada":
+                        sem_gente.append((dia, turno))
+                    break
+                cands.sort()
+                PLAN[cands[0][1]][dia] = turno
+                postos.append((cands[0][1], dia, turno, rodada))
+    if verbose:
+        print(f"FASE 1a · fds preenchido: {len(postos)} encaixes "
+              f"({sum(1 for x in postos if x[3]=='relaxada')} acima do alvo de cota, "
+              f"porque cobertura ganha de cota)")
+        for ap, d, t, r in postos:
+            print(f"   {d:02d}/10 {t}: {ap}{' *' if r=='relaxada' else ''}")
+        for d, t in sem_gente:
+            print(f"   ⚠ {d:02d}/10 {t}: SEM candidato elegível — buraco real")
+    return postos, sem_gente
 
 
 def fase1_fds(verbose=True):
@@ -283,6 +371,8 @@ def fase3_semana(verbose=True):
 
 
 def rodar(verbose=True):
+    m0 = fase0_rotina(verbose)
+    m1a, buracos_fds = fase1a_preencher_fds(verbose)
     if verbose:
         print(f"injustiça inicial (soma dos desvios de cota): {injusticas()}h")
     m1 = fase1_fds(verbose)
@@ -290,7 +380,8 @@ def rodar(verbose=True):
         print(f"injustiça depois da fase 1: {injusticas()}h\n")
     m2, imp = fase2_feriado(verbose)
     m3 = fase3_semana(verbose)
-    return PLAN, {"fds": m1, "feriado": m2, "impossivel": imp, "semana": m3}
+    return PLAN, {"rotina": m0, "fds_preenchido": m1a, "buracos_fds": buracos_fds,
+                  "fds": m1, "feriado": m2, "impossivel": imp, "semana": m3}
 
 
 if __name__ == "__main__":
