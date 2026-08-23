@@ -4,24 +4,74 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "functions": {
-    "api/extrair-escala.ts": { "maxDuration": 120 },
-    "api/montar-escala.ts": { "maxDuration": 120 },
-    "api/regras-parse.ts": { "maxDuration": 60 },
-    "api/maite/index.ts": { "maxDuration": 120 }
+    "api/extrair-escala.ts": {
+      "maxDuration": 120
+    },
+    "api/montar-escala.ts": {
+      "maxDuration": 120
+    },
+    "api/regras-parse.ts": {
+      "maxDuration": 60
+    },
+    "api/maite/index.ts": {
+      "maxDuration": 120
+    }
   },
   "redirects": [
-    { "source": "/", "destination": "/ritmo/", "permanent": false }
+    {
+      "source": "/",
+      "destination": "/ritmo/",
+      "permanent": false
+    }
   ],
   "rewrites": [
-    { "source": "/babymarley", "destination": "/ritmo/babymarley.html" },
-    { "source": "/babymarley/", "destination": "/ritmo/babymarley.html" },
-    { "source": "/sobre", "destination": "/ritmo/sobre.html" },
-    { "source": "/sobre.html", "destination": "/ritmo/sobre.html" },
-    { "source": "/privacy", "destination": "/ritmo/privacy.html" },
-    { "source": "/privacy.html", "destination": "/ritmo/privacy.html" },
-    { "source": "/terms", "destination": "/ritmo/terms.html" },
-    { "source": "/terms.html", "destination": "/ritmo/terms.html" },
-    { "source": "/ritmo", "destination": "/ritmo/index.html" },
-    { "source": "/ritmo/(.*)", "destination": "/ritmo/index.html" }
+    {
+      "source": "/babymarley",
+      "destination": "/ritmo/babymarley.html"
+    },
+    {
+      "source": "/babymarley/",
+      "destination": "/ritmo/babymarley.html"
+    },
+    {
+      "source": "/sobre",
+      "destination": "/ritmo/sobre.html"
+    },
+    {
+      "source": "/sobre.html",
+      "destination": "/ritmo/sobre.html"
+    },
+    {
+      "source": "/privacy",
+      "destination": "/ritmo/privacy.html"
+    },
+    {
+      "source": "/privacy.html",
+      "destination": "/ritmo/privacy.html"
+    },
+    {
+      "source": "/terms",
+      "destination": "/ritmo/terms.html"
+    },
+    {
+      "source": "/terms.html",
+      "destination": "/ritmo/terms.html"
+    },
+    {
+      "source": "/escala/preferencias",
+      "destination": "/ritmo/escala/preferencias/index.html"
+    },
+    {
+      "source": "/escala/preferencias/",
+      "destination": "/ritmo/escala/preferencias/index.html"
+    },
+    {
+      "source": "/ritmo",
+      "destination": "/ritmo/index.html"
+    },
+    {
+      "source": "/ritmo/(.*)",
+      "destination": "/ritmo/index.html"
+    }
   ]
 }

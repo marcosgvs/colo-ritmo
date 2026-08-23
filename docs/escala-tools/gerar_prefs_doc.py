@@ -64,6 +64,31 @@ ESPECIAIS = {
 }
 
 
+# versão PÚBLICA: a restrição operacional fica, o motivo clínico sai.
+# Saúde de terceiros nomeados não vai para URL aberta.
+SANITIZAR = [
+    ("SEM NOTURNOS (atestado)", "SEM NOTURNOS (restrição registrada)"),
+    ("atestado desde abr/25", "restrição registrada"),
+    ("(relatório médico)", "(restrição registrada)"),
+    ("MÁX 1 NOTURNO/MÊS (relatório)", "MÁX 1 NOTURNO/MÊS (restrição registrada)"),
+    ("(mãe em quimio — sem tardes, sem 12h diurnas)",
+     "— sem tardes, sem 12h diurnas (motivo registrado)"),
+    ("mãe em quimio", "motivo registrado"),
+    ("Repouso 09–12/10 (procedimento) — não escalar.",
+     "Afastamento 09–12/10 — não escalar."),
+    ("repouso 09–12/10 (procedimento)", "afastamento 09–12/10"),
+    ("Licença-paternidade: DPP 09/10, 20 dias (pode antecipar) · até lá pode "
+     "todas as manhãs (excepcional).",
+     "Licença-paternidade prevista a partir de ~09/10 (20 dias) · até lá pode "
+     "todas as manhãs (excepcional)."),
+    ("licença-paternidade: DPP 09/10, 20 dias", "licença-paternidade prevista a partir de ~09/10"),
+    ("E-mail novo: dr.carlos.ernesto.pediatra@gmail.com · ", ""),
+    ("e-mail novo dr.carlos.ernesto.pediatra@gmail.com", "e-mail atualizado no cadastro"),
+    # catch-all: nenhum e-mail pessoal na versão pública, em qualquer formato
+    ("dr.carlos.ernesto.pediatra@gmail.com", "e-mail atualizado no cadastro"),
+]
+
+
 def _faixas(dias):
     """[19,20,21,25] -> '19–21 · 25'"""
     dias = sorted(dias)
@@ -105,7 +130,7 @@ def _janela(ap, ALLOW):
     return " · ".join(partes)
 
 
-def montar(caminho_saida):
+def montar(caminho_saida, publico=False):
     ns = runpy.run_path(os.path.join(AQUI, "escala_out_v3.py"))
     PLAN, CONVOC, ALLOW = ns["PLAN"], ns["CONVOC"], ns["ALLOW"]
     CHUTES = ns["CHUTES"]
@@ -188,6 +213,17 @@ def montar(caminho_saida):
                 f'{campos}</section>')
 
     pagina = PAGINA.replace("__INDICE__", " · ".join(indice)).replace("__CORPO__", "\n".join(corpo))
+    if publico:
+        for de, para in SANITIZAR:
+            pagina = pagina.replace(de, para)
+            pagina = pagina.replace(html.escape(de), html.escape(para))
+        pagina = pagina.replace(
+            "<title>", '<meta name="robots" content="noindex,nofollow">\n<title>')
+        pagina = pagina.replace(
+            "Se algo estiver diferente do que a pessoa mandou, é aqui que se corrige.</p>",
+            "Se algo estiver diferente do que a pessoa mandou, é aqui que se corrige. "
+            "<b>Versão para a equipe:</b> motivos clínicos e dados pessoais foram "
+            "omitidos — a restrição vale, o motivo fica no registro interno.</p>")
     with open(caminho_saida, "w", encoding="utf-8") as f:
         f.write(pagina)
     return caminho_saida
@@ -240,6 +276,19 @@ PAGINA = """<title>Preferências da Equipe UTI HCB</title>
             text-transform:uppercase; color:var(--ink-3); padding-top:2px; }
   .valor { color:var(--ink-2); font-size:13.5px; }
   .valor b { color:var(--ink); }
+  @media print {
+    :root { --bg:#fff; --surface:#fff; --line:#bbb; --ink:#000; --ink-2:#222;
+            --ink-3:#555; --brand:#3a3160; --brand-soft:#eee; --ok:#2f4d28;
+            --ok-soft:#eee; --med:#1e4a52; --med-soft:#eee; --mine:#6b4a15;
+            --mine-soft:#eee; --open:#8c4437; --open-soft:#eee; }
+    body { font-size:10.5px; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    main { max-width:none; padding:0; }
+    .indice { display:none; }
+    .pessoa { break-inside:avoid; padding:6px 10px; margin:5px 0; }
+    h2 { break-after:avoid; margin:16px 0 2px; }
+    .rotulo { flex-basis:118px; }
+    @page { size:A4; margin:13mm 11mm; }
+  }
 </style>
 <main>
   <p class="eyebrow">Colo Ritmo · Hospital da Criança de Brasília</p>
@@ -253,4 +302,4 @@ __CORPO__
 
 if __name__ == "__main__":
     destino = sys.argv[1] if len(sys.argv) > 1 else os.path.join(AQUI, "prefs-medicos.html")
-    print("gerado:", montar(destino))
+    print("gerado:", montar(destino, publico="--publico" in sys.argv))
