@@ -134,7 +134,7 @@ def dropdowns(ids):
             continue
         pedidos.append({"setDataValidation": {
             "range": {"sheetId": ids[m], "startRowIndex": 7, "endRowIndex": 73,
-                      "startColumnIndex": 2, "endColumnIndex": 33},
+                      "startColumnIndex": 2, "endColumnIndex": 34},
             "rule": {
                 "condition": {"type": "ONE_OF_LIST",
                               "values": [{"userEnteredValue": c} for c in CODIGOS_VALIDOS]},

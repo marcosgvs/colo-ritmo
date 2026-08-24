@@ -62,14 +62,17 @@ MESES_LONGO = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julh
 # ------------------------------------------------------------------ geometria
 C_MED, C_CH = 1, 2
 C_D1 = 3                      # primeira coluna de dia (C)
-C_DN = C_D1 + 30              # última (AG) — sempre 31 colunas, geometria fixa
+C_DN = C_D1 + 30              # último dia DO MÊS (AG) — as calculadoras param aqui
+C_D32 = C_D1 + 31             # coluna do dia 1º do mês seguinte (AH) — só exibição:
+                              # pela convenção da casa (doc §6), ele conta na cota
+                              # do mês seguinte, então fica fora de CH/FDS/saldo
 COLS_TOT = ["CH mês", "FDS", "SxN", "Feriado", "Meta", "Saldo", "18h⚠", "N→T",
             "Cota FDS", "FDS⚠", "Sem⚠"]   # fds⚠ = excesso sobre cota × fator do mês
 # sem⚠ = maior jornada semanal da pessoa no mês. Teto de 44h (art. 7º XIII da
 # Constituição) e CH + 10h (art. 59 CLT, até 2h extra/dia). O mês pode fechar
 # na média e a semana estourar — em outubro isso aconteceu 39 vezes.
 JANELAS_SEMANA = [(0, 6), (7, 13), (14, 20), (21, 27), (28, 30)]
-C_TOT = C_DN + 1              # AH..AO
+C_TOT = C_D32 + 1             # AI em diante
 R_TIT, R_DIA, R_DOW, R_FDS, R_SEX, R_FER, R_HDR, R_P0 = 1, 2, 3, 4, 5, 6, 7, 8
 
 L_D1, L_DN = get_column_letter(C_D1), get_column_letter(C_DN)
@@ -492,6 +495,19 @@ def aba_mes(wb, mes, DIAS, fim_cod, pessoas, r_cota):
 
     ws.column_dimensions["A"].width = 14
     ws.column_dimensions["B"].width = 5
+    # dia 1º do mês seguinte (32ª coluna): rótulo, estilo e dado real quando existe
+    prox = dt.date(2026 + (1 if mes == 12 else 0), mes % 12 + 1, 1)
+    ws.column_dimensions[get_column_letter(C_D32)].width = 5
+    c32 = ws.cell(row=R_DIA, column=C_D32, value=prox.strftime("%d/%m"))
+    c32.font = Font(name=F, bold=True, size=7, color=INK2)
+    c32.alignment = Alignment(horizontal="center")
+    c32.fill = PatternFill("solid", fgColor=LAVS if prox.weekday() >= 5 else CREME2)
+    w32 = ws.cell(row=R_DOW, column=C_D32, value=WD_PT[prox.weekday()])
+    w32.font = Font(name=F, size=8, color=CORALI if prox.weekday() >= 5 else INK3)
+    w32.alignment = Alignment(horizontal="center")
+    _tip(c32, "dia-seguinte")
+    for rr in (R_FDS, R_SEX, R_FER):
+        ws.cell(row=rr, column=C_D32, value=0)     # fora das calculadoras do mês
     # cabeçalho de dias + máscaras
     for i in range(31):
         col = C_D1 + i
@@ -572,6 +588,17 @@ def aba_mes(wb, mes, DIAS, fim_cod, pessoas, r_cota):
                 c.font = Font(name=F, size=9, color=INK)
         for i in range(ndias, 31):
             ws.cell(row=lin, column=C_D1 + i).fill = PatternFill("solid", fgColor=LINE)
+        cel32 = DIAS.get(prox, {}).get(apelido)
+        c = ws.cell(row=lin, column=C_D32)
+        c.alignment = Alignment(horizontal="center")
+        c.border = BOX
+        if cel32:
+            letra = cel32[0]
+            c.value = letra
+            c.font = Font(name=F, size=9, bold=True,
+                          color="FFFFFF" if letra in BRANCO else INK)
+            if letra in FILLS:
+                c.fill = PatternFill("solid", fgColor=FILLS[letra])
 
         eh = expr_horas(lin)
         f = [f"=SUMPRODUCT({eh})",
@@ -627,16 +654,17 @@ def aba_mes(wb, mes, DIAS, fim_cod, pessoas, r_cota):
         cf0.font = Font(name=F, size=9, bold=True, color=CORALI)
         _tip(cf0, "falta")
         linhas_falta.append(rf)
-        for i in range(ndias):
+        for i, data in [(i2, dt.date(2026, mes, i2 + 1)) for i2 in range(ndias)] + [(31, prox)]:
             col = get_column_letter(C_D1 + i)
             faixa = f"{col}{R_P0}:{col}{ultima}"
             conta = "+".join(f'COUNTIF({faixa},"{x}")' for x in letras)
             c = ws.cell(row=rl, column=C_D1 + i, value=f"={conta}")
             c.font = Font(name=F, size=8, color=INK2)
             c.alignment = Alignment(horizontal="center")
-            data = dt.date(2026, mes, i + 1)
-            # feriado escala como o dia da semana em que cai
-            base = 4 if mes >= D.VIGENCIA_NOVA else 9
+            # feriado escala como o dia da semana em que cai; o dia 32 usa a
+            # vigência do mês a que pertence (SET→01/10 já é regra nova)
+            mes_do_dia = mes if i < 31 else (mes % 12 + 1)
+            base = 4 if mes_do_dia >= D.VIGENCIA_NOVA else 9
             tipo = base + (0 if data.weekday() < 5 else (1 if data.weekday() == 5 else 2))
             ref = f"CONFIG!${get_column_letter(2+idx)}${tipo}"
             cf = ws.cell(row=rf, column=C_D1 + i,
@@ -656,7 +684,7 @@ def aba_mes(wb, mes, DIAS, fim_cod, pessoas, r_cota):
                    fill=PatternFill("solid", bgColor=CORAL),
                    font=Font(name=F, size=8, bold=True, color="FFFFFF")))
     for rf in linhas_falta:
-        faixa = f"{L_D1}{rf}:{L_DN}{rf}"
+        faixa = f"{L_D1}{rf}:{get_column_letter(C_D32)}{rf}"
         ws.conditional_formatting.add(faixa, CellIsRule(
             operator="greaterThan", formula=["0"],
             fill=PatternFill("solid", bgColor=CORAL),
@@ -788,7 +816,7 @@ def aba_senior(wb, pessoas, fim_cod):
         c = ws.cell(row=R_HDR, column=col, value=txt)
         c.font = Font(name=F, bold=True, size=9, color="FFFFFF")
         c.fill = PatternFill("solid", fgColor=LAVI)
-    for i in range(31):
+    for i in range(32):
         col = C_D1 + i
         ws.column_dimensions[get_column_letter(col)].width = 5
         for r, formula in ((R_DIA, f'=IFERROR(INDIRECT($B$1&"!{get_column_letter(col)}{R_DIA}"),"")'),
@@ -803,7 +831,7 @@ def aba_senior(wb, pessoas, fim_cod):
         lin = R_P0 + k
         c = ws.cell(row=lin, column=C_MED, value=nomes.get(apelido, apelido))
         c.font = Font(name=F, size=9, color=INK)
-        for i in range(31):
+        for i in range(32):
             col = C_D1 + i
             cel = ws.cell(row=lin, column=col, value=(
                 f'=IFERROR(VLOOKUP(INDIRECT($B$1&"!"&ADDRESS(ROW(),COLUMN(),4)),'
@@ -910,7 +938,7 @@ def aba_dia_a_dia(wb, mes=10):
     return ws
 
 
-def aba_esboco(wb):
+def aba_esboco(wb, r_cota):
     """Outubro segundo o ESBOÇO da escalista — transcrição do PDF, para conferência.
 
     32 colunas (01/10 a 01/11). Contagens por fórmula; mínimos do dia escritos
@@ -950,10 +978,33 @@ def aba_esboco(wb):
             cw.fill = PatternFill("solid", fgColor=CORALI)
         elif data.weekday() >= 5:
             cd.fill = PatternFill("solid", fgColor=LAVS)
+        fora = i == 31                     # 01/11 conta na cota de novembro
+        ws.cell(row=4, column=col, value=0 if fora else (1 if data.weekday() >= 5 else 0))
+        ws.cell(row=5, column=col, value=0 if fora else (1 if data.weekday() == 4 else 0))
+        ws.cell(row=6, column=col, value=0 if fora else (1 if (10, i + 1) in D.FERIADOS_2026 else 0))
+    for rr, rot in ((4, "máscara fds"), (5, "máscara sexta"), (6, "máscara feriado")):
+        ws.row_dimensions[rr].hidden = True
+        ws.cell(row=rr, column=1, value=rot)
     for col, txt in ((C_MED, "Médico"), (C_CH, "CH")):
         c = ws.cell(row=R_HDR, column=col, value=txt)
         c.font = Font(name=F, bold=True, size=9, color="FFFFFF")
         c.fill = PatternFill("solid", fgColor=LAVI)
+    # calculadoras — as mesmas 11 da aba original, adaptadas às 32 colunas
+    E_D1, E_DN = C_D1, C_D1 + NDIAS - 1                     # C .. AH (exibição)
+    # calculadoras param no dia 31: o 01/11 conta na cota de novembro (doc §6)
+    E_CALC = E_DN - 1                                        # AG
+    L1, LN = get_column_letter(E_D1), get_column_letter(E_CALC)
+    LN_1, L2 = get_column_letter(E_CALC - 1), get_column_letter(E_D1 + 1)
+    E_TOT = E_DN + 1
+    for i, txt in enumerate(COLS_TOT):
+        col = E_TOT + i
+        c = _tip(ws.cell(row=R_HDR, column=col, value=txt), txt)
+        c.font = Font(name=F, bold=True, size=8, color="FFFFFF")
+        c.fill = PatternFill("solid", fgColor=LAVI if i < 6 else CORALI)
+        c.alignment = Alignment(horizontal="center", wrap_text=True)
+        ws.column_dimensions[get_column_letter(col)].width = 7.5
+    JANELAS_32 = [(0, 6), (7, 13), (14, 20), (21, 27), (28, 30)]
+    semanas32 = round(31 / 7, 2)
     for k, (apelido, ch) in enumerate(pessoas):
         lin = R_P0 + k
         ws.cell(row=lin, column=C_MED, value=apelido).font = Font(
@@ -973,6 +1024,46 @@ def aba_esboco(wb):
                               color="FFFFFF" if letra in BRANCO else INK)
                 if letra in FILLS:
                     c.fill = PatternFill("solid", fgColor=FILLS[letra])
+        eh = expr_horas(lin, E_D1, E_CALC)
+        f = [f"=SUMPRODUCT({eh})",
+             f"=SUMPRODUCT(${L1}$4:${LN}$4,{eh})",
+             f'=SUMPRODUCT(${L1}$5:${LN}$5,(${L1}{lin}:${LN}{lin}="N")*1)',
+             f"=SUMPRODUCT(${L1}$6:${LN}$6,{eh})",
+             f"=ROUND({get_column_letter(C_CH)}{lin}*{semanas32},0)",
+             f"={get_column_letter(E_TOT)}{lin}-{get_column_letter(E_TOT+4)}{lin}",
+             f'=SUMPRODUCT((${L1}{lin}:${LN_1}{lin}="N")*'
+             f'((${L2}{lin}:${LN}{lin}="M")+(${L2}{lin}:${LN}{lin}="E")'
+             f'+(${L2}{lin}:${LN}{lin}="C")+(${L2}{lin}:${LN}{lin}="D")))',
+             f'=SUMPRODUCT((${L1}{lin}:${LN_1}{lin}="N")*(${L2}{lin}:${LN}{lin}="T"))',
+             f'=IFERROR(INDEX(CONFIG!$B${r_cota}:$D${r_cota+2},'
+             f'MATCH(${get_column_letter(C_CH)}{lin},CONFIG!$A${r_cota}:$A${r_cota+2},0),'
+             f'IF(COUNTIF(${L1}{lin}:${LN}{lin},"FE")>=10,1,'
+             f'IF(COUNTIF(${L1}{lin}:${LN}{lin},"FE")>=1,2,3))),"")',
+             f'=IF({get_column_letter(E_TOT+8)}{lin}="","",'
+             f'MAX(0,{get_column_letter(E_TOT+1)}{lin}-'
+             f'{get_column_letter(E_TOT+8)}{lin}*CONFIG!$E${r_cota}))',
+             "=MAX(" + ",".join(
+                 f"SUMPRODUCT({expr_horas(lin, E_D1 + a2, E_D1 + b2)})"
+                 for a2, b2 in JANELAS_32) + ")"]
+        for i, formula in enumerate(f):
+            c = ws.cell(row=lin, column=E_TOT + i, value=formula)
+            c.number_format = "0"
+            c.font = Font(name=F, size=8, color=INK2 if i < 5 else INK,
+                          bold=(i == 5))
+            c.alignment = Alignment(horizontal="center")
+            c.border = BOX
+    col_exc = get_column_letter(E_TOT + 9)
+    col_sem = get_column_letter(E_TOT + 10)
+    ws.conditional_formatting.add(
+        f"{col_exc}{R_P0}:{col_exc}{R_P0+len(pessoas)-1}",
+        CellIsRule(operator="greaterThan", formula=["0"],
+                   fill=PatternFill("solid", bgColor=CORAL),
+                   font=Font(name=F, size=8, bold=True, color="FFFFFF")))
+    ws.conditional_formatting.add(
+        f"{col_sem}{R_P0}:{col_sem}{R_P0+len(pessoas)-1}",
+        CellIsRule(operator="greaterThan", formula=["44"],
+                   fill=PatternFill("solid", bgColor=CORAL),
+                   font=Font(name=F, size=8, bold=True, color="FFFFFF")))
     ultima = R_P0 + len(pessoas) - 1
     r = ultima + 2
     grupos = [(rot, [k2 for k2, v in D.TURNOS.items() if v[4 + gi]], gi)
@@ -1010,7 +1101,7 @@ def aba_esboco(wb):
             operator="greaterThan", formula=["0"],
             fill=PatternFill("solid", bgColor=CORAL),
             font=Font(name=F, size=8, bold=True, color="FFFFFF")))
-    creme(ws, r + 8, C_D1 + 33)
+    creme(ws, r + 8, C_D1 + NDIAS + len(COLS_TOT) + 1)
     ws.freeze_panes = f"{get_column_letter(C_D1)}{R_P0}"
     return ws
 
@@ -1359,7 +1450,7 @@ def main():
     for mes in range(1, 13):
         aba_mes(wb, mes, DIAS, fim_cod, pessoas, r_cota)
     aba_dia_a_dia(wb, mes=10)
-    aba_esboco(wb)
+    aba_esboco(wb, r_cota)
     aba_painel(wb, pessoas, oficial)
     aba_senior(wb, pessoas, fim_cod)
     aba_validador(wb, DIAS, pessoas)
