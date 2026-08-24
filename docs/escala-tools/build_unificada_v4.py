@@ -910,6 +910,111 @@ def aba_dia_a_dia(wb, mes=10):
     return ws
 
 
+def aba_esboco(wb):
+    """Outubro segundo o ESBOÇO da escalista — transcrição do PDF, para conferência.
+
+    32 colunas (01/10 a 01/11). Contagens por fórmula; mínimos do dia escritos
+    numa linha própria e a falta em vermelho, como nas mensais.
+    """
+    import esboco_out_dados as EB
+    ws = wb.create_sheet("OUT · ESBOÇO", wb.sheetnames.index("OUT · DIA A DIA") + 1)
+    ws.sheet_properties.tabColor = "D9A85A"
+    ws.sheet_view.showGridLines = False
+    t = ws.cell(row=1, column=1, value="Outubro · Esboço da escalista (verificação)")
+    t.font = Font(name=DISPLAY, bold=True, size=14, color=INK)
+    sub = ws.cell(row=1, column=9, value=(
+        "Transcrito do PDF de 23/08 — 01/10 a 01/11. Compare com a aba OUT; a linha "
+        "Falta mostra onde o esboço não bate o mínimo."))
+    sub.font = Font(name=F, size=8, italic=True, color=INK3)
+    ws.column_dimensions["A"].width = 14
+    ws.column_dimensions["B"].width = 5
+    NDIAS = 32
+    pessoas = [(a2, ch) for a2, _n, ch, *_ in D.ROSTER]
+    for i in range(NDIAS):
+        col = C_D1 + i
+        data = dt.date(2026, 11, 1) if i == 31 else dt.date(2026, 10, i + 1)
+        letra_c = get_column_letter(col)
+        ws.column_dimensions[letra_c].width = 4.2
+        cd = ws.cell(row=2, column=col, value="01/11" if i == 31 else i + 1)
+        cd.font = Font(name=F, bold=True, size=8 if i == 31 else 9,
+                       color="FFFFFF" if (10, i + 1) in D.FERIADOS_2026 else INK)
+        cd.alignment = Alignment(horizontal="center")
+        cw = ws.cell(row=3, column=col, value=WD_PT[data.weekday()])
+        cw.font = Font(name=F, size=8,
+                       color=CORALI if data.weekday() >= 5 else INK3)
+        cw.alignment = Alignment(horizontal="center")
+        if (10, i + 1) in D.FERIADOS_2026:
+            cd.fill = PatternFill("solid", fgColor=CORAL)
+            cw.value = D.FERIADOS_2026[(10, i + 1)][1]
+            cw.font = Font(name=F, size=8, bold=True, color="FFFFFF")
+            cw.fill = PatternFill("solid", fgColor=CORALI)
+        elif data.weekday() >= 5:
+            cd.fill = PatternFill("solid", fgColor=LAVS)
+    for col, txt in ((C_MED, "Médico"), (C_CH, "CH")):
+        c = ws.cell(row=R_HDR, column=col, value=txt)
+        c.font = Font(name=F, bold=True, size=9, color="FFFFFF")
+        c.fill = PatternFill("solid", fgColor=LAVI)
+    for k, (apelido, ch) in enumerate(pessoas):
+        lin = R_P0 + k
+        ws.cell(row=lin, column=C_MED, value=apelido).font = Font(
+            name=F, size=9, bold=True, color=INK)
+        cc = ws.cell(row=lin, column=C_CH, value=ch)
+        cc.font = Font(name=F, size=8, color=INK3)
+        cc.alignment = Alignment(horizontal="center")
+        for i in range(NDIAS):
+            col = C_D1 + i
+            letra = EB.ESBOCO.get(apelido, {}).get(i + 1)
+            c = ws.cell(row=lin, column=col)
+            c.alignment = Alignment(horizontal="center")
+            c.border = BOX
+            if letra:
+                c.value = letra
+                c.font = Font(name=F, size=9, bold=True,
+                              color="FFFFFF" if letra in BRANCO else INK)
+                if letra in FILLS:
+                    c.fill = PatternFill("solid", fgColor=FILLS[letra])
+    ultima = R_P0 + len(pessoas) - 1
+    r = ultima + 2
+    grupos = [(rot, [k2 for k2, v in D.TURNOS.items() if v[4 + gi]], gi)
+              for gi, rot in enumerate(("Manhã", "Tarde", "Noite"))]
+    for gi, (rot, letras, idx) in enumerate(grupos):
+        rl, rf, rm = r + gi, r + 4 + gi, r + 3
+        _tip(ws.cell(row=rl, column=C_MED, value=rot), "cob-turno")
+        ws.cell(row=rl, column=C_MED).font = Font(name=F, size=9, bold=True, color=LAVI)
+        ws.cell(row=rm, column=C_MED, value="Mínimo do dia").font = Font(
+            name=F, size=8, color=INK3)
+        cf0 = ws.cell(row=rf, column=C_MED, value=f"Falta {rot.lower()}")
+        cf0.font = Font(name=F, size=9, bold=True, color=CORALI)
+        _tip(cf0, "falta")
+        for i in range(NDIAS):
+            col = get_column_letter(C_D1 + i)
+            data = dt.date(2026, 11, 1) if i == 31 else dt.date(2026, 10, i + 1)
+            tipo = "útil" if data.weekday() < 5 else ("sábado" if data.weekday() == 5 else "domingo")
+            minimo = D.MINIMOS[tipo][idx]
+            faixa = f"{col}{R_P0}:{col}{ultima}"
+            conta = "+".join(f'COUNTIF({faixa},"{x}")' for x in letras)
+            c1 = ws.cell(row=rl, column=C_D1 + i, value=f"={conta}")
+            c1.font = Font(name=F, size=8, color=INK2)
+            c1.alignment = Alignment(horizontal="center")
+            if gi == 0:
+                cmin = ws.cell(row=rm, column=C_D1 + i,
+                               value="/".join(str(D.MINIMOS[tipo][j]) for j in range(3)))
+                cmin.font = Font(name=F, size=6.5, color=INK3)
+                cmin.alignment = Alignment(horizontal="center")
+            cf = ws.cell(row=rf, column=C_D1 + i, value=f"=MAX(0,{minimo}-{col}{r+gi})")
+            cf.font = Font(name=F, size=8, bold=True, color=CORALI)
+            cf.alignment = Alignment(horizontal="center")
+    for rf in (r + 4, r + 5, r + 6):
+        faixa = f"{get_column_letter(C_D1)}{rf}:{get_column_letter(C_D1+31)}{rf}"
+        ws.conditional_formatting.add(faixa, CellIsRule(
+            operator="greaterThan", formula=["0"],
+            fill=PatternFill("solid", bgColor=CORAL),
+            font=Font(name=F, size=8, bold=True, color="FFFFFF")))
+    creme(ws, r + 8, C_D1 + 33)
+    ws.freeze_panes = f"{get_column_letter(C_D1)}{R_P0}"
+    return ws
+
+
 def contagem_oficial_sxn():
     """lê a aba SEXTA NOITE da contagem anual da Mari: {(apelido, mês): nº}."""
     import unicodedata
@@ -1254,6 +1359,7 @@ def main():
     for mes in range(1, 13):
         aba_mes(wb, mes, DIAS, fim_cod, pessoas, r_cota)
     aba_dia_a_dia(wb, mes=10)
+    aba_esboco(wb)
     aba_painel(wb, pessoas, oficial)
     aba_senior(wb, pessoas, fim_cod)
     aba_validador(wb, DIAS, pessoas)
