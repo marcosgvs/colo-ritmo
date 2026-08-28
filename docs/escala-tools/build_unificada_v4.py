@@ -61,23 +61,48 @@ MESES_LONGO = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julh
 
 # ------------------------------------------------------------------ geometria
 C_MED, C_CH = 1, 2
-C_D1 = 3                      # primeira coluna de dia (C)
-C_DN = C_D1 + 30              # último dia DO MÊS (AG) — as calculadoras param aqui
-C_D32 = C_D1 + 31             # coluna do dia 1º do mês seguinte (AH) — só exibição:
+N_PRE = 6                     # colunas do FIM DO MÊS ANTERIOR: todo mês abre com a
+                              # semana civil fechada (dia 1º cai terça → a segunda
+                              # aparece). São fórmulas vivas da aba anterior — entram
+                              # nas somas semanais, mas CH/FDS/saldo delas pertencem
+                              # ao mês anterior (espelho da regra do dia 1º seguinte)
+C_PRE1 = 3                    # primeira coluna de véspera (C)
+C_D1 = C_PRE1 + N_PRE         # primeira coluna de dia (I)
+C_DN = C_D1 + 30              # último dia DO MÊS (AM) — CH/FDS/saldo param aqui
+C_D32 = C_D1 + 31             # coluna do dia 1º do mês seguinte (AN) — só exibição:
                               # pela convenção da casa (doc §6), ele conta na cota
                               # do mês seguinte, então fica fora de CH/FDS/saldo
-COLS_TOT = ["CH mês", "FDS", "SxN", "Feriado", "Meta", "Saldo", "18h⚠", "N→T",
-            "Cota FDS", "FDS⚠", "Sem⚠"]   # fds⚠ = excesso sobre cota × fator do mês
-# sem⚠ = maior jornada semanal da pessoa no mês. Teto de 44h (art. 7º XIII da
-# Constituição) e CH + 10h (art. 59 CLT, até 2h extra/dia). O mês pode fechar
-# na média e a semana estourar — em outubro isso aconteceu 39 vezes.
-JANELAS_SEMANA = [(0, 6), (7, 13), (14, 20), (21, 27), (28, 30)]
-C_TOT = C_D32 + 1             # AI em diante
+N_SEM = 6                     # máximo de semanas civis que um mês encosta
+COLS_TOT = (["CH mês", "FDS", "SxN", "Feriado", "Meta", "Saldo", "18h⚠", "N→T",
+             "Cota FDS", "FDS⚠", "Sem⚠"]      # fds⚠ = excesso sobre cota × fator
+            + [f"Sem {k}" for k in range(1, N_SEM + 1)])
+# Sem 1..6 = horas por SEMANA CIVIL (seg–dom); a 1ª inclui os dias do mês anterior
+# que fecham a semana. sem⚠ = a maior delas. Teto duro: 44h (art. 7º XIII da
+# Constituição). O mês pode fechar na média e a semana estourar mesmo assim.
+C_TOT = C_D32 + 1             # AO em diante
 R_TIT, R_DIA, R_DOW, R_FDS, R_SEX, R_FER, R_HDR, R_P0 = 1, 2, 3, 4, 5, 6, 7, 8
 
+L_PRE1 = get_column_letter(C_PRE1)
+L_PRE2 = get_column_letter(C_PRE1 + 1)
 L_D1, L_DN = get_column_letter(C_D1), get_column_letter(C_DN)
 L_DN_1 = get_column_letter(C_DN - 1)
 L_D2 = get_column_letter(C_D1 + 1)
+
+
+def janelas_semana_civil(mes, ndias, ano=2026):
+    """[(col_ini, col_fim)] de cada semana civil que o mês encosta.
+
+    A 1ª janela começa na segunda-feira — que pode estar nas colunas de véspera
+    (C..H). A última para no fim do mês: o resto dela é medido na Sem 1 do mês
+    seguinte, então nenhuma semana fica sem dono e nenhuma é contada duas vezes.
+    """
+    offset = dt.date(ano, mes, 1).weekday()          # seg=0 … dom=6
+    ini = C_D1 - offset
+    janelas = []
+    while ini <= C_D1 + ndias - 1:
+        janelas.append((max(ini, C_PRE1), min(ini + 6, C_D1 + ndias - 1)))
+        ini += 7
+    return janelas
 
 # expressão de horas de uma linha de pessoa (usada em várias fórmulas)
 def expr_horas(lin, c1=None, c2=None):
@@ -202,11 +227,15 @@ def aba_leiame(wb, rel_grade):
         ("CONFIG", "As regras como dado: cobertura mínima, cota de fds em mês com férias, "
                    "tabela de códigos e as regras duras com o artigo da CLT. Mudou aqui, "
                    "mudou na planilha toda."),
-        ("JAN a DEZ", "A escala: matriz médico × dia. No rodapé, a lotação de cada turno em "
-                      "cada dia e quanto falta pro mínimo. À direita, por pessoa: carga do mês, "
-                      "fds, sexta-noite, feriado, meta, saldo e os dois alertas de jornada."),
+        ("JAN a DEZ", "A escala: matriz médico × dia. Todo mês abre com a SEMANA FECHADA: "
+                      "as primeiras colunas trazem o fim do mês anterior (dia 1º cai terça, "
+                      "a segunda aparece) e o dia 1º do mês seguinte fecha a ponta. No rodapé, "
+                      "a lotação de cada turno em cada dia e quanto falta pro mínimo. À direita, "
+                      "por pessoa: carga do mês, fds, sexta-noite, feriado, meta, saldo, os "
+                      "alertas de jornada e as horas de cada semana civil (Sem 1 a Sem 6 — "
+                      "a 1ª semana conta os dias do mês anterior; vermelho acima de 44h)."),
         ("OUT · DIA A DIA", "O mês em formato calendário: por dia e por turno, quem "
-                             "está onde, ausências e cobertura. É fórmula da aba do mês — "
+                             "está onde, e a cobertura. É fórmula da aba do mês — "
                              "trocou um plantão no dropdown, o dia a dia se refaz. Bom pra "
                              "bater o olho e perceber o que está esquisito."),
         ("PAINEL ANO", "O comparativo do ano: saldo, fds, sexta-noite e feriado de cada pessoa "
@@ -253,9 +282,10 @@ def aba_leiame(wb, rel_grade):
         "Novembro e dezembro estão em branco, prontos pra montar.",
         "Dois códigos órfãos no histórico: 23 (Isabella 23/08) e 3 (Laura 02/08) — não "
         "constam em nenhuma legenda; ficaram de fora.",
-        "A coluna 18h⚠ compara cada dia com o seguinte DENTRO do mês. Uma noite no último "
-        "dia do mês emendando a manhã do dia 1º do mês seguinte não é pega pela coluna — "
-        "a aba VALIDADOR pega, porque olha o ano inteiro sem parar na virada.",
+        "A coluna 18h⚠ enxerga a virada de mês pelas colunas de véspera: a noite do fim "
+        "do mês anterior emendando a manhã do dia 1º conta no mês NOVO (cada virada tem "
+        "um dono só, nunca é contada duas vezes). A virada dez/26→jan/27 fica com a aba "
+        "VALIDADOR, que olha o ano inteiro.",
         "O seletor de mês da aba SENIOR usa INDIRECT, que só resolve com o arquivo aberto "
         "no Excel ou no Google Sheets — em pré-visualização de e-mail ou no Drive sem abrir, "
         "a matriz aparece vazia. Abrir e escolher o mês em B1 resolve.",
@@ -508,6 +538,32 @@ def aba_mes(wb, mes, DIAS, fim_cod, pessoas, r_cota):
     _tip(c32, "dia-seguinte")
     for rr in (R_FDS, R_SEX, R_FER):
         ws.cell(row=rr, column=C_D32, value=0)     # fora das calculadoras do mês
+
+    # vésperas: o fim do mês anterior que fecha a 1ª semana civil (seg–dom).
+    # Valores vêm POR FÓRMULA da aba anterior — trocou lá, atualiza aqui.
+    # Máscaras zeradas: véspera não conta em CH/FDS/saldo deste mês.
+    offset = dt.date(2026, mes, 1).weekday()       # quantas vésperas o mês pede
+    aba_prev = MESES_PT[mes - 2] if mes > 1 else None
+    for j in range(N_PRE):
+        col = C_PRE1 + j
+        usada = j >= N_PRE - offset
+        for rr in (R_FDS, R_SEX, R_FER):
+            ws.cell(row=rr, column=col, value=0)
+        if not usada:
+            ws.column_dimensions[get_column_letter(col)].width = 2.5
+            for rr in (R_DIA, R_DOW):
+                ws.cell(row=rr, column=col).fill = PatternFill("solid", fgColor=LINE)
+            continue
+        ws.column_dimensions[get_column_letter(col)].width = 4.2
+        d_prev = dt.date(2026, mes, 1) - dt.timedelta(days=N_PRE - j)
+        cd = ws.cell(row=R_DIA, column=col, value=d_prev.strftime("%d/%m"))
+        cd.font = Font(name=F, bold=True, size=7, color=INK2)
+        cd.alignment = Alignment(horizontal="center")
+        cd.fill = PatternFill("solid", fgColor=LAVS if d_prev.weekday() >= 5 else CREME2)
+        cw = ws.cell(row=R_DOW, column=col, value=WD_PT[d_prev.weekday()])
+        cw.font = Font(name=F, size=8, color=CORALI if d_prev.weekday() >= 5 else INK3)
+        cw.alignment = Alignment(horizontal="center")
+        _tip(cd, "dia-anterior")
     # cabeçalho de dias + máscaras
     for i in range(31):
         col = C_D1 + i
@@ -556,11 +612,12 @@ def aba_mes(wb, mes, DIAS, fim_cod, pessoas, r_cota):
         _tip(c, txt)
     for i, txt in enumerate(COLS_TOT):
         col = C_TOT + i
-        c = _tip(ws.cell(row=R_HDR, column=col, value=txt), txt)
+        c = _tip(ws.cell(row=R_HDR, column=col, value=txt),
+                 "sem-n" if txt.startswith("Sem ") else txt)
         c.font = Font(name=F, bold=True, size=8, color="FFFFFF")
-        c.fill = PatternFill("solid", fgColor=LAVI if i < 6 else CORALI)
+        c.fill = PatternFill("solid", fgColor=CORALI if 6 <= i <= 10 else LAVI)
         c.alignment = Alignment(horizontal="center", wrap_text=True)
-        ws.column_dimensions[get_column_letter(col)].width = 7.5
+        ws.column_dimensions[get_column_letter(col)].width = 7.5 if i <= 10 else 6
 
     semanas = round(ndias / 7, 2)
     for k, (apelido, ch) in enumerate(pessoas):
@@ -570,6 +627,20 @@ def aba_mes(wb, mes, DIAS, fim_cod, pessoas, r_cota):
         cc = ws.cell(row=lin, column=C_CH, value=ch)
         cc.font = Font(name=F, size=8, color=INK3)
         cc.alignment = Alignment(horizontal="center")
+        for j in range(N_PRE):
+            col = C_PRE1 + j
+            c = ws.cell(row=lin, column=col)
+            if j < N_PRE - offset or not aba_prev:
+                c.fill = PatternFill("solid", fgColor=LINE)
+                continue
+            d_prev = dt.date(2026, mes, 1) - dt.timedelta(days=N_PRE - j)
+            ref = f"{aba_prev}!{get_column_letter(C_D1 + d_prev.day - 1)}{lin}"
+            c.value = f'=IF({ref}="","",{ref})'
+            c.font = Font(name=F, size=9, color=INK2)
+            c.alignment = Alignment(horizontal="center")
+            c.border = BOX
+            c.fill = PatternFill("solid",
+                                 fgColor=LAVS if d_prev.weekday() >= 5 else CREME2)
         for i in range(ndias):
             col = C_D1 + i
             data = dt.date(2026, mes, i + 1)
@@ -601,16 +672,23 @@ def aba_mes(wb, mes, DIAS, fim_cod, pessoas, r_cota):
                 c.fill = PatternFill("solid", fgColor=FILLS[letra])
 
         eh = expr_horas(lin)
+        # semanas civis do mês: a 1ª pega as vésperas; sem⚠ = MAX(Sem 1..N)
+        jans = janelas_semana_civil(mes, ndias)
+        col_s1 = get_column_letter(C_TOT + 11)
+        col_sf = get_column_letter(C_TOT + 10 + N_SEM)
         f = [f"=SUMPRODUCT({eh})",
              f"=SUMPRODUCT(${L_D1}${R_FDS}:${L_DN}${R_FDS},{eh})",
              f'=SUMPRODUCT(${L_D1}${R_SEX}:${L_DN}${R_SEX},(${L_D1}{lin}:${L_DN}{lin}="N")*1)',
              f"=SUMPRODUCT(${L_D1}${R_FER}:${L_DN}${R_FER},{eh})",
              f"=ROUND({get_column_letter(C_CH)}{lin}*{semanas},0)",
              f"={get_column_letter(C_TOT)}{lin}-{get_column_letter(C_TOT+4)}{lin}",
-             f'=SUMPRODUCT((${L_D1}{lin}:${L_DN_1}{lin}="N")*'
-             f'((${L_D2}{lin}:${L_DN}{lin}="M")+(${L_D2}{lin}:${L_DN}{lin}="E")'
-             f'+(${L_D2}{lin}:${L_DN}{lin}="C")+(${L_D2}{lin}:${L_DN}{lin}="D")))',
-             f'=SUMPRODUCT((${L_D1}{lin}:${L_DN_1}{lin}="N")*(${L_D2}{lin}:${L_DN}{lin}="T"))',
+             # começa nas vésperas: a noite do fim do mês anterior emendando a
+             # manhã do dia 1º agora é vista aqui (a do dia 31→1º seguinte é
+             # vista na aba do mês seguinte — cada virada tem um dono só)
+             f'=SUMPRODUCT((${L_PRE1}{lin}:${L_DN_1}{lin}="N")*'
+             f'((${L_PRE2}{lin}:${L_DN}{lin}="M")+(${L_PRE2}{lin}:${L_DN}{lin}="E")'
+             f'+(${L_PRE2}{lin}:${L_DN}{lin}="C")+(${L_PRE2}{lin}:${L_DN}{lin}="D")))',
+             f'=SUMPRODUCT((${L_PRE1}{lin}:${L_DN_1}{lin}="N")*(${L_PRE2}{lin}:${L_DN}{lin}="T"))',
              # cota de fds: base pela CH, reduzida conforme as semanas de férias no mês.
              # A regra vive em CONFIG; aqui só se aponta pra lá. CH fora da tabela
              # (40h) fica em branco de propósito: o doc diz "40h segue caso a caso".
@@ -624,13 +702,13 @@ def aba_mes(wb, mes, DIAS, fim_cod, pessoas, r_cota):
              f'=IF({get_column_letter(C_TOT+8)}{lin}="","",'
              f'MAX(0,{get_column_letter(C_TOT+1)}{lin}-'
              f'{get_column_letter(C_TOT+8)}{lin}*CONFIG!$E${r_cota}))',
-             "=MAX(" + ",".join(
-                 f"SUMPRODUCT({expr_horas(lin, C_D1 + a2, C_D1 + b2)})"
-                 for a2, b2 in JANELAS_SEMANA) + ")"]
+             f"=MAX({col_s1}{lin}:{col_sf}{lin})"]
+        f += [f"=SUMPRODUCT({expr_horas(lin, a2, b2)})" for a2, b2 in jans]
+        f += [""] * (N_SEM - len(jans))
         for i, formula in enumerate(f):
-            c = ws.cell(row=lin, column=C_TOT + i, value=formula)
+            c = ws.cell(row=lin, column=C_TOT + i, value=formula or None)
             c.number_format = "0"      # hora aqui é inteira; meta já vem arredondada
-            c.font = Font(name=F, size=8, color=INK2 if i < 5 else INK)
+            c.font = Font(name=F, size=8, color=INK2 if (i < 5 or i > 10) else INK)
             c.alignment = Alignment(horizontal="center")
             c.border = BOX
             if i == 5:
@@ -654,16 +732,21 @@ def aba_mes(wb, mes, DIAS, fim_cod, pessoas, r_cota):
         cf0.font = Font(name=F, size=9, bold=True, color=CORALI)
         _tip(cf0, "falta")
         linhas_falta.append(rf)
-        for i, data in [(i2, dt.date(2026, mes, i2 + 1)) for i2 in range(ndias)] + [(31, prox)]:
+        # vésperas entram na contagem visual (a semana inteira à vista);
+        # o dashboard só varre C_D1..C_DN, então elas não poluem a média do mês
+        vesperas = ([(-k, dt.date(2026, mes, 1) - dt.timedelta(days=k))
+                     for k in range(offset, 0, -1)] if aba_prev else [])
+        for i, data in vesperas + \
+                [(i2, dt.date(2026, mes, i2 + 1)) for i2 in range(ndias)] + [(31, prox)]:
             col = get_column_letter(C_D1 + i)
             faixa = f"{col}{R_P0}:{col}{ultima}"
             conta = "+".join(f'COUNTIF({faixa},"{x}")' for x in letras)
             c = ws.cell(row=rl, column=C_D1 + i, value=f"={conta}")
             c.font = Font(name=F, size=8, color=INK2)
             c.alignment = Alignment(horizontal="center")
-            # feriado escala como o dia da semana em que cai; o dia 32 usa a
-            # vigência do mês a que pertence (SET→01/10 já é regra nova)
-            mes_do_dia = mes if i < 31 else (mes % 12 + 1)
+            # feriado escala como o dia da semana em que cai; véspera e dia 32
+            # usam a vigência do mês a que pertencem (SET→01/10 já é regra nova)
+            mes_do_dia = (mes - 1) if i < 0 else (mes if i < 31 else mes % 12 + 1)
             base = 4 if mes_do_dia >= D.VIGENCIA_NOVA else 9
             tipo = base + (0 if data.weekday() < 5 else (1 if data.weekday() == 5 else 2))
             ref = f"CONFIG!${get_column_letter(2+idx)}${tipo}"
@@ -671,9 +754,11 @@ def aba_mes(wb, mes, DIAS, fim_cod, pessoas, r_cota):
                          value=f"=MAX(0,{ref}-{col}{rl})")
             cf.font = Font(name=F, size=8, bold=True, color=CORALI)
             cf.alignment = Alignment(horizontal="center")
-    col_sem = get_column_letter(C_TOT + 10)
+    # Sem⚠ e as semanas civis: vermelho acima do teto constitucional de 44h
+    faixa_sem = (f"{get_column_letter(C_TOT + 10)}{R_P0}:"
+                 f"{get_column_letter(C_TOT + 10 + N_SEM)}{ultima}")
     ws.conditional_formatting.add(
-        f"{col_sem}{R_P0}:{col_sem}{ultima}",
+        faixa_sem,
         CellIsRule(operator="greaterThan", formula=["44"],
                    fill=PatternFill("solid", bgColor=CORAL),
                    font=Font(name=F, size=8, bold=True, color="FFFFFF")))
@@ -684,13 +769,13 @@ def aba_mes(wb, mes, DIAS, fim_cod, pessoas, r_cota):
                    fill=PatternFill("solid", bgColor=CORAL),
                    font=Font(name=F, size=8, bold=True, color="FFFFFF")))
     for rf in linhas_falta:
-        faixa = f"{L_D1}{rf}:{get_column_letter(C_D32)}{rf}"
+        faixa = f"{L_PRE1}{rf}:{get_column_letter(C_D32)}{rf}"
         ws.conditional_formatting.add(faixa, CellIsRule(
             operator="greaterThan", formula=["0"],
             fill=PatternFill("solid", bgColor=CORAL),
             font=Font(name=F, size=8, bold=True, color="FFFFFF")))
     creme(ws, linhas_falta[-1] + 2, C_TOT + len(COLS_TOT))
-    ws.freeze_panes = f"{get_column_letter(C_D1)}{R_P0}"
+    ws.freeze_panes = f"{L_PRE1}{R_P0}"
     return ws
 
 
@@ -805,7 +890,7 @@ def aba_senior(wb, pessoas, fim_cod):
                         allow_blank=False, showDropDown=False)
     ws.add_data_validation(dv)
     dv.add(sel)
-    inst = ws.cell(row=R_TIT, column=C_D1,
+    inst = ws.cell(row=R_TIT, column=3,
                    value="Escolha o mês na célula ao lado — a matriz inteira se traduz "
                          "nos códigos do RH, pronta para lançar no Senior")
     inst.font = Font(name=F, size=9, italic=True, color=INK3)
@@ -816,11 +901,16 @@ def aba_senior(wb, pessoas, fim_cod):
         c = ws.cell(row=R_HDR, column=col, value=txt)
         c.font = Font(name=F, bold=True, size=9, color="FFFFFF")
         c.fill = PatternFill("solid", fgColor=LAVI)
+    # a matriz aqui é compacta (dia 1º na coluna C): as vésperas do mês anterior
+    # NÃO entram — código do RH se lança uma vez, no mês dono do dia. Por isso o
+    # salto de N_PRE colunas ao mirar a aba mensal.
+    S_D1 = 3
     for i in range(32):
-        col = C_D1 + i
+        col = S_D1 + i
+        alvo = get_column_letter(col + N_PRE)
         ws.column_dimensions[get_column_letter(col)].width = 5
-        for r, formula in ((R_DIA, f'=IFERROR(INDIRECT($B$1&"!{get_column_letter(col)}{R_DIA}"),"")'),
-                           (R_DOW, f'=IFERROR(INDIRECT($B$1&"!{get_column_letter(col)}{R_DOW}"),"")')):
+        for r, formula in ((R_DIA, f'=IFERROR(INDIRECT($B$1&"!{alvo}{R_DIA}"),"")'),
+                           (R_DOW, f'=IFERROR(INDIRECT($B$1&"!{alvo}{R_DOW}"),"")')):
             c = ws.cell(row=r, column=col, value=formula)
             c.font = Font(name=F, bold=(r == R_DIA), size=8, color=INK if r == R_DIA else INK3)
             c.alignment = Alignment(horizontal="center")
@@ -832,15 +922,15 @@ def aba_senior(wb, pessoas, fim_cod):
         c = ws.cell(row=lin, column=C_MED, value=nomes.get(apelido, apelido))
         c.font = Font(name=F, size=9, color=INK)
         for i in range(32):
-            col = C_D1 + i
+            col = S_D1 + i
             cel = ws.cell(row=lin, column=col, value=(
-                f'=IFERROR(VLOOKUP(INDIRECT($B$1&"!"&ADDRESS(ROW(),COLUMN(),4)),'
+                f'=IFERROR(VLOOKUP(INDIRECT($B$1&"!"&ADDRESS(ROW(),COLUMN()+{N_PRE},4)),'
                 f'{faixa_cod},2,FALSE),"")'))
             cel.font = Font(name=F, size=8, color=INK)
             cel.alignment = Alignment(horizontal="center")
             cel.border = BOX
-    creme(ws, R_P0 + len(pessoas) + 1, C_DN)
-    ws.freeze_panes = f"{get_column_letter(C_D1)}{R_P0}"
+    creme(ws, R_P0 + len(pessoas) + 1, S_D1 + 32)
+    ws.freeze_panes = f"{get_column_letter(S_D1)}{R_P0}"
     return ws
 
 
@@ -865,9 +955,11 @@ def aba_dia_a_dia(wb, mes=10):
     sub.font = Font(name=F, size=9, italic=True, color=INK3)
     ndias = (dt.date(2026, mes % 12 + 1, 1) - dt.timedelta(days=1)).day
 
+    # sem coluna de ausências (pedido do Marcos, 28/08/26): quem está fora
+    # já se percebe pela própria matriz do mês — aqui é só quem trabalha
     colunas = [("Dia", 5), ("", 5), ("Manhã", 24), ("Tarde", 24), ("Noite", 24),
-               ("Ausências", 16), ("Cobertura", 13)]
-    chave_cal = {"Cobertura": "cobertura-cal", "Ausências": "ausencias-cal"}
+               ("Cobertura", 13)]
+    chave_cal = {"Cobertura": "cobertura-cal"}
     for i, (h, w) in enumerate(colunas, start=1):
         c = ws.cell(row=3, column=i, value=h)
         c.font = Font(name=F, bold=True, size=9, color="FFFFFF")
@@ -916,16 +1008,12 @@ def aba_dia_a_dia(wb, mes=10):
             cel.border = BOX
             if fds or info_fer:
                 cel.fill = PatternFill("solid", fgColor=CREME2)
-        aus = ws.cell(row=r, column=6, value=formula_turno(d, ("FE", "LM", "AB")))
-        aus.font = Font(name=F, size=8, color=INK3)
-        aus.alignment = Alignment(wrap_text=True, vertical="top")
-        aus.border = BOX
         col = col_dia(d)
         # "M18 T12 N9 ✓" — sem denominador enganoso: quando sobra gente, o
         # x/(x+falta) da versão anterior mostrava "18/18" como se o alvo fosse 18
         f_falta = (f'{nome_mes}!{col}${R_P0+70}+{nome_mes}!{col}${R_P0+71}'
                    f'+{nome_mes}!{col}${R_P0+72}')
-        cov = ws.cell(row=r, column=7, value=(
+        cov = ws.cell(row=r, column=6, value=(
             f'="M"&{nome_mes}!{col}${R_P0+67}&" T"&{nome_mes}!{col}${R_P0+68}'
             f'&" N"&{nome_mes}!{col}${R_P0+69}'
             f'&IF({f_falta}=0," ✓"," ⚠ falta "&({f_falta}))'))
@@ -933,7 +1021,7 @@ def aba_dia_a_dia(wb, mes=10):
         cov.alignment = Alignment(wrap_text=True, vertical="top")
         cov.border = BOX
         ws.row_dimensions[r].height = 150
-    creme(ws, 3 + ndias + 2, 8)
+    creme(ws, 3 + ndias + 2, 7)
     ws.freeze_panes = "C4"
     return ws
 
@@ -958,6 +1046,28 @@ def aba_esboco(wb, r_cota):
     ws.column_dimensions["B"].width = 5
     NDIAS = 32
     pessoas = [(a2, ch) for a2, _n, ch, *_ in D.ROSTER]
+    # vésperas de setembro fecham a 1ª semana civil — fórmulas vivas da aba SET
+    offset = dt.date(2026, 10, 1).weekday()
+    for j in range(N_PRE):
+        col = C_PRE1 + j
+        usada = j >= N_PRE - offset
+        for rr in (4, 5, 6):
+            ws.cell(row=rr, column=col, value=0)
+        if not usada:
+            ws.column_dimensions[get_column_letter(col)].width = 2.5
+            for rr in (2, 3):
+                ws.cell(row=rr, column=col).fill = PatternFill("solid", fgColor=LINE)
+            continue
+        ws.column_dimensions[get_column_letter(col)].width = 4.2
+        d_prev = dt.date(2026, 10, 1) - dt.timedelta(days=N_PRE - j)
+        cd = ws.cell(row=2, column=col, value=d_prev.strftime("%d/%m"))
+        cd.font = Font(name=F, bold=True, size=7, color=INK2)
+        cd.alignment = Alignment(horizontal="center")
+        cd.fill = PatternFill("solid", fgColor=LAVS if d_prev.weekday() >= 5 else CREME2)
+        cw = ws.cell(row=3, column=col, value=WD_PT[d_prev.weekday()])
+        cw.font = Font(name=F, size=8, color=CORALI if d_prev.weekday() >= 5 else INK3)
+        cw.alignment = Alignment(horizontal="center")
+        _tip(cd, "dia-anterior")
     for i in range(NDIAS):
         col = C_D1 + i
         data = dt.date(2026, 11, 1) if i == 31 else dt.date(2026, 10, i + 1)
@@ -998,13 +1108,14 @@ def aba_esboco(wb, r_cota):
     E_TOT = E_DN + 1
     for i, txt in enumerate(COLS_TOT):
         col = E_TOT + i
-        c = _tip(ws.cell(row=R_HDR, column=col, value=txt), txt)
+        c = _tip(ws.cell(row=R_HDR, column=col, value=txt),
+                 "sem-n" if txt.startswith("Sem ") else txt)
         c.font = Font(name=F, bold=True, size=8, color="FFFFFF")
-        c.fill = PatternFill("solid", fgColor=LAVI if i < 6 else CORALI)
+        c.fill = PatternFill("solid", fgColor=CORALI if 6 <= i <= 10 else LAVI)
         c.alignment = Alignment(horizontal="center", wrap_text=True)
-        ws.column_dimensions[get_column_letter(col)].width = 7.5
-    JANELAS_32 = [(0, 6), (7, 13), (14, 20), (21, 27), (28, 30)]
+        ws.column_dimensions[get_column_letter(col)].width = 7.5 if i <= 10 else 6
     semanas32 = round(31 / 7, 2)
+    jans_eb = janelas_semana_civil(10, 31)
     for k, (apelido, ch) in enumerate(pessoas):
         lin = R_P0 + k
         ws.cell(row=lin, column=C_MED, value=apelido).font = Font(
@@ -1012,6 +1123,20 @@ def aba_esboco(wb, r_cota):
         cc = ws.cell(row=lin, column=C_CH, value=ch)
         cc.font = Font(name=F, size=8, color=INK3)
         cc.alignment = Alignment(horizontal="center")
+        for j in range(N_PRE):
+            col = C_PRE1 + j
+            c = ws.cell(row=lin, column=col)
+            if j < N_PRE - offset:
+                c.fill = PatternFill("solid", fgColor=LINE)
+                continue
+            d_prev = dt.date(2026, 10, 1) - dt.timedelta(days=N_PRE - j)
+            ref = f"SET!{get_column_letter(C_D1 + d_prev.day - 1)}{lin}"
+            c.value = f'=IF({ref}="","",{ref})'
+            c.font = Font(name=F, size=9, color=INK2)
+            c.alignment = Alignment(horizontal="center")
+            c.border = BOX
+            c.fill = PatternFill("solid",
+                                 fgColor=LAVS if d_prev.weekday() >= 5 else CREME2)
         for i in range(NDIAS):
             col = C_D1 + i
             letra = EB.ESBOCO.get(apelido, {}).get(i + 1)
@@ -1025,16 +1150,18 @@ def aba_esboco(wb, r_cota):
                 if letra in FILLS:
                     c.fill = PatternFill("solid", fgColor=FILLS[letra])
         eh = expr_horas(lin, E_D1, E_CALC)
+        col_s1 = get_column_letter(E_TOT + 11)
+        col_sf = get_column_letter(E_TOT + 10 + N_SEM)
         f = [f"=SUMPRODUCT({eh})",
              f"=SUMPRODUCT(${L1}$4:${LN}$4,{eh})",
              f'=SUMPRODUCT(${L1}$5:${LN}$5,(${L1}{lin}:${LN}{lin}="N")*1)',
              f"=SUMPRODUCT(${L1}$6:${LN}$6,{eh})",
              f"=ROUND({get_column_letter(C_CH)}{lin}*{semanas32},0)",
              f"={get_column_letter(E_TOT)}{lin}-{get_column_letter(E_TOT+4)}{lin}",
-             f'=SUMPRODUCT((${L1}{lin}:${LN_1}{lin}="N")*'
-             f'((${L2}{lin}:${LN}{lin}="M")+(${L2}{lin}:${LN}{lin}="E")'
-             f'+(${L2}{lin}:${LN}{lin}="C")+(${L2}{lin}:${LN}{lin}="D")))',
-             f'=SUMPRODUCT((${L1}{lin}:${LN_1}{lin}="N")*(${L2}{lin}:${LN}{lin}="T"))',
+             f'=SUMPRODUCT((${L_PRE1}{lin}:${LN_1}{lin}="N")*'
+             f'((${L_PRE2}{lin}:${LN}{lin}="M")+(${L_PRE2}{lin}:${LN}{lin}="E")'
+             f'+(${L_PRE2}{lin}:${LN}{lin}="C")+(${L_PRE2}{lin}:${LN}{lin}="D")))',
+             f'=SUMPRODUCT((${L_PRE1}{lin}:${LN_1}{lin}="N")*(${L_PRE2}{lin}:${LN}{lin}="T"))',
              f'=IFERROR(INDEX(CONFIG!$B${r_cota}:$D${r_cota+2},'
              f'MATCH(${get_column_letter(C_CH)}{lin},CONFIG!$A${r_cota}:$A${r_cota+2},0),'
              f'IF(COUNTIF(${L1}{lin}:${LN}{lin},"FE")>=10,1,'
@@ -1042,25 +1169,25 @@ def aba_esboco(wb, r_cota):
              f'=IF({get_column_letter(E_TOT+8)}{lin}="","",'
              f'MAX(0,{get_column_letter(E_TOT+1)}{lin}-'
              f'{get_column_letter(E_TOT+8)}{lin}*CONFIG!$E${r_cota}))',
-             "=MAX(" + ",".join(
-                 f"SUMPRODUCT({expr_horas(lin, E_D1 + a2, E_D1 + b2)})"
-                 for a2, b2 in JANELAS_32) + ")"]
+             f"=MAX({col_s1}{lin}:{col_sf}{lin})"]
+        f += [f"=SUMPRODUCT({expr_horas(lin, a2, b2)})" for a2, b2 in jans_eb]
+        f += [""] * (N_SEM - len(jans_eb))
         for i, formula in enumerate(f):
-            c = ws.cell(row=lin, column=E_TOT + i, value=formula)
+            c = ws.cell(row=lin, column=E_TOT + i, value=formula or None)
             c.number_format = "0"
-            c.font = Font(name=F, size=8, color=INK2 if i < 5 else INK,
+            c.font = Font(name=F, size=8, color=INK2 if (i < 5 or i > 10) else INK,
                           bold=(i == 5))
             c.alignment = Alignment(horizontal="center")
             c.border = BOX
     col_exc = get_column_letter(E_TOT + 9)
-    col_sem = get_column_letter(E_TOT + 10)
     ws.conditional_formatting.add(
         f"{col_exc}{R_P0}:{col_exc}{R_P0+len(pessoas)-1}",
         CellIsRule(operator="greaterThan", formula=["0"],
                    fill=PatternFill("solid", bgColor=CORAL),
                    font=Font(name=F, size=8, bold=True, color="FFFFFF")))
     ws.conditional_formatting.add(
-        f"{col_sem}{R_P0}:{col_sem}{R_P0+len(pessoas)-1}",
+        f"{get_column_letter(E_TOT + 10)}{R_P0}:"
+        f"{get_column_letter(E_TOT + 10 + N_SEM)}{R_P0+len(pessoas)-1}",
         CellIsRule(operator="greaterThan", formula=["44"],
                    fill=PatternFill("solid", bgColor=CORAL),
                    font=Font(name=F, size=8, bold=True, color="FFFFFF")))
@@ -1102,7 +1229,7 @@ def aba_esboco(wb, r_cota):
             fill=PatternFill("solid", bgColor=CORAL),
             font=Font(name=F, size=8, bold=True, color="FFFFFF")))
     creme(ws, r + 8, C_D1 + NDIAS + len(COLS_TOT) + 1)
-    ws.freeze_panes = f"{get_column_letter(C_D1)}{R_P0}"
+    ws.freeze_panes = f"{L_PRE1}{R_P0}"
     return ws
 
 

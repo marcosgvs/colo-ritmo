@@ -133,8 +133,11 @@ def dropdowns(ids):
         if m not in ids:
             continue
         pedidos.append({"setDataValidation": {
+            # colunas I..AN (dia 1º ao dia 1º seguinte). As vésperas C..H ficam
+            # FORA de propósito: são fórmulas da aba anterior — o dropdown ali
+            # deixaria alguém sobrescrever a fórmula sem perceber
             "range": {"sheetId": ids[m], "startRowIndex": 7, "endRowIndex": 73,
-                      "startColumnIndex": 2, "endColumnIndex": 34},
+                      "startColumnIndex": 8, "endColumnIndex": 40},
             "rule": {
                 "condition": {"type": "ONE_OF_LIST",
                               "values": [{"userEnteredValue": c} for c in CODIGOS_VALIDOS]},

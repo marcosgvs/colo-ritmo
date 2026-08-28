@@ -85,12 +85,20 @@ TOOLTIPS = {
     "fds⚠":     "Excesso sobre a cota × fator do mês. Em mês de 5 fins de semana a soma "
                 "das cotas do grupo não cobre a demanda — o alvo justo passa a ser a cota "
                 "× o fator (CONFIG). Vermelho = carregando mais que a fatia proporcional.",
-    "sem⚠":     "Maior jornada semanal da pessoa no mês. Vermelho acima de 44h — teto do "
-                "art. 7º XIII da Constituição. O mês pode fechar na média e uma semana "
-                "estourar mesmo assim.",
+    "sem⚠":     "Maior jornada semanal da pessoa no mês — o MAX das colunas Sem 1 a "
+                "Sem 6. Vermelho acima de 44h — teto do art. 7º XIII da Constituição. "
+                "O mês pode fechar na média e uma semana estourar mesmo assim.",
+    "sem-n":    "Horas da semana civil (segunda a domingo). A Sem 1 inclui os dias do "
+                "fim do mês anterior que fecham a semana; a última para no fim do mês — "
+                "o resto dela é medido na Sem 1 do mês seguinte, então nenhuma semana "
+                "fica sem dono. Vermelho acima de 44h.",
     "dia-seguinte": "Dia 1º do mês seguinte — a grade corre por semanas completas "
                 "(doc §6). Aparece para conferência e cobertura, mas conta na cota "
                 "do MÊS SEGUINTE: fica fora de CH, FDS e saldo deste mês.",
+    "dia-anterior": "Fim do mês anterior — as colunas fecham a 1ª semana civil do mês "
+                "(dia 1º cai terça, a segunda aparece). Vêm POR FÓRMULA da aba do mês "
+                "anterior: trocou lá, atualiza aqui. Entram nas somas semanais (Sem 1 "
+                "e Sem⚠), mas CH, FDS e saldo delas pertencem ao mês anterior.",
     "cob-turno": "Quantas pessoas cobrem o turno em cada dia. D (dia 12h) e C (chefia) "
                 "contam na manhã E na tarde; J (Janaina 8–13h) conta na manhã.",
     "falta":    "Quanto falta para o mínimo do dia (CONFIG — cada mês é medido pela regra "

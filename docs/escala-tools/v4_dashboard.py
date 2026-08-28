@@ -35,9 +35,10 @@ MESES = ["JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "
 # geometria das abas mensais (idêntica em todas)
 R_P0, R_ULT = 8, 73
 R_COB, R_FALTA = 75, 78          # 75-77 cobertura · 78-80 falta
-C_D1, C_DN = "C", "AG"        # cálculo continua nos 31 dias do mês
-C_CH, C_FDS, C_SXN, C_FER = "AI", "AJ", "AK", "AL"    # +1: o AH virou o dia 01 do mês seguinte
-C_META, C_SALDO, C_18H, C_NT = "AM", "AN", "AO", "AP"
+# +6: as colunas C..H viraram as vésperas (fim do mês anterior que fecha a semana)
+C_D1, C_DN = "I", "AM"        # cálculo continua nos 31 dias do mês
+C_CH, C_FDS, C_SXN, C_FER = "AO", "AP", "AQ", "AR"    # AN é o dia 01 do mês seguinte
+C_META, C_SALDO, C_18H, C_NT = "AS", "AT", "AU", "AV"
 
 FINO = Side(style="thin", color=LINE)
 

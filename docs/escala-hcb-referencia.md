@@ -153,6 +153,25 @@ Ariadne, Murilo, Jaqueline (+ Stephanie 11/administrativo). Heloá/Dayana/Leomar
 4. Handoff de virada: a grade corre por **semanas completas** — dias do mês seguinte que caem na última semana já são lançados e contam na cota do mês seguinte.
 5. Erros de contagem são assumidos e compensados no mês seguinte (anotados nos individuais).
 
+### 6.1 · Convenções da planilha unificada (Marcos, 28/08/26)
+
+- **Todo mês abre com a semana civil fechada**: as primeiras colunas da aba mensal
+  trazem o fim do mês anterior (dia 1º cai terça → a segunda aparece), por fórmula
+  viva da aba anterior. Na outra ponta, o dia 1º do mês seguinte fecha a última
+  semana (convenção do item 4 acima).
+- **Soma de horas por semana civil (seg–dom), por pessoa**: colunas Sem 1..Sem 6 em
+  toda aba mensal. A Sem 1 **inclui os dias do mês anterior**; a última semana para
+  no dia final do mês — o resto dela é medido na Sem 1 do mês seguinte, então cada
+  semana tem um dono só. `Sem⚠` = a maior delas; vermelho acima de 44h.
+- **Dono das horas continua sendo o mês do dia**: véspera e dia 1º seguinte aparecem
+  e entram nas somas SEMANAIS, mas CH/FDS/saldo pertencem ao mês de origem — nada
+  conta duas vezes.
+- **18h⚠ enxerga a virada de mês**: a noite do fim do mês anterior emendando a manhã
+  do dia 1º conta no mês novo (cada virada tem um dono só). A virada dez→jan fica com
+  a aba VALIDADOR.
+- **Visão dia a dia sem coluna de ausentes** (pedido de 28/08/26): só quem trabalha,
+  por turno, mais a cobertura.
+
 ## 7 · Inputs conhecidos para OUTUBRO/2026
 
 Calendário: 01/10 = quinta. Feriado: **12/10 N. Sra. Aparecida (segunda)**. Fds: 3-4, 10-11, 17-18, 24-25, 31/10-01/11. 5 semanas (S1 parcial qui-dom).
