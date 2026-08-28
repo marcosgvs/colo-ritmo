@@ -297,9 +297,11 @@ def aba_leiame(wb, rel_grade):
                     "quebra nada. Só não use “Classificar intervalo” numa seleção "
                     "parcial, que aí as linhas se separam das colunas."),
         ("OUT · DIA A DIA", "O mês em formato calendário: por dia e por turno, quem "
-                             "está onde, e a cobertura. É fórmula da aba do mês — "
-                             "trocou um plantão no dropdown, o dia a dia se refaz. Bom pra "
-                             "bater o olho e perceber o que está esquisito."),
+                             "está onde, e a cobertura. Abre na segunda-feira da semana do "
+                             "dia 1º e fecha no domingo da última semana — os dias dos meses "
+                             "vizinhos aparecem acinzentados, só para leitura. É fórmula da "
+                             "aba do mês — trocou um plantão no dropdown, o dia a dia se "
+                             "refaz. Bom pra bater o olho e perceber o que está esquisito."),
         ("PAINEL ANO", "O comparativo do ano: saldo, fds, sexta-noite e feriado de cada pessoa "
                        "mês a mês, com acumulado. Onde existe a contagem manual antiga, ela "
                        "aparece ao lado pra conferência."),
@@ -1072,24 +1074,38 @@ def aba_dia_a_dia(wb, mes=10):
             _tip(c, chave_cal[h])
 
     nomes_rng = f"{nome_mes}!$A${R_P0}:$A${R_P0+65}"
-    def col_dia(d):
-        return get_column_letter(C_D1 + d - 1)
 
-    def formula_turno(d, letras):
-        col = col_dia(d)
+    def formula_turno(col, letras):
         rng = f"{nome_mes}!{col}${R_P0}:{col}${R_P0+65}"
         cond = "+".join(f'({rng}="{l}")' for l in letras)
         return (f'=IFERROR(TEXTJOIN(CHAR(10),TRUE,'
                 f'FILTER({nomes_rng},({cond})>0)),"—")')
 
-    for d in range(1, ndias + 1):
-        r = 3 + d
-        data = dt.date(2026, mes, d)
+    # a semana inteira, de segunda a domingo, nas duas pontas (Marcos, 28/08):
+    # o calendário abre na segunda da semana do dia 1º (vésperas) e fecha no
+    # domingo da última semana (virada) — mesmas colunas vivas da aba do mês
+    offset = dt.date(2026, mes, 1).weekday()
+    n_virada = (7 - ((offset + ndias) % 7)) % 7
+    dias = []
+    if mes > 1:
+        for j in range(offset):
+            data = dt.date(2026, mes, 1) - dt.timedelta(days=offset - j)
+            dias.append((data, C_D1 - offset + j, True))
+    dias += [(dt.date(2026, mes, d + 1), C_D1 + d, False) for d in range(ndias)]
+    if mes < 12:
+        prox1 = dt.date(2026, mes % 12 + 1, 1)
+        for j in range(n_virada):
+            dias.append((prox1 + dt.timedelta(days=j), C_D32 + j, True))
+
+    r = 3
+    for data, col_n, vizinho in dias:
+        r += 1
         fds = data.weekday() >= 5
-        info_fer = D.FERIADOS_2026.get((mes, d))
-        cd = ws.cell(row=r, column=1, value=d)
-        cd.font = Font(name=F, bold=True, size=11,
-                       color="FFFFFF" if info_fer else INK)
+        info_fer = D.FERIADOS_2026.get((data.month, data.day))
+        cd = ws.cell(row=r, column=1,
+                     value=data.strftime("%d/%m") if vizinho else data.day)
+        cd.font = Font(name=F, bold=not vizinho, size=8 if vizinho else 11,
+                       color="FFFFFF" if info_fer else (INK3 if vizinho else INK))
         cd.alignment = Alignment(horizontal="center", vertical="top")
         rotulo = info_fer[1] if info_fer else WD_PT[data.weekday()]
         cw = ws.cell(row=r, column=2, value=rotulo)
@@ -1102,15 +1118,16 @@ def aba_dia_a_dia(wb, mes=10):
         elif fds:
             for cc in (cd, cw):
                 cc.fill = PatternFill("solid", fgColor=LAVS)
+        col = get_column_letter(col_n)
         for j, letras in ((3, ("M", "D", "C", "J")), (4, ("T", "D", "C")),
                           (5, ("N", "NT"))):
-            cel = ws.cell(row=r, column=j, value=formula_turno(d, letras))
-            cel.font = Font(name=F, size=8, color=INK)
+            cel = ws.cell(row=r, column=j, value=formula_turno(col, letras))
+            cel.font = Font(name=F, size=8, color=INK3 if vizinho else INK,
+                            italic=vizinho)
             cel.alignment = Alignment(wrap_text=True, vertical="top")
             cel.border = BOX
-            if fds or info_fer:
+            if vizinho or fds or info_fer:
                 cel.fill = PatternFill("solid", fgColor=CREME2)
-        col = col_dia(d)
         # "M18 T12 N9 ✓" — sem denominador enganoso: quando sobra gente, o
         # x/(x+falta) da versão anterior mostrava "18/18" como se o alvo fosse 18
         f_falta = (f'{nome_mes}!{col}${R_P0+70}+{nome_mes}!{col}${R_P0+71}'
@@ -1119,11 +1136,12 @@ def aba_dia_a_dia(wb, mes=10):
             f'="M"&{nome_mes}!{col}${R_P0+67}&" T"&{nome_mes}!{col}${R_P0+68}'
             f'&" N"&{nome_mes}!{col}${R_P0+69}'
             f'&IF({f_falta}=0," ✓"," ⚠ falta "&({f_falta}))'))
-        cov.font = Font(name=F, size=8, color=INK2)
+        cov.font = Font(name=F, size=8, color=INK3 if vizinho else INK2,
+                        italic=vizinho)
         cov.alignment = Alignment(wrap_text=True, vertical="top")
         cov.border = BOX
-        ws.row_dimensions[r].height = 150
-    creme(ws, 3 + ndias + 2, 7)
+        ws.row_dimensions[r].height = 110 if vizinho else 150
+    creme(ws, r + 2, 7)
     ws.freeze_panes = "C4"
     return ws
 
