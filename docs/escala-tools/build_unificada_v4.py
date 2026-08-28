@@ -130,6 +130,20 @@ def carregar_dados():
         for dia, letra in por_dia.items():
             data = dt.date(2026, 10, dia)
             DIAS.setdefault(data, {})[apelido] = (letra, "montado")
+    # POR CIMA de tudo: outubro segundo a MARI (28/08/26). Ela reescreveu a
+    # proposta no Sheet vivo e a versão dela é a fonte de verdade — o plano do
+    # gerador fica só como base de comparação. Substituição total: célula que
+    # ela deixou vazia fica vazia (ela preferiu buraco a convocação).
+    import mari_out_dados as MO
+    roster = [x[0] for x in D.ROSTER]
+    for data in [dt.date(2026, 10, d) for d in range(1, 32)] + [dt.date(2026, 11, 1)]:
+        dia_k = 32 if data.month == 11 else data.day
+        for apelido in roster:
+            letra = MO.MARI.get(apelido, {}).get(dia_k)
+            if letra:
+                DIAS.setdefault(data, {})[apelido] = (letra, "mari")
+            else:
+                DIAS.get(data, {}).pop(apelido, None)
     return DIAS, rel_grade, ns
 
 

@@ -278,9 +278,11 @@ PROCEDENCIA = {
     7:  ("senior", "Códigos Senior"),
     8:  ("senior", "Códigos Senior"),
     9:  ("senior", "Códigos Senior"),
-    10: ("montado", "REMONTADA em 18/08 sob as regras novas (rotina só manhã e nunca FDS · "
-                     "teto 44h · compromissos de setembro) · convocações e pendências na aba "
-                     "CONVOCAÇÕES · buracos remanescentes aparecem em vermelho na linha Falta"),
+    10: ("montado", "ESCALA DA MARI — ela reescreveu a proposta do gerador direto no Sheet "
+                     "(28/08, 397 células; fonte: mari_out_dados.py, backup integral no Drive). "
+                     "Ela preferiu deixar vaga a convocar fora de preferência: os buracos "
+                     "aparecem em vermelho na linha Falta. As abas ATENDIMENTO e CONVOCAÇÕES "
+                     "descrevem a PROPOSTA antiga do gerador, não esta versão"),
     11: ("vazio", "A montar"),
     12: ("vazio", "A montar"),
 }
