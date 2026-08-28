@@ -149,16 +149,37 @@ def dropdowns(ids):
 
 
 def limpar_vistas(sid):
-    """apaga TODA vista de filtro. Lição de 28/08: ordenar por vista de filtro
-    MOVE as células de verdade (não é só exibição) e quebrou a planilha inteira
-    em #REF. Ordenação agora é a aba VISÃO (SORT por fórmula, só leitura) —
-    vista de filtro nas mensais não pode existir."""
+    """apaga vistas de filtro que alguém tenha criado. A ordenação oficial é o
+    FILTRO BÁSICO (abaixo) — desde 28/08 as fórmulas acham cada pessoa pelo
+    nome (INDEX/MATCH), então ordenar mover as linhas deixou de ser problema;
+    mas vista de filtro duplicada só confunde."""
     meta = gsuite.sheets().spreadsheets().get(
         spreadsheetId=sid, fields="sheets(filterViews(filterViewId))").execute()
     pedidos = []
     for s in meta.get("sheets", []):
         for fv in s.get("filterViews", []):
             pedidos.append({"deleteFilterView": {"filterId": fv["filterViewId"]}})
+    return pedidos
+
+
+# última coluna das mensais (1-based): Nº = C_TOT(46) + 18 → 64 (BL)
+FIM_COLS_IDX = 64
+
+
+def filtros_basicos(ids):
+    """UM filtro básico por aba mensal, do cabeçalho (linha 7) até a última
+    pessoa (linha 73), largura inteira até a coluna Nº. É por ele que a Mari
+    ordena NA PRÓPRIA aba: funil de “Médico” = A a Z · funil de
+    “Grupo” = coordenação→rotina→staff · funil de “Nº” = ordem
+    original. As linhas se movem DE VERDADE — e podem: toda referência cruzada
+    é por nome desde 28/08. O rodapé (cobertura/falta) fica fora do intervalo."""
+    pedidos = []
+    for m in MENSAIS:
+        if m not in ids:
+            continue
+        pedidos.append({"setBasicFilter": {"filter": {
+            "range": {"sheetId": ids[m], "startRowIndex": 6, "endRowIndex": 73,
+                      "startColumnIndex": 0, "endColumnIndex": FIM_COLS_IDX}}}})
     return pedidos
 
 
@@ -171,6 +192,7 @@ def montar(sid=ARQUIVO_ID):
     pedidos = limpar_graficos(sid, dash)
     pedidos += limpar_vistas(sid)
     pedidos += dropdowns(ids)
+    pedidos += filtros_basicos(ids)
 
     # 1 · a história do ano: os alertas de 18h caíram depois de abril
     pedidos.append(grafico(

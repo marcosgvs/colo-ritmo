@@ -80,7 +80,10 @@ N_SEM = 6                     # máximo de semanas civis que um mês encosta
 COLS_TOT = (["CH mês", "FDS", "SxN", "Feriado", "Meta", "Saldo", "18h⚠", "N→T",
              "Cota FDS", "FDS⚠", "Sem⚠"]      # fds⚠ = excesso sobre cota × fator
             + [f"Sem {k}" for k in range(1, N_SEM + 1)]
-            + ["Grupo"])      # coluna de ordenação das vistas de filtro (dash_sheets)
+            + ["Grupo",       # ordenar por tipo no funil do filtro
+               "Nº"])         # posição original do cadastro — ordena de volta
+IDX_GRUPO = len(COLS_TOT) - 2
+IDX_NUM = len(COLS_TOT) - 1
 # Grupo com prefixo numérico pra ordenar coordenação→rotina→staff→administrativo
 # (o sortSpec do Sheets só sabe asc/desc). Coordenação = quem faz o 47 (doc §3).
 GRUPO_COORD = {"Fred", "Milena"}
@@ -106,6 +109,18 @@ L_PRE2 = get_column_letter(C_PRE1 + 1)
 L_D1, L_DN = get_column_letter(C_D1), get_column_letter(C_DN)
 L_DN_1 = get_column_letter(C_DN - 1)
 L_D2 = get_column_letter(C_D1 + 1)
+
+
+def _ref_vizinho(aba, dia, lin):
+    """célula do dia `dia` da pessoa desta linha na aba vizinha, PELO NOME.
+
+    INDEX/MATCH com linhas absolutas: sobrevive à ordenação pelo filtro em
+    qualquer uma das duas abas (a lição do #REF de 28/08 — referência posicional
+    quebra quando as linhas se movem). O &"" evita o 0 de célula vazia.
+    """
+    colv = get_column_letter(C_D1 + dia - 1)
+    return (f'=IFERROR(INDEX({aba}!{colv}${R_P0}:{colv}${R_P0 + 65},'
+            f'MATCH($A{lin},{aba}!$A${R_P0}:$A${R_P0 + 65},0))&"","")')
 
 
 def janelas_semana_civil(mes, ndias, ano=2026):
@@ -264,7 +279,8 @@ def aba_leiame(wb, rel_grade):
         ("CONFIG", "As regras como dado: cobertura mínima, cota de fds em mês com férias, "
                    "tabela de códigos e as regras duras com o artigo da CLT. Mudou aqui, "
                    "mudou na planilha toda."),
-        ("JAN a DEZ", "A escala: matriz médico × dia. A semana fecha NO DOMINGO, então todo "
+        ("JAN a DEZ", "A escala: matriz médico × dia, com filtro no cabeçalho pra ordenar "
+                      "(veja “Ordenar” abaixo). A semana fecha NO DOMINGO, então todo "
                       "mês aparece com as semanas completas: as primeiras colunas trazem o fim "
                       "do mês anterior (dia 1º cai terça, a segunda aparece) e as últimas trazem "
                       "os dias do mês seguinte até o domingo que fecha a última semana. Esses "
@@ -273,10 +289,13 @@ def aba_leiame(wb, rel_grade):
                       "mínimo. À direita, por pessoa: carga do mês, fds, sexta-noite, feriado, "
                       "meta, saldo, os alertas de jornada e as horas de cada semana civil "
                       "(Sem 1 a Sem 6, sempre a semana inteira; vermelho acima de 44h)."),
-        ("VISÃO", "O mês escolhido em B1, ordenado do jeito escolhido em D1: A a Z ou por "
-                  "grupo (coordenação → rotina → staff). Só leitura — espelha a aba do mês "
-                  "por fórmula; qualquer edição é na aba do mês. NUNCA use ordenar/filtrar "
-                  "em cima das abas mensais: isso move as células e quebra a planilha."),
+        ("Ordenar", "Cada aba mensal tem um FILTRO no cabeçalho (ícone de funil): clique no "
+                    "funil de “Médico” e ordene de A a Z, ou no de “Grupo” "
+                    "para ver coordenação → rotina → staff. A coluna “Nº” volta à "
+                    "ordem original. A planilha foi preparada para isso: toda fórmula acha "
+                    "cada pessoa PELO NOME, em qualquer ordem — ordenar pelo funil não "
+                    "quebra nada. Só não use “Classificar intervalo” numa seleção "
+                    "parcial, que aí as linhas se separam das colunas."),
         ("OUT · DIA A DIA", "O mês em formato calendário: por dia e por turno, quem "
                              "está onde, e a cobertura. É fórmula da aba do mês — "
                              "trocou um plantão no dropdown, o dia a dia se refaz. Bom pra "
@@ -668,12 +687,13 @@ def aba_mes(wb, mes, DIAS, fim_cod, pessoas, r_cota):
         col = C_TOT + i
         c = _tip(ws.cell(row=R_HDR, column=col, value=txt),
                  "sem-n" if txt.startswith("Sem ") else
-                 ("grupo-filtro" if txt == "Grupo" else txt))
+                 ("grupo-filtro" if txt == "Grupo" else
+                  ("ordem-original" if txt == "Nº" else txt)))
         c.font = Font(name=F, bold=True, size=8, color="FFFFFF")
         c.fill = PatternFill("solid", fgColor=CORALI if 6 <= i <= 10 else LAVI)
         c.alignment = Alignment(horizontal="center", wrap_text=True)
         ws.column_dimensions[get_column_letter(col)].width = \
-            7.5 if i <= 10 else (13 if txt == "Grupo" else 6)
+            7.5 if i <= 10 else (13 if txt == "Grupo" else (4.5 if txt == "Nº" else 6))
 
     semanas = round(ndias / 7, 2)
     for k, (apelido, ch) in enumerate(pessoas):
@@ -690,8 +710,9 @@ def aba_mes(wb, mes, DIAS, fim_cod, pessoas, r_cota):
                 c.fill = PatternFill("solid", fgColor=LINE)
                 continue
             d_prev = dt.date(2026, mes, 1) - dt.timedelta(days=N_PRE - j)
-            ref = f"{aba_prev}!{get_column_letter(C_D1 + d_prev.day - 1)}{lin}"
-            c.value = f'=IF({ref}="","",{ref})'
+            # busca PELO NOME (não pela posição): a aba pode ser ordenada pelo
+            # filtro — em qualquer ordem, de cá ou de lá, a fórmula acha a pessoa
+            c.value = _ref_vizinho(aba_prev, d_prev.day, lin)
             c.font = Font(name=F, size=9, color=INK2)
             c.alignment = Alignment(horizontal="center")
             c.border = BOX
@@ -716,7 +737,7 @@ def aba_mes(wb, mes, DIAS, fim_cod, pessoas, r_cota):
         for i in range(ndias, 31):
             ws.cell(row=lin, column=C_D1 + i).fill = PatternFill("solid", fgColor=LINE)
         # virada: fórmulas vivas da aba do mês seguinte (editar é LÁ — aqui é
-        # conferência da semana que fecha no domingo)
+        # conferência da semana que fecha no domingo), busca pelo nome
         for j in range(N_POS):
             col = C_D32 + j
             c = ws.cell(row=lin, column=col)
@@ -724,8 +745,7 @@ def aba_mes(wb, mes, DIAS, fim_cod, pessoas, r_cota):
                 c.fill = PatternFill("solid", fgColor=LINE)
                 continue
             d_prox = dias_virada[j]
-            ref = f"{aba_prox}!{get_column_letter(C_D1 + d_prox.day - 1)}{lin}"
-            c.value = f'=IF({ref}="","",{ref})'
+            c.value = _ref_vizinho(aba_prox, d_prox.day, lin)
             c.font = Font(name=F, size=9, color=INK2)
             c.alignment = Alignment(horizontal="center")
             c.border = BOX
@@ -775,10 +795,13 @@ def aba_mes(wb, mes, DIAS, fim_cod, pessoas, r_cota):
             c.border = BOX
             if i == 5:
                 c.font = Font(name=F, size=8, bold=True, color=INK)
-        cg = ws.cell(row=lin, column=C_TOT + len(COLS_TOT) - 1,
-                     value=grupo_filtro(apelido))
+        cg = ws.cell(row=lin, column=C_TOT + IDX_GRUPO, value=grupo_filtro(apelido))
         cg.font = Font(name=F, size=8, color=INK3)
         cg.border = BOX
+        cn = ws.cell(row=lin, column=C_TOT + IDX_NUM, value=k + 1)
+        cn.font = Font(name=F, size=8, color=INK3)
+        cn.alignment = Alignment(horizontal="center")
+        cn.border = BOX
 
     ultima = R_P0 + len(pessoas) - 1
     # ------- rodapé: lotação e falta
@@ -890,8 +913,12 @@ def aba_painel(wb, pessoas, oficial):
         for k in range(len(pessoas)):
             lin = R_P0 + k
             for i, m in enumerate(MESES_PT):
-                cel = ws.cell(row=lin, column=col + i,
-                              value=f"={m}!${get_column_letter(col_origem)}{lin}")
+                # pelo NOME, não pela posição: a aba do mês pode estar ordenada
+                # pelo filtro e o painel continua achando cada pessoa
+                lc = get_column_letter(col_origem)
+                cel = ws.cell(row=lin, column=col + i, value=(
+                    f"=IFERROR(INDEX({m}!${lc}${R_P0}:${lc}${R_P0+65},"
+                    f"MATCH($A{lin},{m}!$A${R_P0}:$A${R_P0+65},0)),\"\")"))
                 cel.number_format = "0"
                 cel.font = Font(name=F, size=8, color=INK2)
                 cel.alignment = Alignment(horizontal="center")
@@ -965,7 +992,7 @@ def aba_senior(wb, pessoas, fim_cod):
 
     ws.column_dimensions["A"].width = 22
     ws.column_dimensions["B"].width = 6
-    for col, txt in ((C_MED, "Médico"), (C_CH, "Mês")):
+    for col, txt in ((C_MED, "Médico"), (C_CH, "Apelido")):
         c = ws.cell(row=R_HDR, column=col, value=txt)
         c.font = Font(name=F, bold=True, size=9, color="FFFFFF")
         c.fill = PatternFill("solid", fgColor=LAVI)
@@ -989,10 +1016,17 @@ def aba_senior(wb, pessoas, fim_cod):
         lin = R_P0 + k
         c = ws.cell(row=lin, column=C_MED, value=nomes.get(apelido, apelido))
         c.font = Font(name=F, size=9, color=INK)
+        # apelido na coluna B: é por ele que cada célula ACHA a pessoa na aba
+        # do mês (MATCH pelo nome — a aba pode estar ordenada pelo filtro)
+        cb = ws.cell(row=lin, column=2, value=apelido)
+        cb.font = Font(name=F, size=7, color=INK3)
         for i in range(32):
             col = S_D1 + i
             cel = ws.cell(row=lin, column=col, value=(
-                f'=IFERROR(VLOOKUP(INDIRECT($B$1&"!"&ADDRESS(ROW(),COLUMN()+{N_PRE},4)),'
+                f'=IFERROR(VLOOKUP(INDEX('
+                f'INDIRECT($B$1&"!"&ADDRESS({R_P0},COLUMN()+{N_PRE},4)&":"'
+                f'&ADDRESS({R_P0+65},COLUMN()+{N_PRE},4)),'
+                f'MATCH($B{lin},INDIRECT($B$1&"!$A${R_P0}:$A${R_P0+65}"),0)),'
                 f'{faixa_cod},2,FALSE),"")'))
             cel.font = Font(name=F, size=8, color=INK)
             cel.alignment = Alignment(horizontal="center")
@@ -1178,12 +1212,13 @@ def aba_esboco(wb, r_cota):
         col = E_TOT + i
         c = _tip(ws.cell(row=R_HDR, column=col, value=txt),
                  "sem-n" if txt.startswith("Sem ") else
-                 ("grupo-filtro" if txt == "Grupo" else txt))
+                 ("grupo-filtro" if txt == "Grupo" else
+                  ("ordem-original" if txt == "Nº" else txt)))
         c.font = Font(name=F, bold=True, size=8, color="FFFFFF")
         c.fill = PatternFill("solid", fgColor=CORALI if 6 <= i <= 10 else LAVI)
         c.alignment = Alignment(horizontal="center", wrap_text=True)
         ws.column_dimensions[get_column_letter(col)].width = \
-            7.5 if i <= 10 else (13 if txt == "Grupo" else 6)
+            7.5 if i <= 10 else (13 if txt == "Grupo" else (4.5 if txt == "Nº" else 6))
     semanas32 = round(31 / 7, 2)
     jans_eb = janelas_semana_civil(10, 31)
     for k, (apelido, ch) in enumerate(pessoas):
@@ -1250,10 +1285,13 @@ def aba_esboco(wb, r_cota):
                           bold=(i == 5))
             c.alignment = Alignment(horizontal="center")
             c.border = BOX
-        cg = ws.cell(row=lin, column=E_TOT + len(COLS_TOT) - 1,
-                     value=grupo_filtro(apelido))
+        cg = ws.cell(row=lin, column=E_TOT + IDX_GRUPO, value=grupo_filtro(apelido))
         cg.font = Font(name=F, size=8, color=INK3)
         cg.border = BOX
+        cn = ws.cell(row=lin, column=E_TOT + IDX_NUM, value=k + 1)
+        cn.font = Font(name=F, size=8, color=INK3)
+        cn.alignment = Alignment(horizontal="center")
+        cn.border = BOX
     col_exc = get_column_letter(E_TOT + 9)
     ws.conditional_formatting.add(
         f"{col_exc}{R_P0}:{col_exc}{R_P0+len(pessoas)-1}",
@@ -1304,100 +1342,6 @@ def aba_esboco(wb, r_cota):
             fill=PatternFill("solid", bgColor=CORAL),
             font=Font(name=F, size=8, bold=True, color="FFFFFF")))
     creme(ws, r + 8, C_D1 + NDIAS + len(COLS_TOT) + 1)
-    ws.freeze_panes = f"{L_PRE1}{R_P0}"
-    return ws
-
-
-def aba_visao(wb):
-    """VISÃO: o mês escolhido, ordenado A a Z ou por grupo — POR FÓRMULA.
-
-    Nasceu de um acidente (28/08): ordenar por vista de filtro no Sheets MOVE
-    as células de verdade e quebrou a planilha inteira em #REF. Aqui o SORT
-    espelha os VALORES da aba do mês sem tocar nela — visão de leitura; pra
-    editar, sempre a aba do mês.
-    """
-    ws = wb.create_sheet("VISÃO")
-    ws.sheet_properties.tabColor = AQUA
-    ws.sheet_view.showGridLines = False
-    t = ws.cell(row=1, column=1, value="Visão ordenada")
-    t.font = Font(name=DISPLAY, bold=True, size=14, color=INK)
-    ws.column_dimensions["A"].width = 14
-    ws.column_dimensions["B"].width = 6
-    sel = ws.cell(row=1, column=C_CH, value="OUT")
-    sel.font = Font(name=F, bold=True, size=13, color=CORALI)
-    sel.fill = PatternFill("solid", fgColor=SANDS)
-    sel.alignment = Alignment(horizontal="center")
-    dv = DataValidation(type="list", formula1='"' + ",".join(MESES_PT) + '"',
-                        allow_blank=False, showDropDown=False)
-    ws.add_data_validation(dv)
-    dv.add(sel)
-    sel2 = ws.cell(row=1, column=4, value="A a Z")
-    sel2.font = Font(name=F, bold=True, size=13, color=LAVI)
-    sel2.fill = PatternFill("solid", fgColor=LAVS)
-    sel2.alignment = Alignment(horizontal="center")
-    dv2 = DataValidation(type="list", formula1='"A a Z,Por grupo"',
-                         allow_blank=False, showDropDown=False)
-    ws.add_data_validation(dv2)
-    dv2.add(sel2)
-    ws.column_dimensions["D"].width = 11
-    inst = ws.cell(row=1, column=6, value=(
-        "Escolha o mês em B1 e a ordem em D1 (A a Z · Por grupo). Esta aba é "
-        "só de leitura — ela espelha a aba do mês por fórmula. Para trocar um "
-        "plantão, edite na aba do mês."))
-    inst.font = Font(name=F, size=9, italic=True, color=INK3)
-
-    fim_l = get_column_letter(C_TOT + len(COLS_TOT) - 1)      # última coluna (Grupo)
-    col_grupo = C_TOT + len(COLS_TOT) - 1
-    # cabeçalhos e matriz espelhados; SORT reordena só a exibição daqui
-    for r in (R_DIA, R_DOW, R_HDR):
-        c = ws.cell(row=r, column=1,
-                    value=f'=INDIRECT($B$1&"!A{r}:{fim_l}{r}")')
-        c.font = Font(name=F, bold=(r != R_DOW), size=8, color=INK)
-    ws.cell(row=R_P0, column=1, value=(
-        f'=IFERROR(SORT(INDIRECT($B$1&"!A{R_P0}:{fim_l}{R_P0+65}"),'
-        f'IF($D$1="Por grupo",{col_grupo},1),TRUE,1,TRUE),"")'))
-
-    # formatação de base pro spill (o Sheets pinta o valor com o formato da célula)
-    for cc in range(C_PRE1, C_D32 + N_POS):
-        ws.column_dimensions[get_column_letter(cc)].width = 4.2
-    for i, txt in enumerate(COLS_TOT):
-        ws.column_dimensions[get_column_letter(C_TOT + i)].width = \
-            7.5 if i <= 10 else (13 if txt == "Grupo" else 6)
-    for r in range(R_P0, R_P0 + 66):
-        ws.cell(row=r, column=1).font = Font(name=F, size=9, bold=True, color=INK)
-        ws.cell(row=r, column=2).font = Font(name=F, size=8, color=INK3)
-        for cc in range(C_PRE1, C_D32 + N_POS):
-            cel = ws.cell(row=r, column=cc)
-            cel.font = Font(name=F, size=9, bold=True, color=INK)
-            cel.alignment = Alignment(horizontal="center")
-        for cc in range(C_TOT, C_TOT + len(COLS_TOT)):
-            cel = ws.cell(row=r, column=cc)
-            cel.font = Font(name=F, size=8, color=INK2)
-            cel.alignment = Alignment(horizontal="center")
-    for r in (R_DIA, R_DOW, R_HDR):
-        for cc in range(2, C_TOT + len(COLS_TOT)):
-            cel = ws.cell(row=r, column=cc)
-            cel.font = Font(name=F, size=8, bold=(r != R_DOW),
-                            color=INK if r != R_DOW else INK3)
-            cel.alignment = Alignment(horizontal="center")
-
-    # as cores dos códigos vêm por formatação condicional (o spill não carrega
-    # o fill da aba de origem)
-    faixa_dias = (f"{get_column_letter(C_PRE1)}{R_P0}:"
-                  f"{get_column_letter(C_D32 + N_POS - 1)}{R_P0 + 65}")
-    for letra, cor in FILLS.items():
-        ws.conditional_formatting.add(faixa_dias, CellIsRule(
-            operator="equal", formula=[f'"{letra}"'],
-            fill=PatternFill("solid", bgColor=cor),
-            font=Font(name=F, size=9, bold=True,
-                      color="FFFFFF" if letra in BRANCO else INK)))
-    ws.conditional_formatting.add(
-        f"{get_column_letter(C_TOT + 10)}{R_P0}:"
-        f"{get_column_letter(C_TOT + 10 + N_SEM)}{R_P0 + 65}",
-        CellIsRule(operator="greaterThan", formula=["44"],
-                   fill=PatternFill("solid", bgColor=CORAL),
-                   font=Font(name=F, size=8, bold=True, color="FFFFFF")))
-    creme(ws, R_P0 + 67, C_TOT + len(COLS_TOT))
     ws.freeze_panes = f"{L_PRE1}{R_P0}"
     return ws
 
@@ -1747,7 +1691,6 @@ def main():
         aba_mes(wb, mes, DIAS, fim_cod, pessoas, r_cota)
     aba_dia_a_dia(wb, mes=10)
     aba_esboco(wb, r_cota)
-    aba_visao(wb)
     aba_painel(wb, pessoas, oficial)
     aba_senior(wb, pessoas, fim_cod)
     aba_validador(wb, DIAS, pessoas)
