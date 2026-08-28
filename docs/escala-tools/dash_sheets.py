@@ -148,6 +148,46 @@ def dropdowns(ids):
     return pedidos
 
 
+def limpar_vistas(sid):
+    """apaga as vistas de filtro existentes (o passo 2 do pipeline zera tudo,
+    mas se alguém rodar este script duas vezes, sem isto duplicaria)."""
+    meta = gsuite.sheets().spreadsheets().get(
+        spreadsheetId=sid, fields="sheets(filterViews(filterViewId))").execute()
+    pedidos = []
+    for s in meta.get("sheets", []):
+        for fv in s.get("filterViews", []):
+            pedidos.append({"deleteFilterView": {"filterId": fv["filterViewId"]}})
+    return pedidos
+
+
+# geometria da coluna Grupo (0-based): C_TOT=41 (1-based AO) + 17 = col 58 → index 57
+COL_MEDICO_IDX, COL_GRUPO_IDX = 0, 57
+FIM_COLS_IDX = 59            # exclusivo: A..BF (Grupo é a última)
+
+
+def vistas_de_filtro(ids):
+    """duas vistas por aba mensal (pedido do Marcos, 28/08): ordem alfabética
+    e por grupo (coordenação → rotina → staff → administrativo, via prefixo
+    numérico da coluna Grupo). Vista de filtro reordena SÓ a exibição de quem
+    ativou — as células não se movem, então PAINEL/SENIOR/vésperas continuam
+    alinhados por linha. Ativa em: Dados → Vistas de filtro (ícone de funil)."""
+    pedidos = []
+    for m in MENSAIS:
+        if m not in ids:
+            continue
+        faixa_fv = {"sheetId": ids[m], "startRowIndex": 6, "endRowIndex": 73,
+                    "startColumnIndex": 0, "endColumnIndex": FIM_COLS_IDX}
+        pedidos.append({"addFilterView": {"filter": {
+            "title": "A a Z · médicos", "range": faixa_fv,
+            "sortSpecs": [{"dimensionIndex": COL_MEDICO_IDX,
+                           "sortOrder": "ASCENDING"}]}}})
+        pedidos.append({"addFilterView": {"filter": {
+            "title": "Por grupo · coordenação→rotina→staff", "range": faixa_fv,
+            "sortSpecs": [{"dimensionIndex": COL_GRUPO_IDX, "sortOrder": "ASCENDING"},
+                          {"dimensionIndex": COL_MEDICO_IDX, "sortOrder": "ASCENDING"}]}}})
+    return pedidos
+
+
 def montar(sid=ARQUIVO_ID):
     ids = ids_das_abas(sid)
     dash, dados = ids["DASHBOARD"], ids["DADOS DASH"]
@@ -155,7 +195,9 @@ def montar(sid=ARQUIVO_ID):
     meses = faixa(dados, D0, 0, D1, 1)
 
     pedidos = limpar_graficos(sid, dash)
+    pedidos += limpar_vistas(sid)
     pedidos += dropdowns(ids)
+    pedidos += vistas_de_filtro(ids)
 
     # 1 · a história do ano: os alertas de 18h caíram depois de abril
     pedidos.append(grafico(

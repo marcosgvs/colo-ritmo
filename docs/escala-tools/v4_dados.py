@@ -106,6 +106,11 @@ TOOLTIPS = {
                 "Vermelho = buraco de cobertura.",
     "grupo":    "Chefia e rotina fazem manhãs seg–sex e a CH deles não entra nas "
                 "contagens de plantão · administrativo não pega plantão.",
+    "grupo-filtro": "Coluna de ordenação das vistas de filtro (Dados → Vistas de "
+                "filtro): coordenação → rotina → staff → administrativo. O prefixo "
+                "numérico existe só para o Sheets ordenar nessa sequência. Use as "
+                "vistas “A a Z · médicos” e “Por grupo” no ícone "
+                "de funil — elas reordenam SÓ a exibição, sem mover as células.",
     "sexta-noite ficha": "Posição da pessoa no rodízio de sexta-noite: sim/não, "
                 "quantas por mês, ou condição especial (ex.: só quando o marido não "
                 "está de plantão).",

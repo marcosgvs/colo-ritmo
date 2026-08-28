@@ -75,7 +75,21 @@ C_D32 = C_D1 + 31             # coluna do dia 1º do mês seguinte (AN) — só 
 N_SEM = 6                     # máximo de semanas civis que um mês encosta
 COLS_TOT = (["CH mês", "FDS", "SxN", "Feriado", "Meta", "Saldo", "18h⚠", "N→T",
              "Cota FDS", "FDS⚠", "Sem⚠"]      # fds⚠ = excesso sobre cota × fator
-            + [f"Sem {k}" for k in range(1, N_SEM + 1)])
+            + [f"Sem {k}" for k in range(1, N_SEM + 1)]
+            + ["Grupo"])      # coluna de ordenação das vistas de filtro (dash_sheets)
+# Grupo com prefixo numérico pra ordenar coordenação→rotina→staff→administrativo
+# (o sortSpec do Sheets só sabe asc/desc). Coordenação = quem faz o 47 (doc §3).
+GRUPO_COORD = {"Fred", "Milena"}
+GRUPO_ROSTER = {a: g for a, _n, _c, g, *_ in D.ROSTER}
+def grupo_filtro(apelido):
+    if apelido in GRUPO_COORD:
+        return "1 · coordenação"
+    g = GRUPO_ROSTER.get(apelido, "")
+    if g in ("chefia", "rotina"):
+        return "2 · rotina"
+    if g == "administrativo":
+        return "4 · administrativo"
+    return "3 · staff"
 # Sem 1..6 = horas por SEMANA CIVIL (seg–dom); a 1ª inclui os dias do mês anterior
 # que fecham a semana. sem⚠ = a maior delas. Teto duro: 44h (art. 7º XIII da
 # Constituição). O mês pode fechar na média e a semana estourar mesmo assim.
@@ -627,11 +641,13 @@ def aba_mes(wb, mes, DIAS, fim_cod, pessoas, r_cota):
     for i, txt in enumerate(COLS_TOT):
         col = C_TOT + i
         c = _tip(ws.cell(row=R_HDR, column=col, value=txt),
-                 "sem-n" if txt.startswith("Sem ") else txt)
+                 "sem-n" if txt.startswith("Sem ") else
+                 ("grupo-filtro" if txt == "Grupo" else txt))
         c.font = Font(name=F, bold=True, size=8, color="FFFFFF")
         c.fill = PatternFill("solid", fgColor=CORALI if 6 <= i <= 10 else LAVI)
         c.alignment = Alignment(horizontal="center", wrap_text=True)
-        ws.column_dimensions[get_column_letter(col)].width = 7.5 if i <= 10 else 6
+        ws.column_dimensions[get_column_letter(col)].width = \
+            7.5 if i <= 10 else (13 if txt == "Grupo" else 6)
 
     semanas = round(ndias / 7, 2)
     for k, (apelido, ch) in enumerate(pessoas):
@@ -727,6 +743,10 @@ def aba_mes(wb, mes, DIAS, fim_cod, pessoas, r_cota):
             c.border = BOX
             if i == 5:
                 c.font = Font(name=F, size=8, bold=True, color=INK)
+        cg = ws.cell(row=lin, column=C_TOT + len(COLS_TOT) - 1,
+                     value=grupo_filtro(apelido))
+        cg.font = Font(name=F, size=8, color=INK3)
+        cg.border = BOX
 
     ultima = R_P0 + len(pessoas) - 1
     # ------- rodapé: lotação e falta
@@ -1123,11 +1143,13 @@ def aba_esboco(wb, r_cota):
     for i, txt in enumerate(COLS_TOT):
         col = E_TOT + i
         c = _tip(ws.cell(row=R_HDR, column=col, value=txt),
-                 "sem-n" if txt.startswith("Sem ") else txt)
+                 "sem-n" if txt.startswith("Sem ") else
+                 ("grupo-filtro" if txt == "Grupo" else txt))
         c.font = Font(name=F, bold=True, size=8, color="FFFFFF")
         c.fill = PatternFill("solid", fgColor=CORALI if 6 <= i <= 10 else LAVI)
         c.alignment = Alignment(horizontal="center", wrap_text=True)
-        ws.column_dimensions[get_column_letter(col)].width = 7.5 if i <= 10 else 6
+        ws.column_dimensions[get_column_letter(col)].width = \
+            7.5 if i <= 10 else (13 if txt == "Grupo" else 6)
     semanas32 = round(31 / 7, 2)
     jans_eb = janelas_semana_civil(10, 31)
     for k, (apelido, ch) in enumerate(pessoas):
@@ -1193,6 +1215,10 @@ def aba_esboco(wb, r_cota):
                           bold=(i == 5))
             c.alignment = Alignment(horizontal="center")
             c.border = BOX
+        cg = ws.cell(row=lin, column=E_TOT + len(COLS_TOT) - 1,
+                     value=grupo_filtro(apelido))
+        cg.font = Font(name=F, size=8, color=INK3)
+        cg.border = BOX
     col_exc = get_column_letter(E_TOT + 9)
     ws.conditional_formatting.add(
         f"{col_exc}{R_P0}:{col_exc}{R_P0+len(pessoas)-1}",
