@@ -37,8 +37,9 @@ R_P0, R_ULT = 8, 73
 R_COB, R_FALTA = 75, 78          # 75-77 cobertura · 78-80 falta
 # +6: as colunas C..H viraram as vésperas (fim do mês anterior que fecha a semana)
 C_D1, C_DN = "I", "AM"        # cálculo continua nos 31 dias do mês
-C_CH, C_FDS, C_SXN, C_FER = "AO", "AP", "AQ", "AR"    # AN é o dia 01 do mês seguinte
-C_META, C_SALDO, C_18H, C_NT = "AS", "AT", "AU", "AV"
+# AN..AS = virada (dias do mês seguinte até o domingo que fecha a última semana)
+C_CH, C_FDS, C_SXN, C_FER = "AT", "AU", "AV", "AW"
+C_META, C_SALDO, C_18H, C_NT = "AX", "AY", "AZ", "BA"
 
 FINO = Side(style="thin", color=LINE)
 

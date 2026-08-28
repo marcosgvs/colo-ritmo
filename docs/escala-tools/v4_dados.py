@@ -92,9 +92,11 @@ TOOLTIPS = {
                 "fim do mês anterior que fecham a semana; a última para no fim do mês — "
                 "o resto dela é medido na Sem 1 do mês seguinte, então nenhuma semana "
                 "fica sem dono. Vermelho acima de 44h.",
-    "dia-seguinte": "Dia 1º do mês seguinte — a grade corre por semanas completas "
-                "(doc §6). Aparece para conferência e cobertura, mas conta na cota "
-                "do MÊS SEGUINTE: fica fora de CH, FDS e saldo deste mês.",
+    "dia-seguinte": "A semana fecha no domingo: estas colunas mostram os dias do "
+                "mês seguinte até o domingo que completa a última semana. Vêm POR "
+                "FÓRMULA da aba do mês seguinte — para editar, use a aba de lá. "
+                "Entram nas somas semanais (última Sem e Sem⚠), mas CH, FDS e "
+                "saldo contam no mês seguinte (doc §6).",
     "dia-anterior": "Fim do mês anterior — as colunas fecham a 1ª semana civil do mês "
                 "(dia 1º cai terça, a segunda aparece). Vêm POR FÓRMULA da aba do mês "
                 "anterior: trocou lá, atualiza aqui. Entram nas somas semanais (Sem 1 "
@@ -106,11 +108,11 @@ TOOLTIPS = {
                 "Vermelho = buraco de cobertura.",
     "grupo":    "Chefia e rotina fazem manhãs seg–sex e a CH deles não entra nas "
                 "contagens de plantão · administrativo não pega plantão.",
-    "grupo-filtro": "Coluna de ordenação das vistas de filtro (Dados → Vistas de "
-                "filtro): coordenação → rotina → staff → administrativo. O prefixo "
-                "numérico existe só para o Sheets ordenar nessa sequência. Use as "
-                "vistas “A a Z · médicos” e “Por grupo” no ícone "
-                "de funil — elas reordenam SÓ a exibição, sem mover as células.",
+    "grupo-filtro": "Coluna de ordenação da aba VISÃO: coordenação → rotina → "
+                "staff → administrativo (o prefixo numérico é só para ordenar "
+                "nessa sequência). Para ver o mês em ordem alfabética ou por "
+                "grupo, use a aba VISÃO — NUNCA o ordenar/filtrar do Sheets em "
+                "cima desta aba, que move as células e quebra as fórmulas.",
     "sexta-noite ficha": "Posição da pessoa no rodízio de sexta-noite: sim/não, "
                 "quantas por mês, ou condição especial (ex.: só quando o marido não "
                 "está de plantão).",
