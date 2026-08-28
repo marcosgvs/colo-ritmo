@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Regras da Escala · UTI HCB</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Nunito:wght@400;600;700;800&family=Caveat:wght@600&display=swap">
+<style>
+  :root { --bg:#FFFAF3; --surface:#FAF3E8; --line:#EBE8E5; --ink:#3A2E2A; --ink-2:#6B5C56;
+          --ink-3:#9A8A82; --brand:#5A4E8C; --brand-soft:#ECEAF4; --ok:#5A6E50; --ok-soft:#ECF6E7;
+          --med:#3D7884; --med-soft:#EAF2F9; --mine:#A8742A; --mine-soft:#FBF1E1;
+          --open:#C77264; --open-soft:#FBE9E5; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --bg:#241D19; --surface:#2C2420; --line:#3C332D; --ink:#F0E7DD; --ink-2:#C8BBAF;
+    --ink-3:#96897E; --brand:#B9B0DF; --brand-soft:#35304A; --ok:#A9C89B; --ok-soft:#2C3527;
+    --med:#8FC0CC; --med-soft:#24363C; --mine:#DDAE62; --mine-soft:#3D3021;
+    --open:#E5A196; --open-soft:#422C28; } }
+  :root[data-theme="dark"] {
+    --bg:#241D19; --surface:#2C2420; --line:#3C332D; --ink:#F0E7DD; --ink-2:#C8BBAF;
+    --ink-3:#96897E; --brand:#B9B0DF; --brand-soft:#35304A; --ok:#A9C89B; --ok-soft:#2C3527;
+    --med:#8FC0CC; --med-soft:#24363C; --mine:#DDAE62; --mine-soft:#3D3021;
+    --open:#E5A196; --open-soft:#422C28; }
+  * { box-sizing: border-box; }
+  body { background:var(--bg); color:var(--ink); margin:0;
+         font-family:Nunito,"Segoe UI",system-ui,sans-serif; font-size:15px; line-height:1.6; }
+  main { max-width:840px; margin:0 auto; padding:44px 24px 90px; }
+  .eyebrow { font-family:Caveat,cursive; font-size:21px; color:var(--brand); margin:0; }
+  h1 { font-family:Fraunces,Georgia,serif; font-size:32px; font-weight:700; margin:4px 0 8px; text-wrap:balance; }
+  .lede { color:var(--ink-2); max-width:66ch; margin:0 0 6px; }
+  .meta { color:var(--ink-3); font-size:13px; margin:0 0 18px; }
+  .meta a { color:var(--brand); }
+  .indice { font-size:12.5px; color:var(--ink-3); line-height:1.9; background:var(--surface);
+            border:1px solid var(--line); border-radius:12px; padding:12px 16px; }
+  .indice a { color:var(--brand); text-decoration:none; }
+  h2 { font-family:Fraunces,Georgia,serif; font-size:21px; color:var(--brand); margin:40px 0 4px; }
+  .secnote { color:var(--ink-2); font-size:13.5px; max-width:70ch; margin:0 0 12px; }
+  .regra { border:1px solid var(--line); border-radius:14px; padding:12px 16px;
+           margin:10px 0; background:var(--bg); break-inside:avoid; }
+  .regra h3 { font-family:Fraunces,Georgia,serif; font-size:16px; margin:0 0 4px; }
+  .regra p { margin:4px 0 0; color:var(--ink-2); font-size:14px; }
+  .regra p strong { color:var(--ink); }
+  .chip { display:inline-block; font-size:10.5px; font-weight:800; letter-spacing:.03em;
+          padding:1px 8px; border-radius:16px; vertical-align:2px; margin-left:6px; }
+  .c-lei { background:var(--open-soft); color:var(--open); }
+  .c-casa { background:var(--brand-soft); color:var(--brand); }
+  .c-pratica { background:var(--mine-soft); color:var(--mine); }
+  table { border-collapse:collapse; width:100%; font-variant-numeric:tabular-nums;
+          font-size:14px; margin:8px 0 4px; }
+  th { font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-3);
+       text-align:left; font-weight:800; padding:6px 10px; border-bottom:2px solid var(--line); }
+  td { padding:6px 10px; border-bottom:1px solid var(--line); color:var(--ink-2); }
+  td:first-child { color:var(--ink); font-weight:700; }
+  td.n { text-align:center; font-weight:700; color:var(--brand); }
+  .tbl { overflow-x:auto; border:1px solid var(--line); border-radius:12px;
+         padding:4px 8px; background:var(--bg); }
+  .tblnote { font-size:12.5px; color:var(--ink-3); margin:4px 2px 0; }
+
+  /* caixa da Mariana */
+  .caixa { background:var(--surface); border:2px solid var(--brand); border-radius:16px;
+           padding:20px 22px; margin:44px 0 0; }
+  .caixa h2 { margin:0 0 4px; }
+  .caixa .secnote { margin-bottom:14px; }
+  .caixa label { display:block; font-size:12px; font-weight:800; letter-spacing:.05em;
+                 text-transform:uppercase; color:var(--ink-3); margin:12px 0 4px; }
+  .caixa input[type="text"], .caixa textarea {
+    width:100%; border:1px solid var(--line); border-radius:10px; background:var(--bg);
+    color:var(--ink); font-family:inherit; font-size:15px; padding:10px 12px; }
+  .caixa textarea { min-height:140px; resize:vertical; line-height:1.55; }
+  .caixa input:focus, .caixa textarea:focus { outline:2px solid var(--brand); outline-offset:1px; }
+  .caixa button { margin-top:14px; background:var(--brand); color:var(--bg); border:0;
+                  border-radius:99px; font-family:inherit; font-weight:800; font-size:15px;
+                  padding:10px 26px; cursor:pointer; }
+  .caixa button:disabled { opacity:.55; cursor:wait; }
+  .caixa button:focus-visible { outline:2px solid var(--ink); outline-offset:2px; }
+  .aviso { margin-top:12px; font-size:14px; border-radius:10px; padding:10px 14px; display:none; }
+  .aviso.ok { display:block; background:var(--ok-soft); color:var(--ok); }
+  .aviso.erro { display:block; background:var(--open-soft); color:var(--open); }
+  .hp { position:absolute; left:-9999px; width:1px; height:1px; overflow:hidden; }
+  .enviadas { margin-top:18px; font-size:13px; color:var(--ink-3); }
+  .enviadas ul { margin:6px 0 0; padding-left:18px; }
+  .enviadas li { margin-bottom:4px; }
+  footer { margin-top:56px; padding-top:14px; border-top:1px solid var(--line);
+           font-size:12.5px; color:var(--ink-3); }
+  @media print {
+    body { background:#fff; color:#000; font-size:11pt; }
+    main { max-width:none; padding:0; }
+    .indice, .caixa, footer { display:none; }
+    .regra { border-color:#bbb; break-inside:avoid; }
+    h2 { color:#000; }
+    .chip { border:1px solid #999; color:#000; background:#fff; }
+    @page { size:A4; margin:16mm; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <p class="eyebrow">colo · escala da equipe</p>
+  <h1>Regras da Escala · UTI HCB</h1>
+  <p class="lede">Como a escala é montada, quais regras valem e como a equidade é medida — tudo em um lugar, para consulta de toda a equipe. As etiquetas dizem a natureza de cada regra: <span class="chip c-lei">lei</span> não se negocia, <span class="chip c-casa">regra da casa</span> é decisão do serviço e <span class="chip c-pratica">prática</span> é o costume vigente registrado.</p>
+  <p class="meta">Atualizado em 28/08/2026 · <a href="/escala/preferencias">ver as preferências da equipe</a></p>
+
+  <nav class="indice">
+    <a href="#prioridades">1 · Ordem de prioridades</a> ·
+    <a href="#cobertura">2 · Cobertura mínima</a> ·
+    <a href="#jornada">3 · Jornada e descanso</a> ·
+    <a href="#rotina">4 · Rotina e chefia</a> ·
+    <a href="#preferencias">5 · Preferências e equidade</a> ·
+    <a href="#fds">6 · Fim de semana</a> ·
+    <a href="#trocas">7 · Trocas e exceções</a> ·
+    <a href="#caixa">✉ Caixa da Mariana</a>
+  </nav>
+
+  <h2 id="prioridades">1 · Ordem de prioridades</h2>
+  <p class="secnote">Quando duas regras entram em conflito, vale a de cima.</p>
+  <div class="regra">
+    <h3>1º — A UTI coberta <span class="chip c-casa">regra da casa</span></h3>
+    <p>Os mínimos de cada turno precisam estar completos em todos os dias do mês. A cobertura não se negocia.</p>
+  </div>
+  <div class="regra">
+    <h3>2º — Preferências com justiça <span class="chip c-casa">regra da casa</span></h3>
+    <p>A preferência de cada colega orienta a montagem, mas não é veto. Impedimento <strong>com motivo declarado</strong> é intocável; a disponibilidade restante é distribuída com critério público e igual para todos.</p>
+  </div>
+  <div class="regra">
+    <h3>3º — Escala entregue completa <span class="chip c-casa">regra da casa</span></h3>
+    <p>A escala é publicada fechada. O que não puder ser atendido vem com justificativa por escrito, imparcial.</p>
+  </div>
+  <div class="regra">
+    <h3>Ordem de montagem <span class="chip c-pratica">prática</span></h3>
+    <p>Primeiro os fins de semana (o turno mais disputado), depois o feriado, depois o restante da semana — assim a parte difícil é resolvida com o mês inteiro ainda livre.</p>
+  </div>
+
+  <h2 id="cobertura">2 · Cobertura mínima por turno</h2>
+  <p class="secnote">Regra em vigor desde a escala de outubro de 2026.</p>
+  <div class="tbl">
+    <table>
+      <tr><th>Turno</th><th>Segunda a sexta</th><th>Sábado</th><th>Domingo e feriado</th></tr>
+      <tr><td>Manhã (7–13h)</td><td class="n">14</td><td class="n">10</td><td class="n">9</td></tr>
+      <tr><td>Tarde (13–19h)</td><td class="n">10</td><td class="n">8</td><td class="n">8</td></tr>
+      <tr><td>Noite (19–7h)</td><td class="n">7</td><td class="n">7</td><td class="n">7</td></tr>
+    </table>
+  </div>
+  <p class="tblnote">A 10ª manhã de sábado é coberta pelo contrato fixo de sábado (8–13h); por isso o domingo pede 9.</p>
+  <div class="regra">
+    <h3>Feriado escala como o dia da semana em que cai <span class="chip c-casa">regra da casa</span></h3>
+    <p>A lotação exigida <strong>não diminui</strong> em feriado. O que muda é a contabilidade: horas de feriado têm equalização anual própria.</p>
+  </div>
+
+  <h2 id="jornada">3 · Jornada e descanso</h2>
+  <div class="regra">
+    <h3>Teto de 44 horas por semana <span class="chip c-lei">lei</span></h3>
+    <p>Nenhuma semana civil (segunda a domingo) pode passar de 44h de trabalho — art. 7º, XIII, da Constituição. O mês pode fechar na média e ainda assim uma semana estourar; por isso a planilha soma as horas de cada semana, pessoa a pessoa.</p>
+  </div>
+  <div class="regra">
+    <h3>Noite não emenda com a manhã seguinte <span class="chip c-lei">lei</span></h3>
+    <p>Entre duas jornadas são exigidas 11 horas de descanso (art. 66 da CLT). Noite de 19–7h seguida da manhã de 7–13h é jornada de 18 horas — o alvo é zero ocorrências.</p>
+  </div>
+  <div class="regra">
+    <h3>Noite seguida de tarde <span class="chip c-pratica">prática</span></h3>
+    <p>Noite de 19–7h seguida da tarde de 13–19h (6h de pausa) é prática aceita do serviço. Fica registrada na planilha, sem alarme — a orientação é não abusar.</p>
+  </div>
+  <div class="regra">
+    <h3>Restrições registradas são invioláveis <span class="chip c-casa">regra da casa</span></h3>
+    <p>Restrição de saúde ou pessoal registrada com a coordenação (por exemplo: sem plantão noturno, limite de noturnos no mês, sem tardes) não entra em rodízio nem em convocação. O motivo fica só com a coordenação.</p>
+  </div>
+  <div class="regra">
+    <h3>Folga de aniversário <span class="chip c-casa">regra da casa</span></h3>
+    <p>6 horas de folga na semana do aniversário, para quem marcou SIM na ficha do ano.</p>
+  </div>
+
+  <h2 id="rotina">4 · Rotina e chefia</h2>
+  <div class="regra">
+    <h3>Rotina e diaristas <span class="chip c-pratica">prática</span></h3>
+    <p>O grupo da rotina cobre as manhãs dos dias úteis e participa dos fins de semana, noites e plantões de 12h conforme os rodízios próprios do grupo (alternância quinzenal nas noites de fim de semana, plantões de dia para completar carga). A montagem respeita esses rodízios como estão sendo praticados.</p>
+  </div>
+  <div class="regra">
+    <h3>Chefia é lançada pela coordenação <span class="chip c-casa">regra da casa</span></h3>
+    <p>Os horários de chefia (10h) não são preenchidos pela escala comum — são camada da coordenação, lançada depois.</p>
+  </div>
+  <div class="regra">
+    <h3>Feriado da rotina <span class="chip c-pratica">prática</span></h3>
+    <p>Nos feriados, parte da rotina cobre a manhã, como em todos os feriados do ano. A prioridade de folga é de quem já trabalhou mais feriados; pedido de folga em feriado é <strong>individual</strong> e vale para quem pediu.</p>
+  </div>
+
+  <h2 id="preferencias">5 · Preferências e equidade</h2>
+  <div class="regra">
+    <h3>Preferência orienta; cobertura decide <span class="chip c-casa">regra da casa</span></h3>
+    <p>Trocas e ajustes fazem parte do fluxo normal do mês. Quando não há voluntário para um turno obrigatório, a designação segue critério público — não há favoritismo nem exceção silenciosa.</p>
+  </div>
+  <div class="regra">
+    <h3>Critério público de convocação <span class="chip c-casa">regra da casa</span></h3>
+    <p>1º) quem tem o menor saldo de horas no mês; 2º) quem foi menos convocado. Toda convocação fora de preferência fica registrada e <strong>gera crédito no mês seguinte</strong>.</p>
+  </div>
+  <div class="regra">
+    <h3>Plantão fora da preferência é anotado <span class="chip c-pratica">prática</span></h3>
+    <p>A anotação é a moeda da equidade: quem cedeu neste mês tem prioridade no próximo.</p>
+  </div>
+  <div class="regra">
+    <h3>Quem não enviou preferências não é sobrecarregado <span class="chip c-casa">regra da casa</span></h3>
+    <p>A ausência de resposta não transforma ninguém em opção padrão para os turnos que sobraram. A pessoa entra na escala com carga proporcional à dos demais — e recebe nova chamada para enviar as preferências.</p>
+  </div>
+  <div class="regra">
+    <h3>Erros de contagem são assumidos e compensados <span class="chip c-pratica">prática</span></h3>
+    <p>Diferenças de horas identificadas depois da publicação são anotadas na ficha individual e compensadas no mês seguinte.</p>
+  </div>
+
+  <h2 id="fds">6 · Fim de semana</h2>
+  <div class="regra">
+    <h3>Cota mensal pela carga horária <span class="chip c-casa">regra da casa</span></h3>
+    <p>Contrato de 36h → 36h de fim de semana no mês · 30h → 30h · 24h → 24h. Contratos de 40h são combinados caso a caso.</p>
+  </div>
+  <div class="tbl">
+    <table>
+      <tr><th>Carga semanal</th><th>Férias de 2 semanas no mês</th><th>Férias de 1 semana</th><th>Sem férias</th></tr>
+      <tr><td>36h</td><td class="n">24h</td><td class="n">30h</td><td class="n">36h</td></tr>
+      <tr><td>30h</td><td class="n">18h</td><td class="n">24h</td><td class="n">30h</td></tr>
+      <tr><td>24h</td><td class="n">12h</td><td class="n">18h</td><td class="n">24h</td></tr>
+    </table>
+  </div>
+  <div class="regra">
+    <h3>Mês com 5 fins de semana <span class="chip c-casa">regra da casa</span></h3>
+    <p>Quando o mês tem 5 sábados, a demanda de fim de semana passa da soma de todas as cotas — o excesso é <strong>matematicamente inevitável</strong>. Nesses meses, o combinado é dividir o excesso em proporção à cota de cada um, para que não caia sobre poucos.</p>
+  </div>
+  <div class="regra">
+    <h3>Sexta-noite em rodízio anual <span class="chip c-pratica">prática</span></h3>
+    <p>Quem fez sexta-noite entra na lista "já fez, não lançar". Quando há mais interessados que vagas, a vaga vai para quem tem menos sextas-noite no ano.</p>
+  </div>
+  <div class="regra">
+    <h3>Fim de semana extra <span class="chip c-pratica">prática</span></h3>
+    <p>O grupo do fim de semana extra alterna mês sim, mês não, conforme a ficha de cada um.</p>
+  </div>
+
+  <h2 id="trocas">7 · Trocas e exceções</h2>
+  <div class="regra">
+    <h3>Trocas fazem parte <span class="chip c-pratica">prática</span></h3>
+    <p>Troca combinada entre colegas é bem-vinda — o combinado é avisar a escalista para o registro ficar certo (cobertura, horas e equidade contam a partir do que foi trabalhado de fato).</p>
+  </div>
+  <div class="regra">
+    <h3>Instância de exceção <span class="chip c-casa">regra da casa</span></h3>
+    <p>Acordos de hora extra, mudança de horário fixo, banco de horas e questões de ponto passam pela coordenação médica. Ninguém é escalado para hora extra sem que isso seja dito com todas as letras.</p>
+  </div>
+
+  <section class="caixa" id="caixa">
+    <h2>✉ Caixa da Mariana</h2>
+    <p class="secnote">Mari: o que estiver faltando ou diferente do que você faz, escreve aqui do seu jeito — regra, exceção, caso especial, o que você olha na hora de montar. Não precisa organizar nada: a gente lê, conversa e traz para esta página o que for regra de verdade.</p>
+    <form id="formCaixa">
+      <label for="cxNome">Quem escreve</label>
+      <input type="text" id="cxNome" name="nome" maxlength="80" placeholder="Mariana" autocomplete="name">
+      <label for="cxTexto">O que precisa entrar (ou sair) daqui</label>
+      <textarea id="cxTexto" name="texto" maxlength="4000" required
+        placeholder="Ex.: fulana só pode X quando Y · o rodízio Z funciona assim · essa regra da página está errada porque…"></textarea>
+      <input class="hp" type="text" name="site" tabindex="-1" autocomplete="off" aria-hidden="true">
+      <button type="submit" id="cxBotao">Enviar para a caixa</button>
+      <p class="aviso" id="cxAviso" role="status"></p>
+    </form>
+    <div class="enviadas" id="cxEnviadas" hidden>
+      <strong>Enviadas deste aparelho</strong>
+      <ul id="cxLista"></ul>
+    </div>
+  </section>
+
+  <footer>
+    Página interna da equipe · sem indexação por buscadores. Dúvidas e correções: caixa acima
+    ou direto com a escalista. As preferências individuais estão em
+    <a href="/escala/preferencias" style="color:var(--brand)">/escala/preferencias</a>.
+  </footer>
+</main>
+
+<script>
+(function () {
+  var URL_CAIXA = 'https://xlefxpcmruhuyexdvzru.supabase.co/rest/v1/escala_caixa';
+  // chave pública (publishable) do projeto — só permite INSERT nesta tabela
+  var CHAVE = 'sb_publishable_lrEzOdS4RnrwsDmCUsXEuQ_ElUajQ3W';
+  var form = document.getElementById('formCaixa');
+  var aviso = document.getElementById('cxAviso');
+  var botao = document.getElementById('cxBotao');
+  var campoTexto = document.getElementById('cxTexto');
+  var campoNome = document.getElementById('cxNome');
+
+  function mostrarEnviadas() {
+    try {
+      var lista = JSON.parse(localStorage.getItem('caixaEnviadas') || '[]');
+      if (!lista.length) return;
+      var ul = document.getElementById('cxLista');
+      ul.innerHTML = '';
+      lista.slice(-5).reverse().forEach(function (item) {
+        var li = document.createElement('li');
+        li.textContent = item.quando + ' — ' + item.resumo;
+        ul.appendChild(li);
+      });
+      document.getElementById('cxEnviadas').hidden = false;
+    } catch (e) { /* localStorage indisponível: segue sem histórico */ }
+  }
+  mostrarEnviadas();
+
+  // rascunho local: não perder texto no meio do caminho
+  try {
+    var rascunho = localStorage.getItem('caixaRascunho');
+    if (rascunho && !campoTexto.value) campoTexto.value = rascunho;
+  } catch (e) {}
+  campoTexto.addEventListener('input', function () {
+    try { localStorage.setItem('caixaRascunho', campoTexto.value); } catch (e) {}
+  });
+
+  form.addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    if (form.site.value) return;                       // honeypot: robô preencheu
+    var texto = campoTexto.value.trim();
+    if (!texto) return;
+    botao.disabled = true;
+    aviso.className = 'aviso';
+    fetch(URL_CAIXA, {
+      method: 'POST',
+      headers: {
+        'apikey': CHAVE,
+        'Authorization': 'Bearer ' + CHAVE,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal'
+      },
+      body: JSON.stringify({ nome: campoNome.value.trim() || 'Mariana', texto: texto })
+    }).then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      aviso.textContent = 'Recebido! Obrigado — vamos ler e organizar aqui na página.';
+      aviso.className = 'aviso ok';
+      try {
+        var lista = JSON.parse(localStorage.getItem('caixaEnviadas') || '[]');
+        lista.push({
+          quando: new Date().toLocaleDateString('pt-BR'),
+          resumo: texto.length > 60 ? texto.slice(0, 60) + '…' : texto
+        });
+        localStorage.setItem('caixaEnviadas', JSON.stringify(lista.slice(-20)));
+        localStorage.removeItem('caixaRascunho');
+      } catch (e) {}
+      campoTexto.value = '';
+      mostrarEnviadas();
+    }).catch(function () {
+      aviso.textContent = 'Não foi possível enviar agora. O texto continua salvo aqui — tente de novo em instantes.';
+      aviso.className = 'aviso erro';
+    }).finally(function () {
+      botao.disabled = false;
+    });
+  });
+})();
+</script>
+</body>
+</html>

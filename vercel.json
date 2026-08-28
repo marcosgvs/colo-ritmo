@@ -66,6 +66,14 @@
       "destination": "/ritmo/escala/preferencias/index.html"
     },
     {
+      "source": "/escala/regras",
+      "destination": "/ritmo/escala/regras/index.html"
+    },
+    {
+      "source": "/escala/regras/",
+      "destination": "/ritmo/escala/regras/index.html"
+    },
+    {
       "source": "/ritmo",
       "destination": "/ritmo/index.html"
     },
