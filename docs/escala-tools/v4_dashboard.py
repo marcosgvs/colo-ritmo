@@ -79,21 +79,26 @@ def _tem_dado(mes):
     return f"COUNTA({mes}!${C_D1}${R_P0}:${C_DN}${R_ULT})>0"
 
 
-def _falta_total(mes, guardado=True):
-    """soma dos três turnos que faltam para o mínimo, no mês inteiro.
+def _dias_com_gente(mes):
+    """máscara 1/0 por dia: só dia que tem alguém lançado conta como dia da
+    escala (novembro com só o 01/11 lançado não pode virar '852 buracos')."""
+    return (f"(({mes}!${C_D1}${R_COB}:${C_DN}${R_COB}"
+            f"+{mes}!${C_D1}${R_COB+1}:${C_DN}${R_COB+1}"
+            f"+{mes}!${C_D1}${R_COB+2}:${C_DN}${R_COB+2})>0)")
 
-    Mês em branco devolve vazio: comparar novembro contra o mínimo cheio daria
-    "871 buracos", que não é informação — é o mês não existir ainda.
-    """
-    soma = "+".join(f"SUM({mes}!${C_D1}${R_FALTA+i}:${C_DN}${R_FALTA+i})" for i in range(3))
+
+def _falta_total(mes, guardado=True):
+    """soma dos três turnos que faltam para o mínimo, só nos dias montados."""
+    soma = "+".join(f"SUMPRODUCT({_dias_com_gente(mes)}*{mes}!${C_D1}${R_FALTA+i}:${C_DN}${R_FALTA+i})"
+                    for i in range(3))
     return f'IF({_tem_dado(mes)},{soma},"")' if guardado else soma
 
 
 def _dias_completos(mes, guardado=True):
-    """dias em que os três turnos bateram o mínimo (falta zero nos três)."""
+    """dias montados em que os três turnos bateram o mínimo (falta zero nos três)."""
     if guardado:
         return f'IF({_tem_dado(mes)},{_dias_completos(mes, False)},"")'
-    return (f"SUMPRODUCT(({mes}!${C_D1}${R_FALTA}:${C_DN}${R_FALTA}"
+    return (f"SUMPRODUCT({_dias_com_gente(mes)}*({mes}!${C_D1}${R_FALTA}:${C_DN}${R_FALTA}"
             f"+{mes}!${C_D1}${R_FALTA+1}:${C_DN}${R_FALTA+1}"
             f"+{mes}!${C_D1}${R_FALTA+2}:${C_DN}${R_FALTA+2}=0)"
             f"*({mes}!${C_D1}${R_FALTA}:${C_DN}${R_FALTA}<>\"\"))")
@@ -237,7 +242,7 @@ def aba_dashboard(wb, mes_vivo="OUT", nome_mes="outubro"):
     ws.row_dimensions[8].height = 20
     _txt(ws, "B8", f"O mês que vai publicar · {nome_mes.capitalize()}", fonte=DISPLAY, tam=12,
          negrito=True, cor=LAVI)
-    for r, h in ((9, 14), (10, 20), (11, 20), (12, 26)):
+    for r, h in ((9, 14), (10, 20), (11, 20), (12, 36)):
         ws.row_dimensions[r].height = h
     M = mes_vivo
     # herói: o número que decide se a escala pode ser publicada
@@ -245,7 +250,7 @@ def aba_dashboard(wb, mes_vivo="OUT", nome_mes="outubro"):
           f"={_falta_total(M)}", nota="soma de tudo que falta pro mínimo, "
           "somando os três turnos e os 31 dias", cor_num=LAVI, fundo=LAVS, tam_num=40)
     _tile(ws, 9, 5, 12, 6, "dias completos",
-          f"={_dias_completos(M)}&\"/\"&COUNT({M}!${C_D1}$2:${C_DN}$2)",
+          f"={_dias_completos(M)}&\"/\"&SUMPRODUCT({_dias_com_gente(M)}*1)",
           formato="General", nota="dias em que os três turnos bateram o mínimo")
     _tile(ws, 9, 7, 12, 8, "alertas de 18h",
           f"=SUM({M}!${C_18H}${R_P0}:${C_18H}${R_ULT})",
@@ -259,7 +264,7 @@ def aba_dashboard(wb, mes_vivo="OUT", nome_mes="outubro"):
         for c in C_BH)
     _tile(ws, 9, 11, 12, 12, "semanas com BH ≠ 0",
           f"={fora_bh}",
-          nota="pessoa-semanas fora do alvo semanal · BHP (+) ou BHN/faltou (−)", fundo=SANDS)
+          nota="pessoa-semanas fora do alvo · BHP (+) ou BHN/faltou (−)", fundo=SANDS)
     _tile(ws, 9, 13, 12, 14, "horas noturnas",
           f'=(COUNTIF({M}!${C_D1}${R_P0}:${C_DN}${R_ULT},"N")'
           f'+COUNTIF({M}!${C_D1}${R_P0}:${C_DN}${R_ULT},"N+"))*7'

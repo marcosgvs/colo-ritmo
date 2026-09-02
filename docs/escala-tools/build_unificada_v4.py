@@ -252,7 +252,7 @@ def altura_bloco(ws, r1, r2, texto, largura, tam=9):
         ws.row_dimensions[rr].height = max(atual, total / n)
 
 
-VERTICAL = Alignment(horizontal="center", vertical="bottom", textRotation=90)
+VERTICAL = Alignment(horizontal="center", vertical="top", textRotation=90)
 
 
 def _tip(cel, chave):
@@ -269,7 +269,7 @@ def estilo_titulo(ws, texto, sub=""):
     c = ws.cell(row=1, column=1, value=texto)
     c.font = Font(name=DISPLAY, bold=True, size=15, color=INK)
     if sub:
-        s = ws.cell(row=1, column=4, value=sub)
+        s = ws.cell(row=2, column=1, value=sub)
         s.font = Font(name=F, size=9, italic=True, color=INK3)
     ws.sheet_view.showGridLines = False
 
@@ -306,7 +306,9 @@ def aba_leiame(wb, rel_grade):
 
     def linha(a, b="", cor=INK2, negrito=False):
         nonlocal r
-        ws.cell(row=r, column=1, value=a).font = Font(name=F, size=10, bold=negrito, color=INK)
+        ca = ws.cell(row=r, column=1, value=a)
+        ca.font = Font(name=F, size=10, bold=negrito, color=INK)
+        ca.alignment = Alignment(vertical="top")
         if b:
             cel = ws.cell(row=r, column=2, value=b)
             cel.font = Font(name=F, size=10, color=cor)
@@ -710,7 +712,7 @@ def aba_mes(wb, mes, DIAS, fim_cod, pessoas, r_cota, r_desc):
                 ws.cell(row=rr, column=col).fill = PatternFill("solid", fgColor=LINE)
             continue
         d_prox = dias_virada[j]
-        ws.column_dimensions[get_column_letter(col)].width = 4.7
+        ws.column_dimensions[get_column_letter(col)].width = 5.3
         cd = ws.cell(row=R_DIA, column=col, value=d_prox.strftime("%d/%m"))
         cd.font = Font(name=F, bold=True, size=7, color=INK2)
         cd.alignment = Alignment(horizontal="center")
@@ -729,7 +731,7 @@ def aba_mes(wb, mes, DIAS, fim_cod, pessoas, r_cota, r_desc):
             for rr in (R_DIA, R_DOW):
                 ws.cell(row=rr, column=col).fill = PatternFill("solid", fgColor=LINE)
             continue
-        ws.column_dimensions[get_column_letter(col)].width = 4.7
+        ws.column_dimensions[get_column_letter(col)].width = 5.3
         d_prev = dt.date(2026, mes, 1) - dt.timedelta(days=N_PRE - j)
         cd = ws.cell(row=R_DIA, column=col, value=d_prev.strftime("%d/%m"))
         cd.font = Font(name=F, bold=True, size=7, color=INK2)
@@ -743,7 +745,7 @@ def aba_mes(wb, mes, DIAS, fim_cod, pessoas, r_cota, r_desc):
     for i in range(31):
         col = C_D1 + i
         letra = get_column_letter(col)
-        ws.column_dimensions[letra].width = 4.7
+        ws.column_dimensions[letra].width = 5.3
         if i >= ndias:
             for r in (R_DIA, R_DOW):
                 ws.cell(row=r, column=col).fill = PatternFill("solid", fgColor=LINE)
@@ -800,7 +802,7 @@ def aba_mes(wb, mes, DIAS, fim_cod, pessoas, r_cota, r_desc):
         c.alignment = VERTICAL          # todo o cabeçalho de totais na vertical (Marcos, 02/09)
         ws.column_dimensions[get_column_letter(col)].width = \
             (13 if txt == "Grupo" else (4.6 if eh_sem or txt == "Nº" else 5.4))
-    ws.row_dimensions[R_HDR].height = 58
+    ws.row_dimensions[R_HDR].height = 66
     # o intervalo de datas de cada semana, em cima do par Sem/BH
     d1 = dt.date(2026, mes, 1)
     for k, spans in enumerate(jans, start=1):
@@ -1436,6 +1438,8 @@ def aba_validador(wb, DIAS, pessoas):
             ct.font = Font(name=F, size=8, bold=True, color=cor)
             for i in range(1, 7):
                 ws.cell(row=r, column=i).border = BOX
+                if i != 4:
+                    ws.cell(row=r, column=i).alignment = Alignment(vertical="top")
             ws.row_dimensions[r].height = altura(a["detalhe"], 62, minimo=15)
             r += 1
 
@@ -1507,7 +1511,6 @@ def aba_validador(wb, DIAS, pessoas):
         cc.font = Font(name=F, bold=True, size=8, color="FFFFFF")
         cc.fill = PatternFill("solid", fgColor=LAVI)
         cc.alignment = Alignment(horizontal="center")
-        ws.column_dimensions[get_column_letter(2 + i)].width = 6
     ws.cell(row=r, column=14, value="Ano").font = Font(name=F, bold=True, size=8, color="FFFFFF")
     ws.cell(row=r, column=14).fill = PatternFill("solid", fgColor=CORALI)
     r += 1
@@ -1566,7 +1569,9 @@ def aba_checagem(wb):
     titulo("As regras que a checagem revelou (e a planilha passou a medir)")
     cab(["", "Regra", "", "", "", "O que é"])
     for nome, txt in CK.REGRAS:
-        ws.cell(row=r, column=2, value=nome).font = Font(name=F, size=9, bold=True, color=INK)
+        cn = ws.cell(row=r, column=2, value=nome)
+        cn.font = Font(name=F, size=9, bold=True, color=INK)
+        cn.alignment = Alignment(vertical="top")
         ws.merge_cells(start_row=r, start_column=2, end_row=r, end_column=5)
         c = ws.cell(row=r, column=6, value=txt)
         c.font = Font(name=F, size=9, color=INK2)
@@ -1598,7 +1603,9 @@ def aba_checagem(wb):
     for item, ap, txt in CK.SEM_ALTERACAO:
         ws.cell(row=r, column=1, value=item).font = Font(name=F, size=9, color=INK)
         ws.cell(row=r, column=1).alignment = Alignment(horizontal="center", vertical="top")
-        ws.cell(row=r, column=2, value=ap).font = Font(name=F, size=9, bold=True, color=INK)
+        ca = ws.cell(row=r, column=2, value=ap)
+        ca.font = Font(name=F, size=9, bold=True, color=INK)
+        ca.alignment = Alignment(vertical="top")
         ws.merge_cells(start_row=r, start_column=2, end_row=r, end_column=5)
         c = ws.cell(row=r, column=6, value=txt)
         c.font = Font(name=F, size=9, color=INK2)
