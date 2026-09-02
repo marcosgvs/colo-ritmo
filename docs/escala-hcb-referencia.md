@@ -237,4 +237,4 @@ Regras que a checagem dos 25 itens revelou e que a planilha passou a medir (aba 
 - **Senior**: BHP não é digitado; BHN aparece como o plantão normal. A aba SENIOR já traduz assim.
 - **Códigos com nome**: `CEP` (4h, código 6), `CP` (cuidados paliativos da Raquel, seg+qua manhã), `CRO` (tardes de ambulatório da LuAlice, 2/mês). Eram E/P/R e ninguém reconhecia.
 
-Fonte de setembro: a **grade do grupo** ("Escala setembro - UTI HCB.xlsx"), não o arquivo de códigos Senior — este veio incompleto em 29 e 30/09 (sem a chefia e sem várias pessoas). Os números da checagem (DebMatias 18h, Anna 24h no fim de setembro) batem com a grade.
+Fonte de TODOS os meses (02/09/26): as **grades do grupo** (as escalas enviadas), não os arquivos de códigos Senior. Marcos: "o Senior é uma coisa à parte que nem sempre condiz com a realidade" (em set/26 veio incompleto em 29 e 30/09). Do Senior entram só os códigos que a grade não distingue (47, 78, 6, 11) e férias/licenças. Os números da checagem (DebMatias 18h, Anna 24h no fim de setembro) batem com a grade.

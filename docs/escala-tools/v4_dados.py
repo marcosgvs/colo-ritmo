@@ -349,20 +349,23 @@ FORA_DO_ROSTER = [
 ]
 
 # --------------------------------------------------------------- procedência
+GRADE = ("Grade do grupo (a escala que a equipe recebe) — a fonte de todos os meses desde "
+         "01/09/26. Do arquivo Senior entram só os códigos que a grade não distingue (47 chefia, "
+         "78 Janaina, 6 CEP, 11 administrativo) e as férias/licenças.")
 PROCEDENCIA = {
-    1:  ("grade", "Reconstruído da grade 'ESCALA FINAL JANEIRO 2026' — a grade começa no dia 2"),
-    2:  ("senior", "Códigos Senior (códigos antigos 110/82/83)"),
-    3:  ("senior", "Códigos Senior (códigos antigos 110/82/83)"),
-    4:  ("senior", "Códigos Senior — mudança de abril: passa a 2/40/41"),
-    5:  ("grade", "Reconstruído da grade; dias 1–2 vêm do arquivo de abril; DIA 3 NÃO EXISTE em nenhum arquivo"),
-    6:  ("grade", "Reconstruído da grade 'Escala junho - UTI HCB'"),
-    7:  ("senior", "Códigos Senior"),
-    8:  ("senior", "Códigos Senior"),
-    9:  ("grade", "Grade do grupo 'Escala setembro - UTI HCB' — a que a equipe segue — com os "
-                  "códigos estruturais (47, 78, 6, 11), férias e licenças vindos do arquivo Senior. "
-                  "O arquivo de códigos Senior de setembro estava INCOMPLETO em 29 e 30/09 (sem a "
-                  "chefia e sem várias pessoas), por isso não é a fonte deste mês. As anotações "
-                  "BHP/BHN da grade entram como códigos + e −"),
+    1:  ("grade", GRADE + " Janeiro: 'ESCALA FINAL JANEIRO 2026', começa no dia 2; sem arquivo Senior."),
+    2:  ("grade", GRADE + " Fevereiro: 'Escala fevereiro UTI HCB 2026' (sem coluna de noitinha)."),
+    3:  ("grade", GRADE + " Março: 'Escala UTI - março 2026' — traz também 01–05/04."),
+    4:  ("grade", GRADE + " Abril: 'Escala abril 2026 UTI HCB' começa no dia 4 (1–3 vêm do arquivo "
+                  "de março) e traz 01–03/05."),
+    5:  ("grade", GRADE + " Maio: 'Escala maio UTI - HCB - última revisão 09.04.26' (dias 1–3 vêm do "
+                  "arquivo de abril); sem arquivo Senior."),
+    6:  ("grade", GRADE + " Junho: 'Escala junho - UTI HCB' — traz também 01–05/07; sem arquivo Senior."),
+    7:  ("grade", GRADE + " Julho: 'Escala juLHO - UTI HCB - apos correcao de carga horaria' começa "
+                  "no dia 6 (1–5 vêm do arquivo de junho) e traz 01–02/08."),
+    8:  ("grade", GRADE + " Agosto: 'Escala agosto - UTI HCB' (1–2 vêm do arquivo de julho)."),
+    9:  ("grade", GRADE + " Setembro: 'Escala setembro - UTI HCB'. O arquivo Senior de setembro "
+                  "estava incompleto em 29–30/09 — mais um motivo pra grade ser a fonte."),
     10: ("montado", "ESCALA DA MARI — a versão viva do Sheet, re-transcrita em 01/09/26 "
                      "(mari_out_dados.py v2), mais as correções da checagem Marcos/Mari "
                      "(checagem_out_v3.py — cada uma listada na aba CHECAGEM OUT). Buracos "
@@ -370,11 +373,12 @@ PROCEDENCIA = {
     11: ("vazio", "A montar"),
     12: ("vazio", "A montar"),
 }
-AVISO_GRADE = ("Meses reconstruídos da grade têm FIDELIDADE MENOR: a grade lista nomes por "
-               "turno, não códigos. 10h de chefia (47), 4h de CEP (6) e 5h da Janaina (78) "
-               "aparecem só como nome na coluna da manhã e entram como manhã de 6h — a carga "
-               "horária desses meses fica subestimada pra chefia. Manhã+tarde no mesmo dia "
-               "foi lido como 12h dia. Anotações BHP/BHN da grade viram os códigos + e − (BHN não conta hora).")
+AVISO_GRADE = ("A grade lista nomes por turno, não códigos: manhã + tarde no mesmo dia foi lido como "
+               "12h dia (D). Nos meses COM arquivo Senior (fev–abr, jul–set) os códigos 47/78/6/11 e as "
+               "férias vêm dele; em janeiro, maio e junho não há arquivo Senior e a chefia entra como "
+               "manhã de 6h (carga subestimada pra Fred/Milena). As anotações BHP/BHN/CEP/CP/CRO da "
+               "grade viram os códigos + e −, CEP, CP e CRO. O Senior NÃO é fonte de escala: nem sempre "
+               "condiz com a realidade (Marcos, 02/09/26).")
 
 # feriado: (nome, sigla curta que cabe na coluna do dia)
 FERIADOS_2026 = {

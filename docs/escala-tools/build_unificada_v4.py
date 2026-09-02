@@ -194,26 +194,24 @@ def carregar_dados():
     DIAS, _ = senior_import.importar()
     grade, rel_grade = grade_import.importar(roster + [x[0] for x in D.FORA_DO_ROSTER])
     ESTRUTURAIS = {"C", "J", "CEP", "A"}       # o que só o arquivo Senior distingue
+    # A GRADE DO GRUPO é a fonte de todo mês que tem grade (Marcos, 02/09/26: "o
+    # Senior é uma coisa à parte que nem sempre condiz com a realidade"). Do
+    # Senior ficam só os códigos estruturais de quem a grade lista como M/T/D e
+    # as ausências/administrativo de quem ela não lista. Dia sem grade (01/01)
+    # fica com o que o Senior tiver.
     for data, pessoas in grade.items():
-        if data.month == 9:
-            # SETEMBRO: a grade do grupo é a fonte (o Senior veio incompleto em
-            # 29–30/09). Do Senior ficam só os códigos estruturais de quem a grade
-            # lista como M/T/D, e as ausências/administrativo de quem ela não lista.
-            sen = DIAS.get(data, {})
-            novo = {}
-            for p, cel in pessoas.items():
-                s_ = sen.get(p)
-                if s_ and s_[0] in ESTRUTURAIS and cel[0] in ("M", "T", "D"):
-                    novo[p] = (s_[0], "senior")
-                else:
-                    novo[p] = cel
-            for p, s_ in sen.items():
-                if p not in novo and (s_[0] in D.AUSENCIAS or s_[0] == "A"):
-                    novo[p] = s_
-            DIAS[data] = novo
-        else:
-            for p, cel in pessoas.items():
-                DIAS.setdefault(data, {}).setdefault(p, cel)   # Senior tem prioridade
+        sen = DIAS.get(data, {})
+        novo = {}
+        for p, cel in pessoas.items():
+            s_ = sen.get(p)
+            if s_ and s_[0] in ESTRUTURAIS and cel[0] in ("M", "T", "D"):
+                novo[p] = (s_[0], "senior")
+            else:
+                novo[p] = cel
+        for p, s_ in sen.items():
+            if p not in novo and (s_[0] in D.AUSENCIAS or s_[0] == "A"):
+                novo[p] = s_
+        DIAS[data] = novo
     # OUTUBRO: a versão VIVA da Mari (re-transcrita em 01/09/26) + as correções
     # da checagem dela e do Marcos. Substituição total da matriz: célula que ela
     # deixou vazia fica vazia (ela preferiu buraco a convocação).
@@ -235,6 +233,28 @@ def carregar_dados():
 
 
 # ============================================================== abas
+def altura(texto, largura, tam=9, minimo=15, extra=0):
+    """altura de linha (pt) pra um texto com quebra numa largura de coluna.
+    O Sheets não auto-ajusta linha com célula mesclada nem linha com altura
+    fixa — então toda linha com texto longo ganha altura calculada."""
+    import math
+    por_linha = max(1.0, largura * {8: 1.35, 9: 1.2, 10: 1.05}.get(tam, 1.1))
+    linhas = sum(max(1, math.ceil(len(p) / por_linha)) for p in str(texto).split("\n"))
+    return max(minimo, (linhas + extra) * (tam * 1.45) + 5)
+
+
+def altura_bloco(ws, r1, r2, texto, largura, tam=9):
+    """distribui a altura de um texto mesclado em várias linhas (r1..r2)."""
+    total = altura(texto, largura, tam)
+    n = r2 - r1 + 1
+    for rr in range(r1, r2 + 1):
+        atual = ws.row_dimensions[rr].height or 15
+        ws.row_dimensions[rr].height = max(atual, total / n)
+
+
+VERTICAL = Alignment(horizontal="center", vertical="bottom", textRotation=90)
+
+
 def _tip(cel, chave):
     """cola o tooltip do dicionário central como comentário (nota no Sheets)."""
     texto = D.TOOLTIPS.get(chave) or D.TOOLTIPS.get(str(chave).lower())
@@ -292,6 +312,7 @@ def aba_leiame(wb, rel_grade):
             cel.font = Font(name=F, size=10, color=cor)
             cel.alignment = Alignment(wrap_text=True, vertical="top")
             ws.merge_cells(start_row=r, start_column=2, end_row=r, end_column=8)
+            ws.row_dimensions[r].height = altura(b, 132, 10)
         r += 1
 
     secao("O que é")
@@ -388,15 +409,17 @@ def aba_leiame(wb, rel_grade):
         c2.font = Font(name=F, size=9, color=INK2)
         c2.alignment = Alignment(wrap_text=True, vertical="top")
         ws.merge_cells(start_row=r, start_column=2, end_row=r, end_column=8)
+        ws.row_dimensions[r].height = altura(nota, 132, 9)
         r += 1
     r += 1
     linha("atenção", D.AVISO_GRADE, cor=CORALI)
     r += 1
     secao("O que ainda falta")
     for falta in (
-        "Maio dia 3 não existe em nenhum arquivo recebido — a coluna fica vazia.",
         "Janeiro começa no dia 2: a grade recebida não tem o dia 1º.",
-        "Junho e janeiro não têm arquivo de códigos Senior; foram reconstruídos da grade.",
+        "Toda a escala de janeiro a setembro vem das GRADES do grupo. O arquivo Senior só "
+        "empresta os códigos 47/78/6/11 e as férias — janeiro, maio e junho não têm Senior, "
+        "então a chefia desses meses aparece como manhã de 6h.",
         "Novembro e dezembro estão em branco, prontos pra montar (01/11 já tem o que a Mari lançou).",
         "Os dias do CRO da LuAlice em outubro (02 e 09) e o domingo 18/10 à noite (ficou com 6/7 "
         "depois de desfazer as 24h emendadas do Moabe) estão marcados pra decisão da Mari na aba "
@@ -451,7 +474,7 @@ def aba_cadastro(wb):
                 cel = ws.cell(row=r, column=i)
                 if cel.fill is None or cel.fill.fgColor.rgb in ("00000000", None):
                     cel.fill = PatternFill("solid", fgColor=CREME2)
-        ws.row_dimensions[r].height = 26
+        ws.row_dimensions[r].height = max(altura(restr, 58), altura(obs, 52), 18)
         r += 1
     r += 1
     ws.cell(row=r, column=1, value="Fora do roster").font = Font(name=F, bold=True, size=10, color=CORALI)
@@ -497,6 +520,7 @@ def aba_config(wb):
     nota.font = Font(name=F, size=9, color=INK2)
     nota.alignment = Alignment(wrap_text=True, vertical="top")
     ws.merge_cells(start_row=4, start_column=6, end_row=7, end_column=7)
+    altura_bloco(ws, 4, 7, D.NOTA_MINIMOS, 88)
     cab(8, ["Até set/26 · histórico", "Manhã", "Tarde", "Noite"])
     for i, tipo in enumerate(("útil", "sábado", "domingo")):
         m, t, n = D.MINIMOS_ANTIGOS[tipo]
@@ -512,6 +536,7 @@ def aba_config(wb):
     nota2.font = Font(name=F, size=9, italic=True, color=INK3)
     nota2.alignment = Alignment(wrap_text=True, vertical="top")
     ws.merge_cells(start_row=9, start_column=6, end_row=11, end_column=7)
+    altura_bloco(ws, 9, 11, nota2.value, 88)
 
     # tabela de códigos — linhas 9..20, referenciada pela aba SENIOR
     ws.cell(row=13, column=1, value="Tabela de códigos").font = Font(
@@ -552,6 +577,7 @@ def aba_config(wb):
     fl.font = Font(name=F, size=9, italic=True, color=INK2)
     fl.alignment = Alignment(wrap_text=True, vertical="top")
     ws.merge_cells(start_row=r - 2, start_column=6, end_row=r + 2, end_column=7)
+    altura_bloco(ws, r - 2, r + 2, fl.value, 88)
     cfat = ws.cell(row=r - 1, column=5, value="Fator do mês")
     cfat.font = Font(name=F, size=9, bold=True, color=INK)
     _tip(cfat, "fator")
@@ -576,6 +602,7 @@ def aba_config(wb):
     na.font = Font(name=F, size=9, color=INK2)
     na.alignment = Alignment(wrap_text=True, vertical="top")
     ws.merge_cells(start_row=r, start_column=6, end_row=r + 3, end_column=7)
+    altura_bloco(ws, r, r + 3, D.NOTA_ALVO, 88)
     r += 1
     cab(r, ["Parâmetro", "Valor"])
     r += 1
@@ -599,6 +626,7 @@ def aba_config(wb):
     nf.font = Font(name=F, size=9, color=INK2)
     nf.alignment = Alignment(wrap_text=True, vertical="top")
     ws.merge_cells(start_row=r, start_column=5, end_row=r + 5, end_column=7)
+    altura_bloco(ws, r, r + 5, D.NOTA_FERIADOS, 101)
     r += 1
     cab(r, ["Data", "Sigla", "Feriado"])
     r += 1
@@ -626,13 +654,15 @@ def aba_config(wb):
     for nome, oque, base, trat, nota_txt in D.REGRAS_DURAS:
         ws.cell(row=r, column=1, value=nome).font = Font(name=F, size=9, bold=True, color=INK)
         for i, v in enumerate((oque, base, trat), start=2):
-            ws.cell(row=r, column=i, value=v).font = Font(name=F, size=9, color=INK2)
+            cx = ws.cell(row=r, column=i, value=v)
+            cx.font = Font(name=F, size=9, color=INK2)
+            cx.alignment = Alignment(wrap_text=True, vertical="top")
         ws.cell(row=r, column=4).fill = PatternFill("solid", fgColor=cores.get(trat, CREME))
         cel = ws.cell(row=r, column=5, value=nota_txt)
         cel.font = Font(name=F, size=9, color=INK2)
         cel.alignment = Alignment(wrap_text=True, vertical="top")
         ws.merge_cells(start_row=r, start_column=5, end_row=r, end_column=7)
-        ws.row_dimensions[r].height = 30
+        ws.row_dimensions[r].height = max(altura(nota_txt, 101), altura(oque, 13), altura(trat, 13))
         r += 1
     creme(ws, r + 2, 7)
     return ws, fim_cod, r_cota, r_desc
@@ -680,7 +710,7 @@ def aba_mes(wb, mes, DIAS, fim_cod, pessoas, r_cota, r_desc):
                 ws.cell(row=rr, column=col).fill = PatternFill("solid", fgColor=LINE)
             continue
         d_prox = dias_virada[j]
-        ws.column_dimensions[get_column_letter(col)].width = 4.2
+        ws.column_dimensions[get_column_letter(col)].width = 4.7
         cd = ws.cell(row=R_DIA, column=col, value=d_prox.strftime("%d/%m"))
         cd.font = Font(name=F, bold=True, size=7, color=INK2)
         cd.alignment = Alignment(horizontal="center")
@@ -699,7 +729,7 @@ def aba_mes(wb, mes, DIAS, fim_cod, pessoas, r_cota, r_desc):
             for rr in (R_DIA, R_DOW):
                 ws.cell(row=rr, column=col).fill = PatternFill("solid", fgColor=LINE)
             continue
-        ws.column_dimensions[get_column_letter(col)].width = 4.2
+        ws.column_dimensions[get_column_letter(col)].width = 4.7
         d_prev = dt.date(2026, mes, 1) - dt.timedelta(days=N_PRE - j)
         cd = ws.cell(row=R_DIA, column=col, value=d_prev.strftime("%d/%m"))
         cd.font = Font(name=F, bold=True, size=7, color=INK2)
@@ -713,7 +743,7 @@ def aba_mes(wb, mes, DIAS, fim_cod, pessoas, r_cota, r_desc):
     for i in range(31):
         col = C_D1 + i
         letra = get_column_letter(col)
-        ws.column_dimensions[letra].width = 4.2
+        ws.column_dimensions[letra].width = 4.7
         if i >= ndias:
             for r in (R_DIA, R_DOW):
                 ws.cell(row=r, column=col).fill = PatternFill("solid", fgColor=LINE)
@@ -767,9 +797,10 @@ def aba_mes(wb, mes, DIAS, fim_cod, pessoas, r_cota, r_desc):
         eh_sem = txt.startswith("Sem ") or txt.startswith("BH ")
         c.fill = PatternFill("solid", fgColor=(CORALI if txt in COLS_ALERTA else
                                                 ("453A73" if eh_sem else LAVI)))
-        c.alignment = Alignment(horizontal="center", wrap_text=True)
+        c.alignment = VERTICAL          # todo o cabeçalho de totais na vertical (Marcos, 02/09)
         ws.column_dimensions[get_column_letter(col)].width = \
-            (13 if txt == "Grupo" else (4.5 if txt == "Nº" else (5.5 if eh_sem else 7.5)))
+            (13 if txt == "Grupo" else (4.6 if eh_sem or txt == "Nº" else 5.4))
+    ws.row_dimensions[R_HDR].height = 58
     # o intervalo de datas de cada semana, em cima do par Sem/BH
     d1 = dt.date(2026, mes, 1)
     for k, spans in enumerate(jans, start=1):
@@ -1068,8 +1099,9 @@ def aba_painel(wb, pessoas, oficial):
         c = _tip(ws.cell(row=R_HDR, column=col + i, value=h), chave_conf.get(h, ""))
         c.font = Font(name=F, bold=True, size=8, color="FFFFFF")
         c.fill = PatternFill("solid", fgColor=CORALI)
-        c.alignment = Alignment(horizontal="center", wrap_text=True)
-        ws.column_dimensions[get_column_letter(col + i)].width = 9
+        c.alignment = VERTICAL
+        ws.column_dimensions[get_column_letter(col + i)].width = 5.4
+    ws.row_dimensions[R_HDR].height = 58
 
     for k, (apelido, _ch) in enumerate(pessoas):
         lin = R_P0 + k
@@ -1130,7 +1162,7 @@ def aba_senior(wb, pessoas, fim_cod):
     for i in range(32):
         col = S_D1 + i
         alvo = get_column_letter(col + N_PRE)
-        ws.column_dimensions[get_column_letter(col)].width = 5
+        ws.column_dimensions[get_column_letter(col)].width = 6.5
         for r, formula in ((R_DIA, f'=IFERROR(INDIRECT($B$1&"!{alvo}{R_DIA}"),"")'),
                            (R_DOW, f'=IFERROR(INDIRECT($B$1&"!{alvo}{R_DOW}"),"")')):
             c = ws.cell(row=r, column=col, value=formula)
@@ -1163,7 +1195,7 @@ def aba_senior(wb, pessoas, fim_cod):
     return ws
 
 
-def aba_dia_a_dia(wb, mes=10):
+def aba_dia_a_dia(wb, DIAS, mes=10):
     """o mês em formato calendário: por dia, por turno, quem está onde.
 
     Tudo FÓRMULA sobre a aba do mês (FILTER + TEXTJOIN, que existem no Google
@@ -1186,8 +1218,8 @@ def aba_dia_a_dia(wb, mes=10):
 
     # sem coluna de ausências (pedido do Marcos, 28/08/26): quem está fora
     # já se percebe pela própria matriz do mês — aqui é só quem trabalha
-    colunas = [("Dia", 5), ("", 5), ("Manhã", 24), ("Tarde", 24), ("Noite", 24),
-               ("BHN (dispensa)", 18), ("Cobertura", 13)]
+    colunas = [("Dia", 5), ("", 5), ("Manhã", 44), ("Tarde", 36), ("Noite", 30),
+               ("BHN (dispensa)", 22), ("Cobertura", 13)]
     chave_cal = {"Cobertura": "cobertura-cal", "BHN (dispensa)": "bhn-cal"}
     for i, (h, w) in enumerate(colunas, start=1):
         c = ws.cell(row=3, column=i, value=h)
@@ -1209,7 +1241,7 @@ def aba_dia_a_dia(wb, mes=10):
         if bhp:
             cond_bhp = "+".join(f'({rng}="{l}")' for l in bhp)
             rotulo = f'{nomes_rng}&IF(({cond_bhp})*1>0," BHP","")'
-        return (f'=IFERROR(TEXTJOIN(CHAR(10),TRUE,'
+        return (f'=IFERROR(TEXTJOIN(", ",TRUE,'
                 f'FILTER({rotulo},({cond})*1>0)),"—")')
 
     def formula_bhn(col):
@@ -1218,7 +1250,7 @@ def aba_dia_a_dia(wb, mes=10):
         cond = "+".join(f'({rng}="{l}")' for l in sorted(D.BHN))
         periodo = (f'IF({rng}="M-"," manhã",IF({rng}="T-"," tarde",IF({rng}="D-"," dia",'
                    f'IF({rng}="N-"," noite",IF({rng}="Tm-"," manhã"," tarde")))))')
-        return (f'=IFERROR(TEXTJOIN(CHAR(10),TRUE,'
+        return (f'=IFERROR(TEXTJOIN(", ",TRUE,'
                 f'FILTER({nomes_rng}&" BHN"&{periodo},({cond})*1>0)),"")')
 
     # a semana inteira, de segunda a domingo, nas duas pontas (Marcos, 28/08):
@@ -1288,7 +1320,17 @@ def aba_dia_a_dia(wb, mes=10):
                         italic=vizinho)
         cov.alignment = Alignment(wrap_text=True, vertical="top")
         cov.border = BOX
-        ws.row_dimensions[r].height = 110 if vizinho else 150
+        # altura pelo que vai aparecer: quantos nomes cada turno tem naquele dia
+        import math
+        pessoas_dia = DIAS.get(data, {})
+        def chars(flag):
+            return sum(len(p) + 2 + (4 if cel[0] in D.BHP else 0)
+                       for p, cel in pessoas_dia.items()
+                       if cel[0] in D.TURNOS and D.TURNOS[cel[0]][flag])
+        bhn = sum(len(p) + 12 for p, cel in pessoas_dia.items() if cel[0] in D.BHN)
+        linhas = max(math.ceil(chars(4) / (44 * 1.35)), math.ceil(chars(5) / (36 * 1.35)),
+                     math.ceil(chars(6) / (30 * 1.35)), math.ceil(bhn / (22 * 1.35)), 1)
+        ws.row_dimensions[r].height = max(26, linhas * 11.6 + 8)
     creme(ws, r + 2, 8)
     ws.freeze_panes = "C4"
     return ws
@@ -1364,7 +1406,7 @@ def aba_validador(wb, DIAS, pessoas):
         e.font = Font(name=F, size=9, italic=True, color=INK2)
         e.alignment = Alignment(wrap_text=True, vertical="top")
         ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=6)
-        ws.row_dimensions[r].height = 28
+        ws.row_dimensions[r].height = altura(explicacao, 150)
         r += 2
 
     def cabecalho():
@@ -1394,6 +1436,7 @@ def aba_validador(wb, DIAS, pessoas):
             ct.font = Font(name=F, size=8, bold=True, color=cor)
             for i in range(1, 7):
                 ws.cell(row=r, column=i).border = BOX
+            ws.row_dimensions[r].height = altura(a["detalhe"], 62, minimo=15)
             r += 1
 
     secao("ESTRUTURAL — decisão de política, não erro de montagem", LAVI,
@@ -1420,7 +1463,7 @@ def aba_validador(wb, DIAS, pessoas):
             name=F, size=8, bold=True, color=LAVI)
         for i in range(1, 7):
             ws.cell(row=r, column=i).border = BOX
-        ws.row_dimensions[r].height = 24
+        ws.row_dimensions[r].height = altura(cd.value, 62, minimo=18)
         r += 1
     r += 2
 
@@ -1454,7 +1497,7 @@ def aba_validador(wb, DIAS, pessoas):
     e.font = Font(name=F, size=9, italic=True, color=INK2)
     e.alignment = Alignment(wrap_text=True, vertical="top")
     ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=6)
-    ws.row_dimensions[r].height = 24
+    ws.row_dimensions[r].height = altura(e.value, 150)
     r += 2
     noturnas = noturnas_por_mes(DIAS, [p for p, _ in pessoas])
     ws.cell(row=r, column=1, value="Médico").font = Font(name=F, bold=True, size=8, color="FFFFFF")
@@ -1530,7 +1573,7 @@ def aba_checagem(wb):
         c.alignment = Alignment(wrap_text=True, vertical="top")
         for j in range(2, 7):
             ws.cell(row=r, column=j).border = BOX
-        ws.row_dimensions[r].height = 30
+        ws.row_dimensions[r].height = altura(txt, 110)
         r += 1
     r += 1
     titulo("Célula a célula — o que mudou na aba OUT")
@@ -1547,7 +1590,7 @@ def aba_checagem(wb):
             ws.cell(row=r, column=5).fill = PatternFill("solid", fgColor=FILL_BHP)
         elif para in D.BHN:
             ws.cell(row=r, column=5).fill = PatternFill("solid", fgColor=FILL_BHN)
-        ws.row_dimensions[r].height = 28
+        ws.row_dimensions[r].height = altura(motivo, 110, minimo=18)
         r += 1
     r += 1
     titulo("Verificado sem mudar célula")
@@ -1562,7 +1605,7 @@ def aba_checagem(wb):
         c.alignment = Alignment(wrap_text=True, vertical="top")
         for j in range(1, 7):
             ws.cell(row=r, column=j).border = BOX
-        ws.row_dimensions[r].height = 40
+        ws.row_dimensions[r].height = altura(txt, 110)
         r += 1
     creme(ws, r + 2, 6)
     ws.freeze_panes = "A4"
@@ -1584,7 +1627,7 @@ def main():
     _cfg, fim_cod, r_cota, r_desc = aba_config(wb)
     for mes in range(1, 13):
         aba_mes(wb, mes, DIAS, fim_cod, pessoas, r_cota, r_desc)
-    aba_dia_a_dia(wb, mes=10)
+    aba_dia_a_dia(wb, DIAS, mes=10)
     aba_checagem(wb)
     aba_painel(wb, pessoas, oficial)
     aba_senior(wb, pessoas, fim_cod)

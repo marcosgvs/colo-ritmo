@@ -22,13 +22,19 @@ DIR_FONTES = os.path.expanduser("~/Downloads/fwdarquivosdaescala")
 nfc = lambda s: unicodedata.normalize("NFC", s)
 
 ARQUIVOS = {
-    # mês: (arquivo, aba, coluna da Manhã ou None = achar pelo cabeçalho)
-    1: ("ESCALA FINAL JANEIRO 2026.xlsx", "Table 1", None),
-    5: ("Escala maio UTI - HCB - última revisão 09.04.26.docx.xlsx", "Table 1", None),
-    6: ("Escala junho - UTI HCB.xlsx", "Junho 2026", None),
-    # setembro: a grade do grupo é a fonte (o arquivo Senior de set/26 veio
-    # incompleto em 29 e 30/09). Sem cabeçalho "Manhã": dia na col. C, M/T/N/NT em D..G
-    9: ("Escala setembro - UTI HCB.xlsx", "Setembro 2026", 4),
+    # mês: (arquivo, aba, coluna da Manhã ou None = achar pelo cabeçalho, tem Noitinha?)
+    # Cada arquivo carrega a semana de virada do mês vizinho (abril 1–3 está no fim
+    # do arquivo de março, julho 1–5 no de junho…): o leitor segue a numeração e
+    # troca o mês quando o número do dia volta pra trás.
+    1: ("ESCALA FINAL JANEIRO 2026.xlsx", "Table 1", None, True),
+    2: ("Escala fevereiro UTI HCB 2026.xlsx", "Planilha1", 4, False),
+    3: ("Escala UTI - março 2026.xlsx", "Table 1", 4, False),
+    4: ("Escala abril 2026 UTI HCB.xlsx", "Table 1", 4, True),
+    5: ("Escala maio UTI - HCB - última revisão 09.04.26.docx.xlsx", "Table 1", None, True),
+    6: ("Escala junho - UTI HCB.xlsx", "Junho 2026", None, True),
+    7: ("Escala juLHO - UTI HCB - apos correcao de carga horaria.xlsx", "Julho 2026", 4, True),
+    8: ("Escala agosto - UTI HCB.xlsx", "Agosto 2026", 4, True),
+    9: ("Escala setembro - UTI HCB.xlsx", "Setembro 2026", 4, True),
 }
 
 DIAS_SEMANA = {"SEGUNDA": 0, "TERÇA": 1, "TERCA": 1, "QUARTA": 2, "QUINTA": 3,
@@ -76,8 +82,29 @@ def _canonico(nome, roster):
     return None
 
 
+def _dia_da_celula(v, mes_atual):
+    """(dia, mês) a partir da célula do dia: inteiro, texto '6', '02/08' ou a data
+    que o Excel inventou (1900-01-06 = dia 6). None se não é um dia."""
+    if isinstance(v, (dt.datetime, dt.date)):
+        return (v.day, mes_atual) if v.year == 1900 else (v.day, v.month)
+    if isinstance(v, (int, float)) and float(v).is_integer() and 1 <= int(v) <= 31:
+        return (int(v), mes_atual)
+    if isinstance(v, str):
+        t = v.strip()
+        if t.isdigit() and 1 <= int(t) <= 31:
+            return (int(t), mes_atual)
+        m = re.match(r"^(\d{1,2})/(\d{1,2})$", t)
+        if m:
+            return (int(m.group(1)), int(m.group(2)))
+    return None
+
+
+def _ultimo(mes):
+    return (dt.date(2026, mes % 12 + 1, 1) - dt.timedelta(days=1)).day if mes < 12 else 31
+
+
 def ler_grade(mes, roster):
-    nome_arq, aba, cM = ARQUIVOS[mes]
+    nome_arq, aba, cM, tem_nt = ARQUIVOS[mes]
     wb = openpyxl.load_workbook(os.path.join(DIR_FONTES, nome_arq), data_only=True)
     ws = wb[aba]
 
@@ -92,45 +119,43 @@ def ler_grade(mes, roster):
             break
     if cM is None:
         cM = 3
-    cT, cN, cNT = cM + 1, cM + 2, cM + 3
+    colunas = [(cM, "M"), (cM + 1, "T"), (cM + 2, "N")] + ([(cM + 3, "NT")] if tem_nt else [])
 
-    ultimo = (dt.date(2026, mes % 12 + 1, 1) - dt.timedelta(days=1)).day
-    turnos = {}           # (apelido, dia) -> set de janelas
-    dia_atual = None
+    turnos = {}           # (apelido, date) -> {janela: anotação}
+    mes_atual, dia_atual = mes, None
     naocasados = set()
     for r in range(1, ws.max_row + 1):
         linha = [ws.cell(row=r, column=c).value for c in range(1, cM)]
-        # número explícito do dia
-        # o número do dia às vezes vem como texto ('1') e não como inteiro
-        def _inteiro(v):
-            if isinstance(v, (int, float)) and float(v).is_integer():
-                return int(v)
-            if isinstance(v, str) and v.strip().isdigit():
-                return int(v.strip())
-            return None
-        numero = next((n for n in (_inteiro(v) for v in linha)
-                       if n is not None and 1 <= n <= ultimo), None)
-        # nome do dia da semana (junho perde o número depois da 1a semana)
+        achado = next((d for d in (_dia_da_celula(v, mes_atual) for v in linha) if d), None)
         nome_dow = next((DIAS_SEMANA[nfc(str(v)).strip().upper()] for v in linha
                          if isinstance(v, str)
                          and nfc(str(v)).strip().upper() in DIAS_SEMANA), None)
-        if numero is not None:
-            # o arquivo do mês carrega a 1a semana do mês SEGUINTE no fim
-            # (handoff por semanas completas). O número do dia reinicia: quando
-            # ele volta pra trás, começou outro mês — para de ler aqui.
-            if dia_atual is not None and numero < dia_atual:
-                break
+        if achado:
+            numero, m2 = achado
+            if m2 != mes_atual:
+                mes_atual = m2                      # '02/08' num arquivo de julho
+            elif dia_atual is not None and numero < dia_atual:
+                mes_atual = mes_atual % 12 + 1      # a numeração voltou: mês seguinte
+            if numero > _ultimo(mes_atual):
+                continue
             dia_atual = numero
-        elif nome_dow is not None:
-            # avança do dia corrente até casar o dia-da-semana
-            candidato = (dia_atual or 0) + 1
-            while candidato <= ultimo and dt.date(2026, mes, candidato).weekday() != nome_dow:
+        elif nome_dow is not None and dia_atual is not None:
+            # avança do dia corrente até casar o dia-da-semana (junho perde o número)
+            candidato = dia_atual + 1
+            while candidato <= _ultimo(mes_atual) and \
+                    dt.date(2026, mes_atual, candidato).weekday() != nome_dow:
                 candidato += 1
-            if candidato <= ultimo:
+            if candidato <= _ultimo(mes_atual):
                 dia_atual = candidato
+            else:
+                mes_atual = mes_atual % 12 + 1
+                dia_atual = 1
+                while dt.date(2026, mes_atual, dia_atual).weekday() != nome_dow:
+                    dia_atual += 1
         if dia_atual is None:
             continue
-        for coluna, janela in ((cM, "M"), (cT, "T"), (cN, "N"), (cNT, "NT")):
+        data = dt.date(2026, mes_atual, dia_atual)
+        for coluna, janela in colunas:
             v = ws.cell(row=r, column=coluna).value
             if v in (None, ""):
                 continue
@@ -141,11 +166,10 @@ def ler_grade(mes, roster):
             if apelido is None:
                 naocasados.add(limpo)
                 continue
-            turnos.setdefault((apelido, dia_atual), {})[janela] = _anotacao(v)
+            turnos.setdefault((apelido, data), {})[janela] = _anotacao(v)
 
     dias = {}
-    for (apelido, dia), janelas in turnos.items():
-        data = dt.date(2026, mes, dia)
+    for (apelido, data), janelas in turnos.items():
         dias.setdefault(data, {})[apelido] = (_compor(janelas), "grade")
     return dias, sorted(naocasados)
 
@@ -186,13 +210,19 @@ def _compor(janelas):
 
 
 def importar(roster):
-    DIAS, relatorio = {}, {}
+    """DIAS de todas as grades. Quando dois arquivos trazem a mesma data (a semana
+    de virada), manda o arquivo cujo mês nominal é o mês da data."""
+    DIAS, dono, relatorio = {}, {}, {}
     for mes in sorted(ARQUIVOS):
         dias, naocasados = ler_grade(mes, roster)
         for data, pessoas in dias.items():
-            DIAS.setdefault(data, {}).update(pessoas)
+            if data in DIAS and dono[data] == data.month:
+                continue                          # o arquivo do mês certo já escreveu
+            DIAS[data] = dict(pessoas)
+            dono[data] = mes
         relatorio[mes] = {"dias": len(dias), "naocasados": naocasados,
-                          "lancamentos": sum(len(v) for v in dias.values())}
+                          "lancamentos": sum(len(v) for v in dias.values()),
+                          "datas": (min(dias), max(dias)) if dias else None}
     return DIAS, relatorio
 
 
