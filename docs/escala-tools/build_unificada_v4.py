@@ -34,6 +34,15 @@ from openpyxl.worksheet.datavalidation import DataValidation
 AQUI = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, AQUI)
 
+# MODO "v3": planilha nova (grades como fonte, correções da checagem, aba CHECAGEM).
+# MODO "antiga": o Sheet que a Mari usa (id em SHEET_ANTIGO) recebe SÓ a estrutura —
+# Sem/BH, cabeçalho vertical, códigos novos, alturas — com os dados como estão lá:
+# outubro lido AO VIVO na hora de gerar, jan–set pelas fontes de antes (Senior +
+# grades de jan/mai/jun), nenhuma correção da checagem. Pedido do Marcos, 02/09/26.
+MODO = "antiga" if "antiga" in sys.argv[1:] else "v3"
+SHEET_ANTIGO = "102d4E3IzlSXH4MDU6hd9ywr21BxthHdqL9meBP-IX7s"
+RENOMEADOS = {"E": "CEP", "P": "CP", "R": "CRO"}   # códigos que ganharam nome legível
+
 import grade_import
 import senior_import
 import v4_dados as D
@@ -188,11 +197,49 @@ def expr_ausencias(lin, spans):
     return "+".join(partes)
 
 
+def _outubro_ao_vivo(roster):
+    """lê a aba OUT (e o 01/11 da NOV) do Sheet antigo agora — o que a Mari tem lá
+    é o dado; só os códigos renomeados (E→CEP, P→CP, R→CRO) mudam de grafia."""
+    import gsuite
+    out = gsuite.ler(SHEET_ANTIGO, "OUT!A8:AM73")
+    nov = gsuite.ler(SHEET_ANTIGO, "NOV!A8:I73")
+    por_pessoa = {}
+    for row in out:
+        if not row or row[0] not in roster:
+            continue
+        for d in range(1, 32):
+            idx = 8 + d - 1
+            v = (row[idx] if idx < len(row) else "").strip()
+            if v:
+                por_pessoa.setdefault(row[0], {})[d] = RENOMEADOS.get(v, v)
+    for row in nov:
+        if row and row[0] in roster and len(row) > 8 and row[8].strip():
+            por_pessoa.setdefault(row[0], {})[32] = RENOMEADOS.get(row[8].strip(), row[8].strip())
+    print(f"outubro ao vivo: {sum(len(v) for v in por_pessoa.values())} células lidas do Sheet antigo")
+    return por_pessoa
+
+
 def carregar_dados():
     """DIAS[date][apelido] = (letra, origem) pro ano inteiro — SÓ fontes reais."""
     roster = [x[0] for x in D.ROSTER]
     DIAS, _ = senior_import.importar()
     grade, rel_grade = grade_import.importar(roster + [x[0] for x in D.FORA_DO_ROSTER])
+    if MODO == "antiga":
+        # dados como estavam: Senior manda, grade só onde não há Senior (jan/mai/jun)
+        for data, pessoas in grade.items():
+            if data.month in (1, 5, 6):
+                for p_, cel in pessoas.items():
+                    DIAS.setdefault(data, {}).setdefault(p_, cel)
+        por_pessoa = _outubro_ao_vivo(roster)
+        for data in [dt.date(2026, 10, d) for d in range(1, 32)] + [dt.date(2026, 11, 1)]:
+            dia_k = 32 if data.month == 11 else data.day
+            for apelido in roster:
+                letra = por_pessoa.get(apelido, {}).get(dia_k)
+                if letra:
+                    DIAS.setdefault(data, {})[apelido] = (letra, "mari")
+                else:
+                    DIAS.get(data, {}).pop(apelido, None)
+        return DIAS, rel_grade
     ESTRUTURAIS = {"C", "J", "CEP", "A"}       # o que só o arquivo Senior distingue
     # A GRADE DO GRUPO é a fonte de todo mês que tem grade (Marcos, 02/09/26: "o
     # Senior é uma coisa à parte que nem sempre condiz com a realidade"). Do
@@ -291,7 +338,8 @@ def creme(ws, ate_linha, ate_coluna):
 def aba_leiame(wb, rel_grade):
     ws = wb.create_sheet("LEIA-ME")
     ws.sheet_properties.tabColor = PINK
-    estilo_titulo(ws, "Escala UTI HCB · 2026 — V3")
+    estilo_titulo(ws, "Escala UTI HCB · 2026 — V3" if MODO == "v3" else
+                  "Escala UTI HCB · 2026 — unificada (estrutura da V3, dados desta planilha)")
     ws.column_dimensions["A"].width = 16
     ws.column_dimensions["B"].width = 30
     for col in "CDEFGH":
@@ -674,6 +722,11 @@ def aba_mes(wb, mes, DIAS, fim_cod, pessoas, r_cota, r_desc):
     nome = MESES_PT[mes - 1]
     ws = wb.create_sheet(nome)
     origem, nota = D.PROCEDENCIA[mes]
+    if MODO == "antiga":
+        nota = {10: "ESCALA DA MARI — os dados desta planilha, lidos ao vivo na hora de gerar a "
+                    "estrutura nova (02/09/26). Nenhuma correção da checagem foi aplicada aqui; "
+                    "elas estão na planilha V3", }.get(mes, "Fontes de antes: códigos Senior; grade "
+                    "do grupo em janeiro, maio e junho" if mes <= 9 else nota)
     ws.sheet_properties.tabColor = {"senior": SAGE, "grade": SAND,
                                    "montado": LAV, "vazio": LINE}[origem]
     ws.sheet_view.showGridLines = False
@@ -1635,16 +1688,22 @@ def main():
     for mes in range(1, 13):
         aba_mes(wb, mes, DIAS, fim_cod, pessoas, r_cota, r_desc)
     aba_dia_a_dia(wb, DIAS, mes=10)
-    aba_checagem(wb)
+    if MODO == "v3":
+        aba_checagem(wb)
     aba_painel(wb, pessoas, oficial)
     aba_senior(wb, pessoas, fim_cod)
     aba_validador(wb, DIAS, pessoas)
     # painel de leitura: DADOS DASH alimenta os gráficos, DASHBOARD é a capa
     import v4_dashboard as VD
     VD.aba_dados(wb)
-    VD.aba_dashboard(wb, mes_vivo="OUT", nome_mes="outubro")
+    VD.aba_dashboard(wb, mes_vivo="OUT", nome_mes="outubro", nota=(
+        None if MODO == "v3" else
+        "Outubro é o que está lançado nesta planilha (lido ao vivo em 02/09). A estrutura é a da "
+        "V3 — semanas e BH na frente, códigos de banco, cabeçalho vertical — sem nenhuma "
+        "correção da checagem: essas estão só na V3."))
 
-    destino = os.path.join(AQUI, NOME_ARQUIVO)
+    destino = os.path.join(AQUI, NOME_ARQUIVO if MODO == "v3"
+                           else "Escala UTI HCB 2026 - unificada v4.xlsx")
     wb.save(destino)
     tam = os.path.getsize(destino) / 1024
     print(f"\n=== planilha V3 salva ===\n{destino}\n{tam:.0f} kb · {len(wb.sheetnames)} abas")

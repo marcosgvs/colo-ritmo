@@ -215,7 +215,7 @@ def _tile(ws, r1, c1, r2, c2, rotulo, formula, formato="0", nota="",
          alin="center", wrap=True)
 
 
-def aba_dashboard(wb, mes_vivo="OUT", nome_mes="outubro"):
+def aba_dashboard(wb, mes_vivo="OUT", nome_mes="outubro", nota=None):
     ws = wb.create_sheet("DASHBOARD", 0)
     ws.sheet_properties.tabColor = LAVI
     _sem_grade(ws)
@@ -273,9 +273,10 @@ def aba_dashboard(wb, mes_vivo="OUT", nome_mes="outubro"):
 
     # nota: a fonte de outubro
     ws.row_dimensions[13].height = 26
-    av = _txt(ws, "B13", "Outubro é a versão da Mari (Sheet vivo, 01/09) com as correções "
+    av = _txt(ws, "B13", nota or (
+              "Outubro é a versão da Mari (Sheet vivo, 01/09) com as correções "
               "da checagem dela e do Marcos — cada mudança está na aba CHECAGEM OUT. "
-              "Setembro vem da grade do grupo. Nada aqui é proposta do gerador.",
+              "Janeiro a setembro vêm das grades do grupo. Nada aqui é proposta do gerador."),
               tam=9, italico=True, cor=LAVI, wrap=True)
     ws.merge_cells("B13:N13")
     for c in range(2, 15):
