@@ -21,6 +21,7 @@ import sys
 AQUI = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, AQUI)
 import gsuite
+import v4_dados as D
 import v4_dashboard as VD
 
 ARQUIVO_ID = "102d4E3IzlSXH4MDU6hd9ywr21BxthHdqL9meBP-IX7s"
@@ -116,10 +117,11 @@ def limpar_graficos(sid, dash_id):
     return pedidos
 
 
-LEGENDA = ("M manhã 7–13h · T tarde 13–19h · D dia 7–19h (12h) · N noite 19–7h (12h) · "
-           "NT noitinha 19–1h · C chefia 10h · J Janaina 8–13h · E CEP 4h · A administrativo · "
-           "FE férias · LM licença · AB abono de aniversário")
-CODIGOS_VALIDOS = ["M", "T", "D", "N", "NT", "C", "J", "E", "A", "P", "R", "FE", "LM", "AB"]
+LEGENDA = ("M manhã 7–13h · T tarde 13–19h · D dia 7–19h · N noite 19–7h · "
+           "NT noitinha 19–1h · C chefia 10h · J Janaina 8–13h · CEP 4h · CP paliativos · "
+           "CRO ambulatório · A administrativo · + = BHP (a mais, banco) · − = BHN (dispensa) · "
+           "FE férias · LM licença · AB abono")
+CODIGOS_VALIDOS = list(D.TURNOS)
 MENSAIS = ["JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"]
 
 
@@ -162,8 +164,8 @@ def limpar_vistas(sid):
     return pedidos
 
 
-# última coluna das mensais (1-based): Nº = C_TOT(46) + 18 → 64 (BL)
-FIM_COLS_IDX = 64
+# última coluna das mensais (1-based): Nº = C_TOT(46) + 24 → 70 (BR) — V3
+FIM_COLS_IDX = 70
 
 
 def filtros_basicos(ids):
@@ -243,8 +245,9 @@ def montar(sid=ARQUIVO_ID):
 
 
 if __name__ == "__main__":
-    pedidos, ids = montar()
+    sid = sys.argv[1] if len(sys.argv) > 1 else ARQUIVO_ID
+    pedidos, ids = montar(sid)
     r = gsuite.sheets().spreadsheets().batchUpdate(
-        spreadsheetId=ARQUIVO_ID, body={"requests": pedidos}).execute()
+        spreadsheetId=sid, body={"requests": pedidos}).execute()
     print(f"{len(pedidos)} pedidos aplicados · "
           f"{sum(1 for x in r.get('replies', []) if x.get('addChart'))} gráficos criados")

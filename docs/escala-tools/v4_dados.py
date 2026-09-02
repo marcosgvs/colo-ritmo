@@ -8,21 +8,85 @@ de re-deduzir. Fonte: docs/escala-hcb-referencia.md + atualizações de agosto/2
 # ------------------------------------------------------------------ turnos
 # letra: (rótulo, horário, horas, código Senior, conta em M?, conta em T?, conta em N?)
 TURNOS = {
-    "M":  ("manhã",         "07–13h",          6,  "2",   1, 0, 0),
-    "T":  ("tarde",         "13–19h",          6,  "239", 0, 1, 0),
-    "D":  ("dia 12h",       "07–19h",          12, "40",  1, 1, 0),
-    "N":  ("noite 12h",     "19–07h",          12, "41",  0, 0, 1),
-    "NT": ("noitinha",      "19–01h",          6,  "349", 0, 0, 1),
-    "C":  ("10h chefia",    "8–12 + 13–19h",   10, "47",  1, 1, 0),
-    "A":  ("administrativo","8h diurno",       8,  "11",  0, 0, 0),
-    "J":  ("5h Janaina",    "08–13h",          5,  "78",  1, 0, 0),
-    "E":  ("4h CEP",        "08–12h",          4,  "6",   1, 0, 0),
-    "P":  ("paliativo",     "07–13h",          6,  "",    0, 0, 0),
-    "R":  ("CRO",           "13–19h",          6,  "",    0, 0, 0),
-    "FE": ("férias",        "—",               0,  "Férias", 0, 0, 0),
-    "LM": ("licença",       "—",               0,  "LM",  0, 0, 0),
-    "AB": ("abono niver",   "—",               0,  "",    0, 0, 0),
+    "M":   ("manhã",          "07–13h",          6,  "2",   1, 0, 0),
+    "T":   ("tarde",          "13–19h",          6,  "239", 0, 1, 0),
+    "D":   ("dia 12h",        "07–19h",          12, "40",  1, 1, 0),
+    "N":   ("noite 12h",      "19–07h",          12, "41",  0, 0, 1),
+    "NT":  ("noitinha",       "19–01h",          6,  "349", 0, 0, 1),
+    "C":   ("10h chefia",     "8–12 + 13–19h",   10, "47",  1, 1, 0),
+    "A":   ("administrativo", "8h diurno",       8,  "11",  0, 0, 0),
+    "J":   ("5h Janaina",     "08–13h",          5,  "78",  1, 0, 0),
+    "CEP": ("4h CEP",         "08–12h",          4,  "6",   1, 0, 0),
+    "CP":  ("CP · cuidados paliativos", "07–13h", 6, "",    0, 0, 0),
+    "CRO": ("CRO · ambulatório", "13–19h",       6,  "",    0, 0, 0),
+    # banco de horas — "+" = BHP (trabalhou a MAIS: fica no banco; o Senior NÃO
+    # recebe esse plantão) · "-" = BHN (dispensa paga pelo banco: não trabalha,
+    # mas o Senior recebe o plantão normal, como se trabalhado — regra da casa,
+    # confirmada por Marcos/Mari em 28/08/26, item 25 da checagem)
+    "M+":  ("manhã BHP",      "07–13h · banco",  6,  "",    1, 0, 0),
+    "T+":  ("tarde BHP",      "13–19h · banco",  6,  "",    0, 1, 0),
+    "D+":  ("dia BHP",        "07–19h · banco",  12, "",    1, 1, 0),
+    "N+":  ("noite BHP",      "19–07h · banco",  12, "",    0, 0, 1),
+    "Dm+": ("dia · manhã é BHP", "07–19h",       12, "239", 1, 1, 0),
+    "Dt+": ("dia · tarde é BHP", "07–19h",       12, "2",   1, 1, 0),
+    "M-":  ("BHN da manhã",   "dispensa",        0,  "2",   0, 0, 0),
+    "T-":  ("BHN da tarde",   "dispensa",        0,  "239", 0, 0, 0),
+    "D-":  ("BHN do dia",     "dispensa",        0,  "40",  0, 0, 0),
+    "N-":  ("BHN da noite",   "dispensa",        0,  "41",  0, 0, 0),
+    "Tm-": ("tarde · manhã é BHN", "13–19h",     6,  "40",  0, 1, 0),
+    "Mt-": ("manhã · tarde é BHN", "07–13h",     6,  "40",  1, 0, 0),
+    "FE":  ("férias",         "—",               0,  "Férias", 0, 0, 0),
+    "LM":  ("licença",        "—",               0,  "LM",  0, 0, 0),
+    "AB":  ("abono niver",    "—",               0,  "",    0, 0, 0),
 }
+BHP = {"M+", "T+", "D+", "N+", "Dm+", "Dt+"}
+BHN = {"M-", "T-", "D-", "N-", "Tm-", "Mt-"}
+AUSENCIAS = {"FE", "LM", "AB"}
+
+
+def efetivo(letra):
+    """o turno de fato TRABALHADO por trás do código (descanso, cobertura,
+    validador). None = não trabalha nesse dia (BHN puro, férias, licença)."""
+    if letra in ("M-", "T-", "D-", "N-") or letra in AUSENCIAS:
+        return None
+    if letra == "Tm-":
+        return "T"
+    if letra == "Mt-":
+        return "M"
+    if letra in ("Dm+", "Dt+"):
+        return "D"
+    if letra.endswith("+"):
+        return letra[:-1]
+    return letra
+
+
+def base_visual(letra):
+    """a letra cuja cor a célula herda (M+ pinta como M, Tm- como T…)."""
+    if letra in ("Dm+", "Dt+"):
+        return "D"
+    if letra in ("Tm-",):
+        return "T"
+    if letra in ("Mt-",):
+        return "M"
+    return letra.rstrip("+-")
+
+
+# ------------------------------------------------ alvo semanal (o BH da semana)
+# A carga contratada é alvo POR SEMANA CIVIL (seg–dom) — regra revelada pelos 25
+# itens da checagem de Marcos/Mari (28/08/26). BH da semana = horas − alvo:
+# positivo = BHP (a mais, fica no banco) · negativo = BHN (faltou / dispensa).
+# 40h (DebAlves, MSalomão): o alvo é 42 — exatamente UMA semana do mês fica em
+# 36 (o antigo 42/42/36), e é essa que aparece com −6. Aline: 36 assist + 4 CEP.
+ALVO_SEMANAL = {"DebAlves": 42, "MSalomão": 42, "Aline": 40}
+# cada dia de férias/licença/abono na semana desconta isto do alvo (Thamyres
+# voltou de férias na terça: alvo 24 → 18 · Vinicius idem: 36 → 30 — item 22/23)
+DESCONTO_AUSENCIA_SEMANA = 6
+NOTA_ALVO = ("Alvo semanal = carga contratada por semana civil (segunda a domingo), contando "
+             "os dias do mês vizinho que fecham a semana. 40h → alvo 42 com UMA semana de 36 "
+             "no mês (a que aparece com −6). Cada dia de férias/licença/abono na semana "
+             "desconta 6h do alvo. O BH da semana é horas − alvo: positivo é BHP (fica no "
+             "banco), negativo é BHN (faltou ou foi dispensa). Marque o BHP/BHN na própria "
+             "célula com os códigos + e − para a conferência bater.")
 CODIGOS_ANTIGOS = {"110": "M (manhã)", "82": "D (dia 12h)", "83": "N (noite 12h)",
                    "10": "J (5h, virou 78)"}
 
@@ -88,6 +152,13 @@ TOOLTIPS = {
     "sem⚠":     "Maior jornada semanal da pessoa no mês — o MAX das colunas Sem 1 a "
                 "Sem 6. Vermelho acima de 44h — teto do art. 7º XIII da Constituição. "
                 "O mês pode fechar na média e uma semana estourar mesmo assim.",
+    "bh-n":     "BH da semana = horas da semana − alvo semanal da pessoa (CADASTRO, coluna "
+                "Alvo/sem; −6h por dia de férias/licença/abono na semana). Positivo = BHP, "
+                "trabalhou a mais e fica no banco · negativo = BHN, faltou ou foi dispensa. "
+                "Zero = semana fechada. Marque na célula: M+ T+ D+ N+ (BHP) · M- T- D- N- (BHN).",
+    "alvo-sem": "Horas que a pessoa deve fechar por semana civil. Em geral é a CH; 40h → 42 "
+                "(uma semana de 36 por mês); Aline 40 (36 + 4 de CEP). É contra este número que "
+                "o BH de cada semana é medido.",
     "sem-n":    "Horas da semana civil (segunda a domingo). A Sem 1 inclui os dias do "
                 "fim do mês anterior que fecham a semana; a última para no fim do mês — "
                 "o resto dela é medido na Sem 1 do mês seguinte, então nenhuma semana "
@@ -204,16 +275,16 @@ REGRAS_DURAS = [
 # ----------------------------------------------------------------- roster
 # apelido, nome completo, CH, grupo, restrições duras, SN, FE, observação
 ROSTER = [
-    ("Fred", "Frederico Pires", 36, "chefia", "dias úteis apenas manhã · nunca FDS (regra 18/08/26)", "não", "não", "CH zerada nas contagens de plantão · o 10h de chefia (47) é lançado depois pela coordenação"),
-    ("Milena", "Milena", 36, "chefia", "dias úteis apenas manhã · nunca FDS (regra 18/08/26)", "não", "não", "o 10h de chefia (47) é lançado depois pela coordenação"),
-    ("Pabdo", "Paula Abdo", 36, "chefia", "dias úteis apenas manhã · nunca FDS (regra 18/08/26)", "não", "não", "aniversário 29/10, sem folga"),
-    ("MSalomão", "Marina Salomão", 40, "chefia", "dias úteis apenas manhã · nunca FDS (regra 18/08/26)", "não", "não", "folga 12/10 (pedido individual) · bloqueio 42/42/36 e rodízio FDS 15/15 com Vinicius REVOGADOS pela regra de 18/08"),
-    ("DebAlves", "Deborah Alves", 40, "chefia", "dias úteis apenas manhã · nunca FDS (regra 18/08/26)", "não", "não", "tardes de completude e bloqueio 42/42/36 REVOGADOS pela regra de 18/08"),
-    ("Vinicius", "Vinicius Bezerra", 36, "chefia", "dias úteis apenas manhã · nunca FDS (regra 18/08/26)", "não", "sim", "FÉRIAS 12–26/10 · bloqueio 30/42 e rodízio 15/15 REVOGADOS pela regra de 18/08"),
-    ("Amelio", "Fernanda Amelio", 36, "chefia", "dias úteis apenas manhã · nunca FDS (regra 18/08/26) · SEM NOTURNOS (atestado)", "não", "não", "fora 24–31/10 (BHN)"),
-    ("Murilo", "Murilo", 36, "rotina", "rotina onco: dias úteis apenas manhã · nunca FDS (regra 18/08/26)", "não", "não", "sábado noturno 15/15 REVOGADO pela regra de 18/08"),
+    ("Fred", "Frederico Pires", 36, "chefia", "coordenação: seg+ter 10h de chefia (47), qua+qui manhã", "não", "não", "o 47 é lançado pela coordenação · CH não entra nas contagens de plantão"),
+    ("Milena", "Milena", 36, "chefia", "coordenação: seg/ter/qua manhã, qui 10h de chefia (47)", "não", "não", "o 47 é lançado pela coordenação"),
+    ("Pabdo", "Paula Abdo", 36, "chefia", "manhãs seg–sex", "não", "não", "aniversário 29/10, sem folga"),
+    ("MSalomão", "Marina Salomão", 40, "chefia", "manhãs seg–sex · D às quintas · N de domingo no rodízio de fds 15/15 com Vinicius · alvo 42h/semana com UMA semana de 36h no mês", "não", "não", "folga 12/10 (pedido individual) · NÃO sexta tarde"),
+    ("DebAlves", "Deborah Alves", 40, "chefia", "manhãs e tardes seg–sex, D pra completar (cobre o gargalo das tardes) · alvo 42h/semana com UMA semana de 36h no mês", "não", "não", ""),
+    ("Vinicius", "Vinicius Bezerra", 36, "chefia", "manhãs seg–sex · N de sábado no rodízio 15/15 com Murilo · fds 15/15 com MSalomão", "não", "sim", "FÉRIAS 12–26/10 — volta ter 27/10 (semana de retorno: alvo 30h)"),
+    ("Amelio", "Fernanda Amelio", 36, "chefia", "manhãs seg–sex e D diurnos (inclusive fds) · SEM NOTURNOS (atestado)", "não", "não", "fora 24–31/10 (BHN) — compensa com BHP em 03 e 17/10"),
+    ("Murilo", "Murilo", 36, "rotina", "rotina onco: manhãs seg–sex · N de sábado no rodízio 15/15 com Vinicius", "não", "não", ""),
     ("Janaina", "Janaina Rabelo", 30, "30h", "SÓ 8–13h (código 78); sem noturnos; seg–sáb", "não", "não", "é sempre a 10ª da manhã de sábado; NUNCA domingo"),
-    ("Aline", "Aline Saliba", 40, "36h", "CEP 4h: 1ª terça manhã do mês; demais semanas seg ou qui", "não", "sim", "36 assist + 4 CEP · FÉRIAS 19/10–02/11"),
+    ("Aline", "Aline Saliba", 40, "36h", "CEP 4h toda semana: 1ª terça manhã do mês (reunião); demais semanas seg ou qui", "não", "sim", "36 assist + 4 CEP (alvo semanal 40) · FÉRIAS 19/10–02/11"),
     ("CaAbreu", "Camila Abreu", 36, "36h", "fixa qua dia (+seg dia); NÃO qui noite", "não", "sim", ""),
     ("Danielle", "Danielle Tanajura", 36, "36h", "fixa qua noite (+qui noite); só noites", "não", "não", "não lançar sexta-noite (já fez muitas)"),
     ("Fabiula", "Fabiula Czameski", 36, "36h", "só noites; ter/qua/qui alternando com ter/qua/dom", "sim", "não", ""),
@@ -223,7 +294,7 @@ ROSTER = [
     ("Mayana", "Mayana Leal", 36, "36h", "fixa ter dia, qui dia; NÃO seg/qua/sex tarde", "não", "não", ""),
     ("Neyde", "Neyde Brito", 36, "36h", "fixa ter+qua noite + 1º/3º/4º dom noite; NÃO qui/sex/sáb noite (HMIB)", "não", "sim", "férias 19/10 + 15 dias"),
     ("Roberta", "Roberta Iglesias", 36, "36h", "coringa", "não", "sim", ""),
-    ("LuAlice", "Luciana Alice", 36, "36h", "fixa ter+qui noite, sáb noite no fds; SÓ noturnos (+tardes CRO)", "sim", "não", "NUNCA lançar banco de horas · 36h temporária, 12h/mês CRO · não lançar sextas 02 e 30/10 N"),
+    ("LuAlice", "Luciana Alice", 36, "36h", "fixa ter+qui noite, sáb noite no fds; SÓ noturnos (+tardes CRO, código CRO)", "sim", "não", "NUNCA lançar banco de horas · 36h temporária, 12h/mês CRO (2 tardes) · não lançar sextas 02 e 30/10 N"),
     ("Amanda", "Amanda Braga", 30, "30h", "alterna qui noite / qua dia", "sim", "sim", "férias até ~12/10 · NÃO escalar fds extra em outubro (fez horas a mais em set)"),
     ("Fernando", "Fernando Filardi", 30, "30h", "fixo seg noite, qua+qui manhã, sáb manhã", "não", "não", "troca sáb 17/10 → dom 04/10 manhã; oferece sexta-noite 23/10"),
     ("João", "João", 30, "30h", "NÃO manhãs, NÃO segundas, NÃO sábados; ter/qui/sex tarde + qua noite", "não", "não", "extrapola fds · férias até ~06/10"),
@@ -263,7 +334,7 @@ ROSTER = [
     ("Pedro", "Pedro", 24, "24h", "fixo seg noite, qua tarde, sex tarde; NÃO manhãs", "rodízio", "não", ""),
     ("Pjamile", "Paula Jamile", 24, "24h", "fixa qua dia + sex dia; NÃO seg, ter tarde, qui tarde", "não", "não", ""),
     ("Raphael", "Raphael Costa", 24, "24h", "NÃO manhãs seg–sex", "sim", "não", ""),
-    ("Raquel", "Raquel Assis", 24, "24h", "CP seg+qua manhã; NÃO tardes, NÃO quintas; máx 1 noturno/semana", "1", "não", "12h CP + 12h plantão + 24h fds · férias 05–19/10"),
+    ("Raquel", "Raquel Assis", 24, "24h", "CP (cuidados paliativos, código CP) seg+qua manhã; NÃO tardes, NÃO quintas; máx 1 noturno/semana", "1", "não", "12h CP + 12h plantão + 24h fds · férias 05–19/10"),
     ("Thamyres", "Thamyres", 24, "24h", "MÁX 1 NOTURNO/MÊS (relatório médico); NÃO seg/ter, qui dia, dom noite", "não", "não", "fds em 12h emendadas"),
     ("Vanessa", "Vanessa", 24, "24h", "fixa qua dia; máx 1 noturno/semana", "não", "não", ""),
     ("Yuji", "Henrique Yuji", 24, "24h", "NÃO seg e sex (dia+noite); ter/qua/qui ok; fds coringa de DOMINGOS (não pode sábados)", "não", "não", "licença-paternidade: DPP 09/10, 20 dias"),
@@ -287,12 +358,15 @@ PROCEDENCIA = {
     6:  ("grade", "Reconstruído da grade 'Escala junho - UTI HCB'"),
     7:  ("senior", "Códigos Senior"),
     8:  ("senior", "Códigos Senior"),
-    9:  ("senior", "Códigos Senior"),
-    10: ("montado", "ESCALA DA MARI — ela reescreveu a proposta do gerador direto no Sheet "
-                     "(28/08, 397 células; fonte: mari_out_dados.py, backup integral no Drive). "
-                     "Ela preferiu deixar vaga a convocar fora de preferência: os buracos "
-                     "aparecem em vermelho na linha Falta. As abas ATENDIMENTO e CONVOCAÇÕES "
-                     "descrevem a PROPOSTA antiga do gerador, não esta versão"),
+    9:  ("grade", "Grade do grupo 'Escala setembro - UTI HCB' — a que a equipe segue — com os "
+                  "códigos estruturais (47, 78, 6, 11), férias e licenças vindos do arquivo Senior. "
+                  "O arquivo de códigos Senior de setembro estava INCOMPLETO em 29 e 30/09 (sem a "
+                  "chefia e sem várias pessoas), por isso não é a fonte deste mês. As anotações "
+                  "BHP/BHN da grade entram como códigos + e −"),
+    10: ("montado", "ESCALA DA MARI — a versão viva do Sheet, re-transcrita em 01/09/26 "
+                     "(mari_out_dados.py v2), mais as correções da checagem Marcos/Mari "
+                     "(checagem_out_v3.py — cada uma listada na aba CHECAGEM OUT). Buracos "
+                     "que ela deixou aparecem em vermelho na linha Falta"),
     11: ("vazio", "A montar"),
     12: ("vazio", "A montar"),
 }
@@ -300,7 +374,7 @@ AVISO_GRADE = ("Meses reconstruídos da grade têm FIDELIDADE MENOR: a grade lis
                "turno, não códigos. 10h de chefia (47), 4h de CEP (6) e 5h da Janaina (78) "
                "aparecem só como nome na coluna da manhã e entram como manhã de 6h — a carga "
                "horária desses meses fica subestimada pra chefia. Manhã+tarde no mesmo dia "
-               "foi lido como 12h dia. Anotações BHN (dispensa) foram excluídas; BHP conta.")
+               "foi lido como 12h dia. Anotações BHP/BHN da grade viram os códigos + e − (BHN não conta hora).")
 
 # feriado: (nome, sigla curta que cabe na coluna do dia)
 FERIADOS_2026 = {

@@ -21,6 +21,23 @@ DSR_MAX_DIAS = 6
 JANELA = {}
 for _cod, (_letra, _h, _i, _f) in CODIGOS.items():
     JANELA.setdefault(_letra, (_h, _i, _f))
+JANELA.setdefault("CP", (6.0, 7.0, 13.0))     # cuidados paliativos (manhã)
+JANELA.setdefault("CRO", (6.0, 13.0, 19.0))   # ambulatório CRO (tarde)
+
+
+def _efetivo(letra):
+    """códigos de banco de horas: M+ trabalha como M; M- não trabalha; Tm- = T."""
+    if letra in ("M-", "T-", "D-", "N-"):
+        return None
+    if letra == "Tm-":
+        return "T"
+    if letra == "Mt-":
+        return "M"
+    if letra in ("Dm+", "Dt+"):
+        return "D"
+    if letra.endswith("+"):
+        return letra[:-1]
+    return letra
 
 
 def _dtq(data, horas):
@@ -34,8 +51,8 @@ def turnos_de(dias, pessoa):
         cel = dias[data].get(pessoa)
         if not cel:
             continue
-        letra = cel[0] if isinstance(cel, tuple) else cel
-        if letra in AUSENTE or letra not in JANELA:
+        letra = _efetivo(cel[0] if isinstance(cel, tuple) else cel)
+        if not letra or letra in AUSENTE or letra not in JANELA:
             continue
         _h, ini, fim = JANELA[letra]
         saida.append((data, letra, _dtq(data, ini), _dtq(data, fim)))

@@ -1,5 +1,10 @@
 # Q&A das regras — roteiro preparado (para a sessão de revisão)
 
+> **01/09/26:** o Marcos pediu pra aplicar tudo direto na planilha V3 em vez do Q&A. As
+> decisões tomadas (com as escolhas de dia justificadas) estão em `checagem_out_v3.py` e
+> na aba CHECAGEM OUT da V3. Este roteiro fica como registro das perguntas em aberto
+> (A7 proporção do retorno de férias, B5 dias do CRO, B7 dom 18/10 N).
+
 > Pedido do Marcos (28/08+): "um Q&A de tudo que você aprendeu para revisarmos regra por
 > regra, você perguntando e nós clicando a resposta certa". Este arquivo é o roteiro.
 > Mecânica: perguntas via AskUserQuestion (opções clicáveis), em blocos de até 4,

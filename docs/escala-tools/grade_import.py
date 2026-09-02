@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Importa jan/mai/jun de 2026 a partir das GRADES (não têm arquivo de códigos Senior).
+"""Importa jan/mai/jun/set de 2026 a partir das GRADES do grupo.
 
 A grade é um bloco por dia com os nomes empilhados em colunas Manhã | Tarde | Noite | Noitinha.
 Reconstrução: manhã+tarde no mesmo dia = 12h dia (D); só manhã = M; só tarde = T;
@@ -9,7 +9,7 @@ noite = N; noitinha = NT.
 FIDELIDADE MENOR que os meses vindos dos códigos Senior — registrar isso na planilha:
 - 47 (10h chefia) aparece só como nome na coluna Manhã → entra como M (6h), perde 4h;
 - 6 (4h CEP) e 78 (5h Janaina) idem, viram M/T;
-- sufixos BHP/BHN/CRO/CP/CEP são anotações de banco de horas e serviço, não turno.
+- sufixos BHP/BHN viram códigos + e − (banco de horas); CEP/CP/CRO viram o código do serviço.
 """
 import datetime as dt
 import os
@@ -22,18 +22,22 @@ DIR_FONTES = os.path.expanduser("~/Downloads/fwdarquivosdaescala")
 nfc = lambda s: unicodedata.normalize("NFC", s)
 
 ARQUIVOS = {
-    1: ("ESCALA FINAL JANEIRO 2026.xlsx", "Table 1"),
-    5: ("Escala maio UTI - HCB - última revisão 09.04.26.docx.xlsx", "Table 1"),
-    6: ("Escala junho - UTI HCB.xlsx", "Junho 2026"),
+    # mês: (arquivo, aba, coluna da Manhã ou None = achar pelo cabeçalho)
+    1: ("ESCALA FINAL JANEIRO 2026.xlsx", "Table 1", None),
+    5: ("Escala maio UTI - HCB - última revisão 09.04.26.docx.xlsx", "Table 1", None),
+    6: ("Escala junho - UTI HCB.xlsx", "Junho 2026", None),
+    # setembro: a grade do grupo é a fonte (o arquivo Senior de set/26 veio
+    # incompleto em 29 e 30/09). Sem cabeçalho "Manhã": dia na col. C, M/T/N/NT em D..G
+    9: ("Escala setembro - UTI HCB.xlsx", "Setembro 2026", 4),
 }
 
 DIAS_SEMANA = {"SEGUNDA": 0, "TERÇA": 1, "TERCA": 1, "QUARTA": 2, "QUINTA": 3,
                "SEXTA": 4, "SÁBADO": 5, "SABADO": 5, "DOMINGO": 6}
 
-# sufixos de anotação que vêm colados no nome
-SUFIXOS = re.compile(r"\s+(BHP|BH|CRO|CP|CEP|Pr|PR|ICDF|\(.*\))\s*$", re.I)
-# BHN = banco de horas NEGATIVO: "NÃO vá ao plantão". É dispensa do fixo, não turno —
-# contar como plantão infla a lotação (era um bug meu na 1a versão).
+# sufixos de anotação que vêm colados no nome. BHP/BHN/CEP/CP/CRO são LIDOS
+# (viram código: M+ M- CEP CP CRO); Pr/PR/ICDF/(…) são só descartados
+ANOTACAO = re.compile(r"\b(BHP|BHN|CEP|CRO|CP)\b", re.I)
+SUFIXOS = re.compile(r"\s+(BHP|BHN|BH|CRO|CP|CEP|Pr|PR|ICDF|\(.*\))\s*$", re.I)
 DISPENSA = re.compile(r"\bBHN\b", re.I)
 # linhas que não são pessoa
 NAO_PESSOA = re.compile(r"^(niver|anivers|obs\b|feriado|total|legenda|coord)|^(manh[ãa]|tarde|noite|noitinha|dia)$", re.I)
@@ -44,12 +48,16 @@ ALIASES = {"Ste": "Stephanie", "Patricia Abreu": "Patricia", "PatiAbreu": "Patri
            "Pjamile": "Pjamile", "Isabela": "IsaRibeiro", "Marina": "MSalomão"}
 
 
+def _anotacao(nome):
+    """BHP / BHN / CEP / CP / CRO colado no nome, ou None."""
+    m = ANOTACAO.search(nfc(str(nome)))
+    return m.group(1).upper() if m else None
+
+
 def _limpar(nome):
     s = nfc(str(nome).strip())
     if not s or NAO_PESSOA.match(s):
         return None
-    if DISPENSA.search(s):
-        return None          # BHN dispensa do plantão: não entra na escala
     anterior = None
     while anterior != s:
         anterior = s
@@ -69,13 +77,12 @@ def _canonico(nome, roster):
 
 
 def ler_grade(mes, roster):
-    nome_arq, aba = ARQUIVOS[mes]
+    nome_arq, aba, cM = ARQUIVOS[mes]
     wb = openpyxl.load_workbook(os.path.join(DIR_FONTES, nome_arq), data_only=True)
     ws = wb[aba]
 
-    # coluna da Manhã: pelo cabeçalho; janeiro não tem cabeçalho → 3
-    cM = None
-    for r in range(1, min(ws.max_row, 60) + 1):
+    # coluna da Manhã: explícita, ou pelo cabeçalho; janeiro não tem cabeçalho → 3
+    for r in range(1, (min(ws.max_row, 60) + 1) if cM is None else 1):
         for c in range(1, min(ws.max_column, 12) + 1):
             v = ws.cell(row=r, column=c).value
             if v and nfc(str(v).strip()).upper().startswith("MANH"):
@@ -134,21 +141,48 @@ def ler_grade(mes, roster):
             if apelido is None:
                 naocasados.add(limpo)
                 continue
-            turnos.setdefault((apelido, dia_atual), set()).add(janela)
+            turnos.setdefault((apelido, dia_atual), {})[janela] = _anotacao(v)
 
-    # manhã + tarde no mesmo dia = 12h dia
     dias = {}
     for (apelido, dia), janelas in turnos.items():
-        if {"M", "T"} <= janelas:
-            letras = ["D"] + [x for x in janelas if x not in ("M", "T")]
-        else:
-            letras = sorted(janelas, key=lambda x: ("M", "T", "N", "NT").index(x))
-        letra = "D" if "D" in letras else letras[0]
-        if "N" in janelas and letra == "D":
-            letra = "D"          # dia + noite no mesmo dia: 18h — o validador pega
         data = dt.date(2026, mes, dia)
-        dias.setdefault(data, {})[apelido] = (letra, "grade")
+        dias.setdefault(data, {})[apelido] = (_compor(janelas), "grade")
     return dias, sorted(naocasados)
+
+
+def _compor(janelas):
+    """{janela: anotação} de um dia → código da planilha.
+
+    Manhã + tarde = D. BHP num período vira '+', BHN vira '-': M+ (manhã a mais),
+    Dm+ (dia em que a manhã é BHP), M- (dispensa da manhã, não trabalha), Tm-
+    (trabalha a tarde, a manhã é dispensa) etc. CEP/CP/CRO são serviços próprios.
+    """
+    for servico in ("CEP", "CP", "CRO"):
+        if servico in janelas.values():
+            return servico
+    m, t = janelas.get("M", "ausente"), janelas.get("T", "ausente")
+    tem_m, tem_t = "M" in janelas, "T" in janelas
+    if tem_m and tem_t:
+        if m == "BHN" and t == "BHN":
+            return "D-"
+        if m == "BHN":
+            return "Tm-"
+        if t == "BHN":
+            return "Mt-"
+        if m == "BHP" and t == "BHP":
+            return "D+"
+        if m == "BHP":
+            return "Dm+"
+        if t == "BHP":
+            return "Dt+"
+        return "D"           # dia + noite no mesmo dia: 18h — o validador pega
+    if tem_m:
+        return {"BHP": "M+", "BHN": "M-"}.get(m, "M")
+    if tem_t:
+        return {"BHP": "T+", "BHN": "T-"}.get(t, "T")
+    if "N" in janelas:
+        return {"BHP": "N+", "BHN": "N-"}.get(janelas["N"], "N")
+    return "NT"
 
 
 def importar(roster):

@@ -38,8 +38,11 @@ R_COB, R_FALTA = 75, 78          # 75-77 cobertura · 78-80 falta
 # +6: as colunas C..H viraram as vésperas (fim do mês anterior que fecha a semana)
 C_D1, C_DN = "I", "AM"        # cálculo continua nos 31 dias do mês
 # AN..AS = virada (dias do mês seguinte até o domingo que fecha a última semana)
-C_CH, C_FDS, C_SXN, C_FER = "AT", "AU", "AV", "AW"
-C_META, C_SALDO, C_18H, C_NT = "AX", "AY", "AZ", "BA"
+# AT..BE = Sem 1, BH 1, … Sem 6, BH 6 (as semanas vêm primeiro — V3, 01/09/26)
+C_SEM = ["AT", "AV", "AX", "AZ", "BB", "BD"]
+C_BH = ["AU", "AW", "AY", "BA", "BC", "BE"]
+C_CH, C_FDS, C_SXN, C_FER = "BF", "BG", "BH", "BI"
+C_META, C_SALDO, C_18H, C_NT = "BJ", "BK", "BL", "BM"
 
 FINO = Side(style="thin", color=LINE)
 
@@ -122,9 +125,11 @@ def aba_dados(wb):
             f'=IF({_tem_dado(mes)},IFERROR(AVERAGEIF({mes}!${C_D1}${R_COB}:${C_DN}${R_COB},">0"),0),"")',
             f'=IF({_tem_dado(mes)},IFERROR(AVERAGEIF({mes}!${C_D1}${R_COB+1}:${C_DN}${R_COB+1},">0"),0),"")',
             f'=IF({_tem_dado(mes)},IFERROR(AVERAGEIF({mes}!${C_D1}${R_COB+2}:${C_DN}${R_COB+2},">0"),0),"")',
-            f'=COUNTIF({mes}!${C_D1}${R_P0}:${C_DN}${R_ULT},"N")',
+            f'=COUNTIF({mes}!${C_D1}${R_P0}:${C_DN}${R_ULT},"N")'
+            f'+COUNTIF({mes}!${C_D1}${R_P0}:${C_DN}${R_ULT},"N+")',
             # noite 19–07h cobre integralmente as 7h da janela 22h–05h
-            f'=COUNTIF({mes}!${C_D1}${R_P0}:${C_DN}${R_ULT},"N")*7'
+            f'=(COUNTIF({mes}!${C_D1}${R_P0}:${C_DN}${R_ULT},"N")'
+            f'+COUNTIF({mes}!${C_D1}${R_P0}:${C_DN}${R_ULT},"N+"))*7'
             f'+COUNTIF({mes}!${C_D1}${R_P0}:${C_DN}${R_ULT},"NT")*3',
             f'=SUMPRODUCT(--(ABS({mes}!${C_SALDO}${R_P0}:${C_SALDO}${R_ULT})>12))',
         ]
@@ -248,20 +253,24 @@ def aba_dashboard(wb, mes_vivo="OUT", nome_mes="outubro"):
     _tile(ws, 9, 9, 12, 10, "fora da meta",
           f"=SUMPRODUCT(--(ABS({M}!${C_SALDO}${R_P0}:${C_SALDO}${R_ULT})>12))",
           nota="pessoas com mais de 12h de desvio, pra cima ou pra baixo")
-    _tile(ws, 9, 11, 12, 12, "convocações",
-          "=IFERROR(SUM(CONVOCAÇÕES!$B$6:$B$60),0)",
-          nota="entraram fora da própria preferência · geram crédito", fundo=SANDS)
+    # semanas com BH ≠ 0: o que ainda não fechou (ou está no banco) em outubro
+    fora_bh = "+".join(
+        f'SUMPRODUCT(({M}!${c}${R_P0}:${c}${R_ULT}<>"")*({M}!${c}${R_P0}:${c}${R_ULT}<>0))'
+        for c in C_BH)
+    _tile(ws, 9, 11, 12, 12, "semanas com BH ≠ 0",
+          f"={fora_bh}",
+          nota="pessoa-semanas fora do alvo semanal · BHP (+) ou BHN/faltou (−)", fundo=SANDS)
     _tile(ws, 9, 13, 12, 14, "horas noturnas",
-          f'=COUNTIF({M}!${C_D1}${R_P0}:${C_DN}${R_ULT},"N")*7'
+          f'=(COUNTIF({M}!${C_D1}${R_P0}:${C_DN}${R_ULT},"N")'
+          f'+COUNTIF({M}!${C_D1}${R_P0}:${C_DN}${R_ULT},"N+"))*7'
           f'+COUNTIF({M}!${C_D1}${R_P0}:${C_DN}${R_ULT},"NT")*3',
           nota="janela 22h–05h · insumo do adicional noturno", fundo=AQUAS)
 
-    # nota do feriado — entendimento corrigido em 18/08/26
+    # nota: a fonte de outubro
     ws.row_dimensions[13].height = 26
-    av = _txt(ws, "B13", "Feriado 12/10: folga da MSalomão atendida (pedido "
-              "individual — a leitura 'rotina inteira folga' estava errada). Os "
-              "demais rotineiros seguem o padrão dos 7 feriados do ano. Motivos "
-              "linha a linha na aba CONVOCAÇÕES.",
+    av = _txt(ws, "B13", "Outubro é a versão da Mari (Sheet vivo, 01/09) com as correções "
+              "da checagem dela e do Marcos — cada mudança está na aba CHECAGEM OUT. "
+              "Setembro vem da grade do grupo. Nada aqui é proposta do gerador.",
               tam=9, italico=True, cor=LAVI, wrap=True)
     ws.merge_cells("B13:N13")
     for c in range(2, 15):

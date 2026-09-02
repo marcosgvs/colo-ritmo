@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Planilha unificada v4 — ANUAL, UTI HCB 2026.
+"""Planilha V3 — ANUAL, UTI HCB 2026 (gerador; a numeração V3 é a das versões
+que a Mari recebe).
 
-Abas: LEIA-ME · CADASTRO · CONFIG · 12 mensais (JAN..DEZ) · PAINEL ANO · SENIOR · VALIDADOR
-      · PREFS OUT · ATENDIMENTO · CONVOCAÇÕES
+Abas: DASHBOARD · LEIA-ME · CADASTRO · CONFIG · 12 mensais (JAN..DEZ) · OUT · DIA A DIA
+      · CHECAGEM OUT · PAINEL ANO · SENIOR · VALIDADOR · DADOS DASH
+
+Só realidade: histórico dos arquivos oficiais (Senior + grades do grupo), outubro
+na versão viva da Mari + as correções da checagem dela e do Marcos. Nada de
+proposta do gerador (as abas ATENDIMENTO/CONVOCAÇÕES/ESBOÇO saíram em 01/09/26).
 
 Princípios:
 - regras vivem em CONFIG como DADO; as abas mensais apontam pra lá (mudou o
@@ -49,7 +54,11 @@ DISPLAY = "Fraunces"  # títulos
 MAO = "Caveat"        # sobretítulo à mão
 
 FILLS = {"M": SANDS, "T": BLUES, "D": SAND, "N": LAVI, "NT": LAV, "C": "FAEAF2",
-         "J": AQUAS, "E": OLIVES, "A": LINE, "FE": AQUA, "LM": SAGE, "AB": PINK}
+         "J": AQUAS, "CEP": OLIVES, "CP": "E9F0E4", "CRO": "EDE7F6", "A": LINE,
+         "FE": AQUA, "LM": SAGE, "AB": PINK}
+# banco de horas: toda célula BHP (+) pinta de coral claro, toda BHN (−) de cinza
+# riscado — a cor diz o estado do banco, a letra diz o turno
+FILL_BHP, FILL_BHN = CORALS, LINE
 BRANCO = {"N"}
 THIN = Side(style="thin", color=LINE)
 BOX = Border(left=THIN, right=THIN, top=THIN, bottom=THIN)
@@ -77,13 +86,23 @@ N_POS = 6                     # colunas da VIRADA: a semana fecha NO DOMINGO
                               # SEMANAIS, mas a cota é do mês seguinte (doc §6)
 C_D32 = C_D1 + 31             # primeira coluna da virada (AN)
 N_SEM = 6                     # máximo de semanas civis que um mês encosta
-COLS_TOT = (["CH mês", "FDS", "SxN", "Feriado", "Meta", "Saldo", "18h⚠", "N→T",
-             "Cota FDS", "FDS⚠", "Sem⚠"]      # fds⚠ = excesso sobre cota × fator
-            + [f"Sem {k}" for k in range(1, N_SEM + 1)]
+# As semanas vêm PRIMEIRO (pedido do Marcos, 01/09/26): Sem k = horas da semana
+# civil, BH k = Sem k − alvo semanal da pessoa (positivo BHP, negativo BHN).
+COLS_SEM = [x for k in range(1, N_SEM + 1) for x in (f"Sem {k}", f"BH {k}")]
+COLS_TOT = (COLS_SEM
+            + ["CH mês", "FDS", "SxN", "Feriado", "Meta", "Saldo", "18h⚠", "N→T",
+               "Cota FDS", "FDS⚠", "Sem⚠"]      # fds⚠ = excesso sobre cota × fator
             + ["Grupo",       # ordenar por tipo no funil do filtro
                "Nº"])         # posição original do cadastro — ordena de volta
-IDX_GRUPO = len(COLS_TOT) - 2
-IDX_NUM = len(COLS_TOT) - 1
+IDX = {nome: i for i, nome in enumerate(COLS_TOT)}
+COLS_ALERTA = {"18h⚠", "N→T", "Cota FDS", "FDS⚠", "Sem⚠"}
+IDX_GRUPO = IDX["Grupo"]
+IDX_NUM = IDX["Nº"]
+
+
+def col_tot(nome):
+    """coluna (1-based) de um total nas abas mensais, pelo NOME — nunca por offset."""
+    return C_TOT + IDX[nome]
 # Grupo com prefixo numérico pra ordenar coordenação→rotina→staff→administrativo
 # (o sortSpec do Sheets só sabe asc/desc). Coordenação = quem faz o 47 (doc §3).
 GRUPO_COORD = {"Fred", "Milena"}
@@ -142,47 +161,77 @@ def janelas_semana_civil(mes, ndias, ano=2026):
         ini += 7
     return janelas
 
-# expressão de horas de uma linha de pessoa (usada em várias fórmulas)
+# expressão de horas de uma linha de pessoa (usada em várias fórmulas).
+# BHN puro (M- T- D- N-) tem 0h na tabela e por isso não entra; Tm-/Mt- entram com 6h
 def expr_horas(lin, c1=None, c2=None):
     a = f"${get_column_letter(c1 or C_D1)}{lin}:${get_column_letter(c2 or C_DN)}{lin}"
     partes = [f'({a}="{k}")*{v[2]}' for k, v in D.TURNOS.items() if v[2]]
     return "+".join(partes)
 
 
+def expr_conta(faixa, letras):
+    """(faixa=letra)+(faixa=letra)… — 1 onde a célula é um dos códigos."""
+    return "(" + "+".join(f'({faixa}="{l}")' for l in letras) + ")"
+
+
+# grupos de códigos pelo turno EFETIVAMENTE trabalhado (M+ é manhã, Tm- é tarde…)
+def codigos_por_efetivo(*bases):
+    return [k for k in D.TURNOS if D.efetivo(k) in bases]
+
+
+def expr_ausencias(lin, spans):
+    """quantos dias de férias/licença/abono nos trechos de coluna da semana."""
+    partes = []
+    for a2, b2 in spans:
+        faixa = f"${get_column_letter(a2)}{lin}:${get_column_letter(b2)}{lin}"
+        partes += [f'COUNTIF({faixa},"{x}")' for x in sorted(D.AUSENCIAS)]
+    return "+".join(partes)
+
+
 def carregar_dados():
-    """DIAS[date][apelido] = (letra, origem) pro ano inteiro."""
+    """DIAS[date][apelido] = (letra, origem) pro ano inteiro — SÓ fontes reais."""
     roster = [x[0] for x in D.ROSTER]
     DIAS, _ = senior_import.importar()
     grade, rel_grade = grade_import.importar(roster + [x[0] for x in D.FORA_DO_ROSTER])
+    ESTRUTURAIS = {"C", "J", "CEP", "A"}       # o que só o arquivo Senior distingue
     for data, pessoas in grade.items():
-        for p, cel in pessoas.items():
-            DIAS.setdefault(data, {}).setdefault(p, cel)   # códigos Senior têm prioridade
-    # outubro: plano montado pelo v3
-    # ORDEM DA MONTAGEM (dica do Marcos): fds primeiro e o mais justo possível,
-    # depois o feriado, depois o resto da semana. remontar_fds.py faz nessa ordem.
-    import remontar_fds
-    plano, mov = remontar_fds.rodar(verbose=False)
-    ns = remontar_fds.NS
-    ns["_mov"] = mov
-    for apelido, por_dia in plano.items():
-        for dia, letra in por_dia.items():
-            data = dt.date(2026, 10, dia)
-            DIAS.setdefault(data, {})[apelido] = (letra, "montado")
-    # POR CIMA de tudo: outubro segundo a MARI (28/08/26). Ela reescreveu a
-    # proposta no Sheet vivo e a versão dela é a fonte de verdade — o plano do
-    # gerador fica só como base de comparação. Substituição total: célula que
-    # ela deixou vazia fica vazia (ela preferiu buraco a convocação).
+        if data.month == 9:
+            # SETEMBRO: a grade do grupo é a fonte (o Senior veio incompleto em
+            # 29–30/09). Do Senior ficam só os códigos estruturais de quem a grade
+            # lista como M/T/D, e as ausências/administrativo de quem ela não lista.
+            sen = DIAS.get(data, {})
+            novo = {}
+            for p, cel in pessoas.items():
+                s_ = sen.get(p)
+                if s_ and s_[0] in ESTRUTURAIS and cel[0] in ("M", "T", "D"):
+                    novo[p] = (s_[0], "senior")
+                else:
+                    novo[p] = cel
+            for p, s_ in sen.items():
+                if p not in novo and (s_[0] in D.AUSENCIAS or s_[0] == "A"):
+                    novo[p] = s_
+            DIAS[data] = novo
+        else:
+            for p, cel in pessoas.items():
+                DIAS.setdefault(data, {}).setdefault(p, cel)   # Senior tem prioridade
+    # OUTUBRO: a versão VIVA da Mari (re-transcrita em 01/09/26) + as correções
+    # da checagem dela e do Marcos. Substituição total da matriz: célula que ela
+    # deixou vazia fica vazia (ela preferiu buraco a convocação).
     import mari_out_dados as MO
-    roster = [x[0] for x in D.ROSTER]
+    import checagem_out_v3 as CK
+    por_pessoa = {ap: dict(d) for ap, d in MO.MARI.items()}
+    mexidos = {(ap, dia) for _i, ap, dia, _de, _para, _m in CK.EDITS}
+    CK.aplicar(por_pessoa, verbose=True)
     for data in [dt.date(2026, 10, d) for d in range(1, 32)] + [dt.date(2026, 11, 1)]:
         dia_k = 32 if data.month == 11 else data.day
         for apelido in roster:
-            letra = MO.MARI.get(apelido, {}).get(dia_k)
+            letra = por_pessoa.get(apelido, {}).get(dia_k)
             if letra:
-                DIAS.setdefault(data, {})[apelido] = (letra, "mari")
+                origem = "checagem" if (apelido, dia_k) in mexidos else "mari"
+                DIAS.setdefault(data, {})[apelido] = (letra, origem)
             else:
                 DIAS.get(data, {}).pop(apelido, None)
-    return DIAS, rel_grade, ns
+    return DIAS, rel_grade
 
 
 # ============================================================== abas
@@ -222,7 +271,7 @@ def creme(ws, ate_linha, ate_coluna):
 def aba_leiame(wb, rel_grade):
     ws = wb.create_sheet("LEIA-ME")
     ws.sheet_properties.tabColor = PINK
-    estilo_titulo(ws, "Escala UTI HCB · 2026 — Planilha Unificada v4")
+    estilo_titulo(ws, "Escala UTI HCB · 2026 — V3")
     ws.column_dimensions["A"].width = 16
     ws.column_dimensions["B"].width = 30
     for col in "CDEFGH":
@@ -260,9 +309,15 @@ def aba_leiame(wb, rel_grade):
     r += 1
     for letra, (rot, hora, horas, cod, *_) in D.TURNOS.items():
         cel = ws.cell(row=r, column=1, value=letra)
-        cel.font = Font(name=F, bold=True, size=10,
-                        color="FFFFFF" if letra in BRANCO else INK)
-        cel.fill = PatternFill("solid", fgColor=FILLS.get(letra, CREME))
+        base = D.base_visual(letra)
+        cel.font = Font(name=F, bold=True, size=10, italic=letra in D.BHN,
+                        strike=letra in D.BHN,
+                        color=(CORALI if letra in D.BHP else
+                               (INK3 if letra in D.BHN else
+                                ("FFFFFF" if base in BRANCO else INK))))
+        cel.fill = PatternFill("solid", fgColor=(FILL_BHP if letra in D.BHP else
+                                                 (FILL_BHN if letra in D.BHN else
+                                                  FILLS.get(base, CREME))))
         cel.alignment = Alignment(horizontal="center")
         for i, v in enumerate((rot, hora, horas if horas else "—", cod or "—")):
             ws.cell(row=r, column=2 + i, value=v).font = Font(name=F, size=10, color=INK2)
@@ -270,6 +325,10 @@ def aba_leiame(wb, rel_grade):
     linha("Antigos", "Até abril de 2026 os códigos eram outros: "
           + " · ".join(f"{k} = {v}" for k, v in D.CODIGOS_ANTIGOS.items())
           + ". A mudança de abril passou a usar 2/40/41.")
+    linha("Banco", "Código com + é BHP: a pessoa trabalha a MAIS e a hora fica no banco — o "
+          "Senior não recebe esse plantão. Código com − é BHN: dispensa paga pelo banco — a "
+          "pessoa não vem, mas o Senior recebe o plantão normal. Dm+ é um dia inteiro em que "
+          "só a manhã é BHP; Tm- é uma tarde trabalhada com a manhã dispensada.", negrito=True)
     r += 1
 
     secao("As abas")
@@ -282,13 +341,14 @@ def aba_leiame(wb, rel_grade):
         ("JAN a DEZ", "A escala: matriz médico × dia, com filtro no cabeçalho pra ordenar "
                       "(veja “Ordenar” abaixo). A semana fecha NO DOMINGO, então todo "
                       "mês aparece com as semanas completas: as primeiras colunas trazem o fim "
-                      "do mês anterior (dia 1º cai terça, a segunda aparece) e as últimas trazem "
-                      "os dias do mês seguinte até o domingo que fecha a última semana. Esses "
-                      "dias vizinhos são fórmula da aba deles — pra editar, use a aba do mês "
-                      "dono do dia. No rodapé, a lotação de cada turno e quanto falta pro "
-                      "mínimo. À direita, por pessoa: carga do mês, fds, sexta-noite, feriado, "
-                      "meta, saldo, os alertas de jornada e as horas de cada semana civil "
-                      "(Sem 1 a Sem 6, sempre a semana inteira; vermelho acima de 44h)."),
+                      "do mês anterior e as últimas trazem os dias do mês seguinte até o domingo "
+                      "que fecha a última semana. Esses dias vizinhos são fórmula da aba deles — "
+                      "pra editar, use a aba do mês dono do dia. À direita, por pessoa, PRIMEIRO "
+                      "as semanas: Sem 1..6 = horas de cada semana civil (o intervalo de datas "
+                      "está em cima) e, ao lado de cada uma, BH = horas − alvo semanal da pessoa "
+                      "(+ é BHP e fica areia, − é BHN/faltou e fica coral; zero é semana fechada). "
+                      "Depois: carga do mês, fds, sexta-noite, feriado, meta, saldo e os alertas "
+                      "de jornada. No rodapé, a lotação de cada turno e quanto falta pro mínimo."),
         ("Ordenar", "Cada aba mensal tem um FILTRO no cabeçalho (ícone de funil): clique no "
                     "funil de “Médico” e ordene de A a Z, ou no de “Grupo” "
                     "para ver coordenação → rotina → staff. A coluna “Nº” volta à "
@@ -309,17 +369,11 @@ def aba_leiame(wb, rel_grade):
                    "pronta pra lançar."),
         ("VALIDADOR", "O que fere regra dura, separado em ESTRUTURAL (é a forma do contrato, "
                       "decisão de política) e PONTUAL (erro daquele mês)."),
-        ("ATENDIMENTO", "O mês vivo: o que foi atendido de cada pedido, e por quê."),
-        ("CONVOCAÇÕES", "Quem foi convocado fora da preferência, com o critério público — "
-                        "e as decisões do feriado, incluindo o que não foi atendido."),
+        ("CHECAGEM OUT", "A checagem de outubro feita por Marcos e Mari: as regras que ela "
+                         "revelou, cada célula que mudou (estava → ficou, por quê) e o que foi "
+                         "verificado sem mudar."),
     ):
         linha(nome, desc, negrito=True)
-    r += 1
-
-    secao("A ordem de montar · dica")
-    linha("", D.NOTA_DICA, cor=INK2)
-    for titulo, texto in D.DICA_ORDEM:
-        linha(titulo, texto, negrito=True)
     r += 1
 
     secao("De onde vem cada mês — leia antes de comparar")
@@ -343,7 +397,10 @@ def aba_leiame(wb, rel_grade):
         "Maio dia 3 não existe em nenhum arquivo recebido — a coluna fica vazia.",
         "Janeiro começa no dia 2: a grade recebida não tem o dia 1º.",
         "Junho e janeiro não têm arquivo de códigos Senior; foram reconstruídos da grade.",
-        "Novembro e dezembro estão em branco, prontos pra montar.",
+        "Novembro e dezembro estão em branco, prontos pra montar (01/11 já tem o que a Mari lançou).",
+        "Os dias do CRO da LuAlice em outubro (02 e 09) e o domingo 18/10 à noite (ficou com 6/7 "
+        "depois de desfazer as 24h emendadas do Moabe) estão marcados pra decisão da Mari na aba "
+        "CHECAGEM OUT.",
         "Dois códigos órfãos no histórico: 23 (Isabella 23/08) e 3 (Laura 02/08) — não "
         "constam em nenhuma legenda; ficaram de fora.",
         "A coluna 18h⚠ enxerga a virada de mês pelas colunas de véspera: a noite do fim "
@@ -365,10 +422,10 @@ def aba_cadastro(wb):
     estilo_titulo(ws, "Cadastro · Quem é quem",
                   f"{len(D.ROSTER)} pessoas ativas")
     cabecalhos = ["Médico", "Nome completo", "CH", "Grupo", "Restrições duras",
-                  "Sexta-noite", "FDS extra", "Observações"]
-    larguras = [14, 22, 5, 15, 58, 16, 14, 52]
+                  "Sexta-noite", "FDS extra", "Observações", "Alvo/sem"]
+    larguras = [14, 22, 5, 15, 58, 16, 14, 52, 8]
     chaves_cad = {"CH": "CH", "Grupo": "grupo", "Sexta-noite": "sexta-noite ficha",
-                  "FDS extra": "fds extra ficha", "Médico": "médico"}
+                  "FDS extra": "fds extra ficha", "Médico": "médico", "Alvo/sem": "alvo-sem"}
     for i, (h, w) in enumerate(zip(cabecalhos, larguras), start=1):
         cel = ws.cell(row=3, column=i, value=h)
         cel.font = Font(name=F, bold=True, size=9, color="FFFFFF")
@@ -381,16 +438,16 @@ def aba_cadastro(wb):
               "36h": SANDS, "24h": CREME, "administrativo": LINE}
     r = 4
     for apelido, nome, ch, grupo, restr, sn, fe, obs in D.ROSTER:
-        vals = [apelido, nome, ch, grupo, restr, sn, fe, obs]
+        vals = [apelido, nome, ch, grupo, restr, sn, fe, obs, D.ALVO_SEMANAL.get(apelido, ch)]
         for i, v in enumerate(vals, start=1):
             cel = ws.cell(row=r, column=i, value=v)
-            cel.font = Font(name=F, size=9, color=INK, bold=(i == 1))
+            cel.font = Font(name=F, size=9, color=INK, bold=(i in (1, 9)))
             cel.alignment = Alignment(wrap_text=(i in (5, 8)), vertical="top")
             cel.border = BOX
             if i == 4:
                 cel.fill = PatternFill("solid", fgColor=grupos.get(grupo, CREME))
         if (r % 2) == 1:                      # banda quente alternada
-            for i in range(1, 9):
+            for i in range(1, 10):
                 cel = ws.cell(row=r, column=i)
                 if cel.fill is None or cel.fill.fgColor.rgb in ("00000000", None):
                     cel.fill = PatternFill("solid", fgColor=CREME2)
@@ -403,7 +460,7 @@ def aba_cadastro(wb):
         ws.cell(row=r, column=1, value=apelido).font = Font(name=F, size=9, bold=True, color=INK3)
         ws.cell(row=r, column=2, value=motivo).font = Font(name=F, size=9, color=INK3)
         r += 1
-    creme(ws, r + 2, 8)
+    creme(ws, r + 2, 9)
     ws.freeze_panes = "C4"
     return ws
 
@@ -511,6 +568,29 @@ def aba_config(wb):
             cel.border = BOX
         r += 1
 
+    # alvo semanal e banco de horas (regra revelada pela checagem de 28/08)
+    r += 1
+    ws.cell(row=r, column=1, value="Alvo semanal e banco de horas").font = Font(
+        name=DISPLAY, bold=True, size=11, color=LAVI)
+    na = ws.cell(row=r, column=6, value=D.NOTA_ALVO)
+    na.font = Font(name=F, size=9, color=INK2)
+    na.alignment = Alignment(wrap_text=True, vertical="top")
+    ws.merge_cells(start_row=r, start_column=6, end_row=r + 3, end_column=7)
+    r += 1
+    cab(r, ["Parâmetro", "Valor"])
+    r += 1
+    r_desc = r                      # as abas mensais apontam para cá (BH k)
+    ws.cell(row=r, column=1, value="Desconto por dia de férias/licença/abono na semana (h)").font = Font(
+        name=F, size=9, bold=True, color=INK)
+    cd = ws.cell(row=r, column=2, value=D.DESCONTO_AUSENCIA_SEMANA)
+    cd.font = Font(name=F, size=11, bold=True, color=LAVI)
+    cd.alignment = Alignment(horizontal="center")
+    cd.border = BOX
+    r += 1
+    ws.cell(row=r, column=1, value="Alvo por pessoa: CADASTRO, coluna Alvo/sem").font = Font(
+        name=F, size=9, italic=True, color=INK3)
+    r += 1
+
     # feriados do ano — eram dado escondido no Python; agora vivem aqui
     r += 1
     ws.cell(row=r, column=1, value="Feriados de 2026").font = Font(
@@ -555,20 +635,10 @@ def aba_config(wb):
         ws.row_dimensions[r].height = 30
         r += 1
     creme(ws, r + 2, 7)
-    return ws, fim_cod, r_cota
+    return ws, fim_cod, r_cota, r_desc
 
 
-def _atend_do_v3():
-    """extrai o literal ATEND de gerar_saidas.py sem executar o resto do arquivo."""
-    src = open(os.path.join(AQUI, "gerar_saidas.py"), encoding="utf-8").read()
-    ini = src.index("ATEND = [")
-    fim = src.index("\n]", ini) + 2
-    ns = {}
-    exec(src[ini:fim], {}, ns)
-    return ns["ATEND"]
-
-
-def aba_mes(wb, mes, DIAS, fim_cod, pessoas, r_cota):
+def aba_mes(wb, mes, DIAS, fim_cod, pessoas, r_cota, r_desc):
     nome = MESES_PT[mes - 1]
     ws = wb.create_sheet(nome)
     origem, nota = D.PROCEDENCIA[mes]
@@ -583,8 +653,8 @@ def aba_mes(wb, mes, DIAS, fim_cod, pessoas, r_cota):
     # legenda compacta sempre à vista — pra ninguém precisar decorar as siglas
     sub = ws.cell(row=R_TIT, column=C_D1 + 6, value=(
         "Legenda: M manhã 7–13 · T tarde 13–19 · D dia 7–19 · N noite 19–7 · "
-        "NT noitinha · C chefia 10h · J Janaina 8–13 · E CEP · FE férias · "
-        "LM licença · AB abono"))
+        "NT noitinha · C chefia 10h · J Janaina 8–13 · CEP · CP · CRO · "
+        "+ = BHP (a mais, no banco) · − = BHN (dispensa) · FE férias · LM licença · AB abono"))
     sub.font = Font(name=F, size=8, italic=True, color=INK3)
 
     ws.column_dimensions["A"].width = 14
@@ -685,17 +755,35 @@ def aba_mes(wb, mes, DIAS, fim_cod, pessoas, r_cota):
         c.font = Font(name=F, bold=True, size=9, color="FFFFFF")
         c.fill = PatternFill("solid", fgColor=LAVI)
         _tip(c, txt)
+    jans = janelas_semana_civil(mes, ndias)
     for i, txt in enumerate(COLS_TOT):
         col = C_TOT + i
         c = _tip(ws.cell(row=R_HDR, column=col, value=txt),
                  "sem-n" if txt.startswith("Sem ") else
-                 ("grupo-filtro" if txt == "Grupo" else
-                  ("ordem-original" if txt == "Nº" else txt)))
+                 ("bh-n" if txt.startswith("BH ") else
+                  ("grupo-filtro" if txt == "Grupo" else
+                   ("ordem-original" if txt == "Nº" else txt))))
         c.font = Font(name=F, bold=True, size=8, color="FFFFFF")
-        c.fill = PatternFill("solid", fgColor=CORALI if 6 <= i <= 10 else LAVI)
+        eh_sem = txt.startswith("Sem ") or txt.startswith("BH ")
+        c.fill = PatternFill("solid", fgColor=(CORALI if txt in COLS_ALERTA else
+                                                ("453A73" if eh_sem else LAVI)))
         c.alignment = Alignment(horizontal="center", wrap_text=True)
         ws.column_dimensions[get_column_letter(col)].width = \
-            7.5 if i <= 10 else (13 if txt == "Grupo" else (4.5 if txt == "Nº" else 6))
+            (13 if txt == "Grupo" else (4.5 if txt == "Nº" else (5.5 if eh_sem else 7.5)))
+    # o intervalo de datas de cada semana, em cima do par Sem/BH
+    d1 = dt.date(2026, mes, 1)
+    for k, spans in enumerate(jans, start=1):
+        ini_sem = d1 + dt.timedelta(days=(spans[0][0] - C_D1))
+        fim_sem = ini_sem + dt.timedelta(days=6)
+        c1 = col_tot(f"Sem {k}")
+        ws.merge_cells(start_row=R_DIA, start_column=c1, end_row=R_DIA, end_column=c1 + 1)
+        cd = ws.cell(row=R_DIA, column=c1, value=f"{ini_sem:%d/%m}–{fim_sem:%d/%m}")
+        cd.font = Font(name=F, size=7, color=INK3)
+        cd.alignment = Alignment(horizontal="center")
+        cs = ws.cell(row=R_DOW, column=c1, value="semana civil")
+        cs.font = Font(name=F, size=7, italic=True, color=INK3)
+        ws.merge_cells(start_row=R_DOW, start_column=c1, end_row=R_DOW, end_column=c1 + 1)
+        cs.alignment = Alignment(horizontal="center")
 
     semanas = round(ndias / 7, 2)
     for k, (apelido, ch) in enumerate(pessoas):
@@ -730,10 +818,18 @@ def aba_mes(wb, mes, DIAS, fim_cod, pessoas, r_cota):
             if cel:
                 letra = cel[0]
                 c.value = letra
-                c.font = Font(name=F, size=9, bold=True,
-                              color="FFFFFF" if letra in BRANCO else INK)
-                if letra in FILLS:
-                    c.fill = PatternFill("solid", fgColor=FILLS[letra])
+                base = D.base_visual(letra)
+                if letra in D.BHN:          # dispensa: cinza, itálico, riscado
+                    c.font = Font(name=F, size=8, italic=True, strike=True, color=INK3)
+                    c.fill = PatternFill("solid", fgColor=FILL_BHN)
+                elif letra in D.BHP:        # a mais: coral claro, negrito
+                    c.font = Font(name=F, size=8, bold=True, color=CORALI)
+                    c.fill = PatternFill("solid", fgColor=FILL_BHP)
+                else:
+                    c.font = Font(name=F, size=9, bold=True,
+                                  color="FFFFFF" if base in BRANCO else INK)
+                    if base in FILLS:
+                        c.fill = PatternFill("solid", fgColor=FILLS[base])
             else:
                 c.font = Font(name=F, size=9, color=INK)
         for i in range(ndias, 31):
@@ -755,48 +851,64 @@ def aba_mes(wb, mes, DIAS, fim_cod, pessoas, r_cota):
                                  fgColor=LAVS if d_prox.weekday() >= 5 else CREME2)
 
         eh = expr_horas(lin)
-        # semanas civis do mês: a 1ª pega as vésperas; sem⚠ = MAX(Sem 1..N)
-        jans = janelas_semana_civil(mes, ndias)
-        col_s1 = get_column_letter(C_TOT + 11)
-        col_sf = get_column_letter(C_TOT + 10 + N_SEM)
-        f = [f"=SUMPRODUCT({eh})",
-             f"=SUMPRODUCT(${L_D1}${R_FDS}:${L_DN}${R_FDS},{eh})",
-             f'=SUMPRODUCT(${L_D1}${R_SEX}:${L_DN}${R_SEX},(${L_D1}{lin}:${L_DN}{lin}="N")*1)',
-             f"=SUMPRODUCT(${L_D1}${R_FER}:${L_DN}${R_FER},{eh})",
-             f"=ROUND({get_column_letter(C_CH)}{lin}*{semanas},0)",
-             f"={get_column_letter(C_TOT)}{lin}-{get_column_letter(C_TOT+4)}{lin}",
-             # começa nas vésperas: a noite do fim do mês anterior emendando a
-             # manhã do dia 1º agora é vista aqui (a do dia 31→1º seguinte é
-             # vista na aba do mês seguinte — cada virada tem um dono só)
-             f'=SUMPRODUCT((${L_PRE1}{lin}:${L_DN_1}{lin}="N")*'
-             f'((${L_PRE2}{lin}:${L_DN}{lin}="M")+(${L_PRE2}{lin}:${L_DN}{lin}="E")'
-             f'+(${L_PRE2}{lin}:${L_DN}{lin}="C")+(${L_PRE2}{lin}:${L_DN}{lin}="D")))',
-             f'=SUMPRODUCT((${L_PRE1}{lin}:${L_DN_1}{lin}="N")*(${L_PRE2}{lin}:${L_DN}{lin}="T"))',
-             # cota de fds: base pela CH, reduzida conforme as semanas de férias no mês.
-             # A regra vive em CONFIG; aqui só se aponta pra lá. CH fora da tabela
-             # (40h) fica em branco de propósito: o doc diz "40h segue caso a caso".
-             f'=IFERROR(INDEX(CONFIG!$B${r_cota}:$D${r_cota+2},'
-             f'MATCH(${get_column_letter(C_CH)}{lin},CONFIG!$A${r_cota}:$A${r_cota+2},0),'
-             f'IF(COUNTIF(${L_D1}{lin}:${L_DN}{lin},"FE")>=10,1,'
-             f'IF(COUNTIF(${L_D1}{lin}:${L_DN}{lin},"FE")>=1,2,3))),"")',
-             # alerta contra o ALVO proporcional (cota × fator do mês), não contra a
-             # cota crua: em mês de 5 fds o excesso é inevitável e o que importa é
-             # se a pessoa carrega mais do que a fatia dela
-             f'=IF({get_column_letter(C_TOT+8)}{lin}="","",'
-             f'MAX(0,{get_column_letter(C_TOT+1)}{lin}-'
-             f'{get_column_letter(C_TOT+8)}{lin}*CONFIG!$E${r_cota}))',
-             f"=MAX({col_s1}{lin}:{col_sf}{lin})"]
-        f += ["=" + "+".join(f"SUMPRODUCT({expr_horas(lin, a2, b2)})"
-                             for a2, b2 in spans) for spans in jans]
-        f += [""] * (N_SEM - len(jans))
-        for i, formula in enumerate(f):
-            c = ws.cell(row=lin, column=C_TOT + i, value=formula or None)
-            c.number_format = "0"      # hora aqui é inteira; meta já vem arredondada
-            c.font = Font(name=F, size=8, color=INK2 if (i < 5 or i > 10) else INK)
+        L = lambda nome: get_column_letter(col_tot(nome))
+        LC = get_column_letter(C_CH)
+        noites = codigos_por_efetivo("N")
+        manhas = codigos_por_efetivo("M", "D", "C", "CEP")
+        tardes = codigos_por_efetivo("T")
+        r1 = f"${L_PRE1}{lin}:${L_DN_1}{lin}"       # dia D
+        r2 = f"${L_PRE2}{lin}:${L_DN}{lin}"         # dia D+1
+        formulas = {
+            "CH mês":  f"=SUMPRODUCT({eh})",
+            "FDS":     f"=SUMPRODUCT(${L_D1}${R_FDS}:${L_DN}${R_FDS},{eh})",
+            "SxN":     f"=SUMPRODUCT(${L_D1}${R_SEX}:${L_DN}${R_SEX},"
+                       f"{expr_conta(f'${L_D1}{lin}:${L_DN}{lin}', noites)})",
+            "Feriado": f"=SUMPRODUCT(${L_D1}${R_FER}:${L_DN}${R_FER},{eh})",
+            "Meta":    f"=ROUND({LC}{lin}*{semanas},0)",
+            "Saldo":   f"={L('CH mês')}{lin}-{L('Meta')}{lin}",
+            # começa nas vésperas: a noite do fim do mês anterior emendando a
+            # manhã do dia 1º é vista aqui (a do dia 31→1º seguinte é vista na
+            # aba do mês seguinte — cada virada tem um dono só)
+            "18h⚠":    f"=SUMPRODUCT({expr_conta(r1, noites)}*{expr_conta(r2, manhas)})",
+            "N→T":     f"=SUMPRODUCT({expr_conta(r1, noites)}*{expr_conta(r2, tardes)})",
+            # cota de fds: base pela CH, reduzida conforme as semanas de férias no mês.
+            # A regra vive em CONFIG; aqui só se aponta pra lá. CH fora da tabela
+            # (40h) fica em branco de propósito: o doc diz "40h segue caso a caso".
+            "Cota FDS": f'=IFERROR(INDEX(CONFIG!$B${r_cota}:$D${r_cota+2},'
+                        f'MATCH(${LC}{lin},CONFIG!$A${r_cota}:$A${r_cota+2},0),'
+                        f'IF(COUNTIF(${L_D1}{lin}:${L_DN}{lin},"FE")>=10,1,'
+                        f'IF(COUNTIF(${L_D1}{lin}:${L_DN}{lin},"FE")>=1,2,3))),"")',
+            # alerta contra o ALVO proporcional (cota × fator do mês), não contra a
+            # cota crua: em mês de 5 fds o excesso é inevitável e o que importa é
+            # se a pessoa carrega mais do que a fatia dela
+            "FDS⚠":    f'=IF({L("Cota FDS")}{lin}="","",'
+                       f'MAX(0,{L("FDS")}{lin}-{L("Cota FDS")}{lin}*CONFIG!$E${r_cota}))',
+            "Sem⚠":    "=MAX(" + ",".join(f"{L(f'Sem {k}')}{lin}" for k in range(1, N_SEM + 1)) + ")",
+        }
+        # alvo semanal da pessoa (CADASTRO, coluna Alvo/sem — pelo nome) menos o
+        # desconto por dia de ausência na semana (CONFIG). BH = horas − alvo.
+        alvo = (f'IFERROR(INDEX(CADASTRO!$I$4:$I$80,MATCH($A{lin},CADASTRO!$A$4:$A$80,0)),'
+                f'${LC}{lin})')
+        for k in range(1, N_SEM + 1):
+            if k <= len(jans):
+                spans = jans[k - 1]
+                formulas[f"Sem {k}"] = "=" + "+".join(
+                    f"SUMPRODUCT({expr_horas(lin, a2, b2)})" for a2, b2 in spans)
+                formulas[f"BH {k}"] = (f"={L(f'Sem {k}')}{lin}-MAX(0,{alvo}"
+                                       f"-CONFIG!$B${r_desc}*({expr_ausencias(lin, spans)}))")
+            else:
+                formulas[f"Sem {k}"] = formulas[f"BH {k}"] = ""
+        for nome in COLS_TOT:
+            if nome in ("Grupo", "Nº"):
+                continue
+            formula = formulas[nome]
+            c = ws.cell(row=lin, column=col_tot(nome), value=formula or None)
+            c.number_format = "+0;-0;0" if nome.startswith("BH ") else "0"
+            c.font = Font(name=F, size=8, bold=(nome in ("Saldo",) or nome.startswith("BH ")),
+                          color=INK if (nome in COLS_ALERTA or nome == "Saldo"
+                                        or nome.startswith("BH ")) else INK2)
             c.alignment = Alignment(horizontal="center")
             c.border = BOX
-            if i == 5:
-                c.font = Font(name=F, size=8, bold=True, color=INK)
         cg = ws.cell(row=lin, column=C_TOT + IDX_GRUPO, value=grupo_filtro(apelido))
         cg.font = Font(name=F, size=8, color=INK3)
         cg.border = BOX
@@ -848,14 +960,26 @@ def aba_mes(wb, mes, DIAS, fim_cod, pessoas, r_cota):
             cf.font = Font(name=F, size=8, bold=True, color=CORALI)
             cf.alignment = Alignment(horizontal="center")
     # Sem⚠ e as semanas civis: vermelho acima do teto constitucional de 44h
-    faixa_sem = (f"{get_column_letter(C_TOT + 10)}{R_P0}:"
-                 f"{get_column_letter(C_TOT + 10 + N_SEM)}{ultima}")
-    ws.conditional_formatting.add(
-        faixa_sem,
-        CellIsRule(operator="greaterThan", formula=["44"],
-                   fill=PatternFill("solid", bgColor=CORAL),
-                   font=Font(name=F, size=8, bold=True, color="FFFFFF")))
-    col_exc = get_column_letter(C_TOT + 9)
+    for nome in [f"Sem {k}" for k in range(1, N_SEM + 1)] + ["Sem⚠"]:
+        lc = get_column_letter(col_tot(nome))
+        ws.conditional_formatting.add(
+            f"{lc}{R_P0}:{lc}{ultima}",
+            CellIsRule(operator="greaterThan", formula=["44"],
+                       fill=PatternFill("solid", bgColor=CORAL),
+                       font=Font(name=F, size=8, bold=True, color="FFFFFF")))
+    # BH da semana: positivo = BHP (areia) · negativo = BHN / faltou (coral claro)
+    for k in range(1, N_SEM + 1):
+        lc = get_column_letter(col_tot(f"BH {k}"))
+        faixa_bh = f"{lc}{R_P0}:{lc}{ultima}"
+        ws.conditional_formatting.add(faixa_bh, CellIsRule(
+            operator="greaterThan", formula=["0"],
+            fill=PatternFill("solid", bgColor=SAND),
+            font=Font(name=F, size=8, bold=True, color=INK)))
+        ws.conditional_formatting.add(faixa_bh, CellIsRule(
+            operator="lessThan", formula=["0"],
+            fill=PatternFill("solid", bgColor=CORALS),
+            font=Font(name=F, size=8, bold=True, color=CORALI)))
+    col_exc = get_column_letter(col_tot("FDS⚠"))
     ws.conditional_formatting.add(
         f"{col_exc}{R_P0}:{col_exc}{ultima}",
         CellIsRule(operator="greaterThan", formula=["0"],
@@ -887,10 +1011,10 @@ def aba_painel(wb, pessoas, oficial):
     ws.cell(row=R_HDR, column=C_CH).fill = PatternFill("solid", fgColor=LAVI)
 
     # 4 blocos de 13 colunas (12 meses + total)
-    blocos = [("Saldo do mês (h)", C_TOT + 5, LAVS),
-              ("FDS (h)", C_TOT + 1, AQUAS),
-              ("Sexta-noite", C_TOT + 2, SANDS),
-              ("Feriado (h)", C_TOT + 3, CORALS)]
+    blocos = [("Saldo do mês (h)", col_tot("Saldo"), LAVS),
+              ("FDS (h)", col_tot("FDS"), AQUAS),
+              ("Sexta-noite", col_tot("SxN"), SANDS),
+              ("Feriado (h)", col_tot("Feriado"), CORALS)]
     chave_bloco = {"Saldo do mês (h)": "saldo-bloco", "FDS (h)": "fds-bloco",
                    "Sexta-noite": "sxn-bloco", "Feriado (h)": "feriado-bloco"}
     col = 3
@@ -989,7 +1113,8 @@ def aba_senior(wb, pessoas, fim_cod):
     dv.add(sel)
     inst = ws.cell(row=R_TIT, column=3,
                    value="Escolha o mês na célula ao lado — a matriz inteira se traduz "
-                         "nos códigos do RH, pronta para lançar no Senior")
+                         "nos códigos do RH, pronta para lançar no Senior. BHP (+) não "
+                         "gera código; BHN (−) sai como o plantão normal")
     inst.font = Font(name=F, size=9, italic=True, color=INK3)
 
     ws.column_dimensions["A"].width = 22
@@ -1029,7 +1154,7 @@ def aba_senior(wb, pessoas, fim_cod):
                 f'INDIRECT($B$1&"!"&ADDRESS({R_P0},COLUMN()+{N_PRE},4)&":"'
                 f'&ADDRESS({R_P0+65},COLUMN()+{N_PRE},4)),'
                 f'MATCH($B{lin},INDIRECT($B$1&"!$A${R_P0}:$A${R_P0+65}"),0)),'
-                f'{faixa_cod},2,FALSE),"")'))
+                f'{faixa_cod},2,FALSE)&"","")'))       # &"": código vazio (BHP) fica vazio, não 0
             cel.font = Font(name=F, size=8, color=INK)
             cel.alignment = Alignment(horizontal="center")
             cel.border = BOX
@@ -1062,8 +1187,8 @@ def aba_dia_a_dia(wb, mes=10):
     # sem coluna de ausências (pedido do Marcos, 28/08/26): quem está fora
     # já se percebe pela própria matriz do mês — aqui é só quem trabalha
     colunas = [("Dia", 5), ("", 5), ("Manhã", 24), ("Tarde", 24), ("Noite", 24),
-               ("Cobertura", 13)]
-    chave_cal = {"Cobertura": "cobertura-cal"}
+               ("BHN (dispensa)", 18), ("Cobertura", 13)]
+    chave_cal = {"Cobertura": "cobertura-cal", "BHN (dispensa)": "bhn-cal"}
     for i, (h, w) in enumerate(colunas, start=1):
         c = ws.cell(row=3, column=i, value=h)
         c.font = Font(name=F, bold=True, size=9, color="FFFFFF")
@@ -1075,11 +1200,26 @@ def aba_dia_a_dia(wb, mes=10):
 
     nomes_rng = f"{nome_mes}!$A${R_P0}:$A${R_P0+65}"
 
-    def formula_turno(col, letras):
+    def formula_turno(col, letras, bhp=()):
+        """nomes do turno; quem está de BHP naquele período ganha ' BHP' colado
+        (o formato da grade oficial — é assim que a Mari confere)."""
         rng = f"{nome_mes}!{col}${R_P0}:{col}${R_P0+65}"
         cond = "+".join(f'({rng}="{l}")' for l in letras)
+        rotulo = nomes_rng
+        if bhp:
+            cond_bhp = "+".join(f'({rng}="{l}")' for l in bhp)
+            rotulo = f'{nomes_rng}&IF(({cond_bhp})*1>0," BHP","")'
         return (f'=IFERROR(TEXTJOIN(CHAR(10),TRUE,'
-                f'FILTER({nomes_rng},({cond})>0)),"—")')
+                f'FILTER({rotulo},({cond})*1>0)),"—")')
+
+    def formula_bhn(col):
+        """a linha 'lá embaixo' da grade oficial: quem foi dispensado (BHN) no dia."""
+        rng = f"{nome_mes}!{col}${R_P0}:{col}${R_P0+65}"
+        cond = "+".join(f'({rng}="{l}")' for l in sorted(D.BHN))
+        periodo = (f'IF({rng}="M-"," manhã",IF({rng}="T-"," tarde",IF({rng}="D-"," dia",'
+                   f'IF({rng}="N-"," noite",IF({rng}="Tm-"," manhã"," tarde")))))')
+        return (f'=IFERROR(TEXTJOIN(CHAR(10),TRUE,'
+                f'FILTER({nomes_rng}&" BHN"&{periodo},({cond})*1>0)),"")')
 
     # a semana inteira, de segunda a domingo, nas duas pontas (Marcos, 28/08):
     # o calendário abre na segunda da semana do dia 1º (vésperas) e fecha no
@@ -1119,20 +1259,28 @@ def aba_dia_a_dia(wb, mes=10):
             for cc in (cd, cw):
                 cc.fill = PatternFill("solid", fgColor=LAVS)
         col = get_column_letter(col_n)
-        for j, letras in ((3, ("M", "D", "C", "J")), (4, ("T", "D", "C")),
-                          (5, ("N", "NT"))):
-            cel = ws.cell(row=r, column=j, value=formula_turno(col, letras))
+        # os códigos de cada turno vêm dos flags da tabela (conta manhã/tarde/noite)
+        grupos_cal = ((3, [k for k, v in D.TURNOS.items() if v[4]], ("M+", "D+", "Dm+")),
+                      (4, [k for k, v in D.TURNOS.items() if v[5]], ("T+", "D+", "Dt+")),
+                      (5, [k for k, v in D.TURNOS.items() if v[6]], ("N+",)))
+        for j, letras, bhp in grupos_cal:
+            cel = ws.cell(row=r, column=j, value=formula_turno(col, letras, bhp))
             cel.font = Font(name=F, size=8, color=INK3 if vizinho else INK,
                             italic=vizinho)
             cel.alignment = Alignment(wrap_text=True, vertical="top")
             cel.border = BOX
             if vizinho or fds or info_fer:
                 cel.fill = PatternFill("solid", fgColor=CREME2)
+        cb = ws.cell(row=r, column=6, value=formula_bhn(col))
+        cb.font = Font(name=F, size=8, italic=True, color=INK3)
+        cb.alignment = Alignment(wrap_text=True, vertical="top")
+        cb.border = BOX
+        cb.fill = PatternFill("solid", fgColor=FILL_BHN)
         # "M18 T12 N9 ✓" — sem denominador enganoso: quando sobra gente, o
         # x/(x+falta) da versão anterior mostrava "18/18" como se o alvo fosse 18
         f_falta = (f'{nome_mes}!{col}${R_P0+70}+{nome_mes}!{col}${R_P0+71}'
                    f'+{nome_mes}!{col}${R_P0+72}')
-        cov = ws.cell(row=r, column=6, value=(
+        cov = ws.cell(row=r, column=7, value=(
             f'="M"&{nome_mes}!{col}${R_P0+67}&" T"&{nome_mes}!{col}${R_P0+68}'
             f'&" N"&{nome_mes}!{col}${R_P0+69}'
             f'&IF({f_falta}=0," ✓"," ⚠ falta "&({f_falta}))'))
@@ -1141,226 +1289,8 @@ def aba_dia_a_dia(wb, mes=10):
         cov.alignment = Alignment(wrap_text=True, vertical="top")
         cov.border = BOX
         ws.row_dimensions[r].height = 110 if vizinho else 150
-    creme(ws, r + 2, 7)
+    creme(ws, r + 2, 8)
     ws.freeze_panes = "C4"
-    return ws
-
-
-def aba_esboco(wb, r_cota):
-    """Outubro segundo o ESBOÇO da escalista — transcrição do PDF, para conferência.
-
-    32 colunas (01/10 a 01/11). Contagens por fórmula; mínimos do dia escritos
-    numa linha própria e a falta em vermelho, como nas mensais.
-    """
-    import esboco_out_dados as EB
-    ws = wb.create_sheet("OUT · ESBOÇO", wb.sheetnames.index("OUT · DIA A DIA") + 1)
-    ws.sheet_properties.tabColor = "D9A85A"
-    ws.sheet_view.showGridLines = False
-    t = ws.cell(row=1, column=1, value="Outubro · Esboço da escalista (verificação)")
-    t.font = Font(name=DISPLAY, bold=True, size=14, color=INK)
-    sub = ws.cell(row=1, column=9, value=(
-        "Transcrito do PDF de 23/08 — 01/10 a 01/11. Compare com a aba OUT; a linha "
-        "Falta mostra onde o esboço não bate o mínimo."))
-    sub.font = Font(name=F, size=8, italic=True, color=INK3)
-    ws.column_dimensions["A"].width = 14
-    ws.column_dimensions["B"].width = 5
-    NDIAS = 32
-    pessoas = [(a2, ch) for a2, _n, ch, *_ in D.ROSTER]
-    # vésperas de setembro fecham a 1ª semana civil — fórmulas vivas da aba SET
-    offset = dt.date(2026, 10, 1).weekday()
-    for j in range(N_PRE):
-        col = C_PRE1 + j
-        usada = j >= N_PRE - offset
-        for rr in (4, 5, 6):
-            ws.cell(row=rr, column=col, value=0)
-        if not usada:
-            ws.column_dimensions[get_column_letter(col)].width = 2.5
-            for rr in (2, 3):
-                ws.cell(row=rr, column=col).fill = PatternFill("solid", fgColor=LINE)
-            continue
-        ws.column_dimensions[get_column_letter(col)].width = 4.2
-        d_prev = dt.date(2026, 10, 1) - dt.timedelta(days=N_PRE - j)
-        cd = ws.cell(row=2, column=col, value=d_prev.strftime("%d/%m"))
-        cd.font = Font(name=F, bold=True, size=7, color=INK2)
-        cd.alignment = Alignment(horizontal="center")
-        cd.fill = PatternFill("solid", fgColor=LAVS if d_prev.weekday() >= 5 else CREME2)
-        cw = ws.cell(row=3, column=col, value=WD_PT[d_prev.weekday()])
-        cw.font = Font(name=F, size=8, color=CORALI if d_prev.weekday() >= 5 else INK3)
-        cw.alignment = Alignment(horizontal="center")
-        _tip(cd, "dia-anterior")
-    for i in range(NDIAS):
-        col = C_D1 + i
-        data = dt.date(2026, 11, 1) if i == 31 else dt.date(2026, 10, i + 1)
-        letra_c = get_column_letter(col)
-        ws.column_dimensions[letra_c].width = 4.2
-        cd = ws.cell(row=2, column=col, value="01/11" if i == 31 else i + 1)
-        cd.font = Font(name=F, bold=True, size=8 if i == 31 else 9,
-                       color="FFFFFF" if (10, i + 1) in D.FERIADOS_2026 else INK)
-        cd.alignment = Alignment(horizontal="center")
-        cw = ws.cell(row=3, column=col, value=WD_PT[data.weekday()])
-        cw.font = Font(name=F, size=8,
-                       color=CORALI if data.weekday() >= 5 else INK3)
-        cw.alignment = Alignment(horizontal="center")
-        if (10, i + 1) in D.FERIADOS_2026:
-            cd.fill = PatternFill("solid", fgColor=CORAL)
-            cw.value = D.FERIADOS_2026[(10, i + 1)][1]
-            cw.font = Font(name=F, size=8, bold=True, color="FFFFFF")
-            cw.fill = PatternFill("solid", fgColor=CORALI)
-        elif data.weekday() >= 5:
-            cd.fill = PatternFill("solid", fgColor=LAVS)
-        fora = i == 31                     # 01/11 conta na cota de novembro
-        ws.cell(row=4, column=col, value=0 if fora else (1 if data.weekday() >= 5 else 0))
-        ws.cell(row=5, column=col, value=0 if fora else (1 if data.weekday() == 4 else 0))
-        ws.cell(row=6, column=col, value=0 if fora else (1 if (10, i + 1) in D.FERIADOS_2026 else 0))
-    for rr, rot in ((4, "máscara fds"), (5, "máscara sexta"), (6, "máscara feriado")):
-        ws.row_dimensions[rr].hidden = True
-        ws.cell(row=rr, column=1, value=rot)
-    for col, txt in ((C_MED, "Médico"), (C_CH, "CH")):
-        c = ws.cell(row=R_HDR, column=col, value=txt)
-        c.font = Font(name=F, bold=True, size=9, color="FFFFFF")
-        c.fill = PatternFill("solid", fgColor=LAVI)
-    # calculadoras — as mesmas 11 da aba original, adaptadas às 32 colunas
-    E_D1, E_DN = C_D1, C_D1 + NDIAS - 1                     # C .. AH (exibição)
-    # calculadoras param no dia 31: o 01/11 conta na cota de novembro (doc §6)
-    E_CALC = E_DN - 1                                        # AG
-    L1, LN = get_column_letter(E_D1), get_column_letter(E_CALC)
-    LN_1, L2 = get_column_letter(E_CALC - 1), get_column_letter(E_D1 + 1)
-    E_TOT = E_DN + 1
-    for i, txt in enumerate(COLS_TOT):
-        col = E_TOT + i
-        c = _tip(ws.cell(row=R_HDR, column=col, value=txt),
-                 "sem-n" if txt.startswith("Sem ") else
-                 ("grupo-filtro" if txt == "Grupo" else
-                  ("ordem-original" if txt == "Nº" else txt)))
-        c.font = Font(name=F, bold=True, size=8, color="FFFFFF")
-        c.fill = PatternFill("solid", fgColor=CORALI if 6 <= i <= 10 else LAVI)
-        c.alignment = Alignment(horizontal="center", wrap_text=True)
-        ws.column_dimensions[get_column_letter(col)].width = \
-            7.5 if i <= 10 else (13 if txt == "Grupo" else (4.5 if txt == "Nº" else 6))
-    semanas32 = round(31 / 7, 2)
-    jans_eb = janelas_semana_civil(10, 31)
-    for k, (apelido, ch) in enumerate(pessoas):
-        lin = R_P0 + k
-        ws.cell(row=lin, column=C_MED, value=apelido).font = Font(
-            name=F, size=9, bold=True, color=INK)
-        cc = ws.cell(row=lin, column=C_CH, value=ch)
-        cc.font = Font(name=F, size=8, color=INK3)
-        cc.alignment = Alignment(horizontal="center")
-        for j in range(N_PRE):
-            col = C_PRE1 + j
-            c = ws.cell(row=lin, column=col)
-            if j < N_PRE - offset:
-                c.fill = PatternFill("solid", fgColor=LINE)
-                continue
-            d_prev = dt.date(2026, 10, 1) - dt.timedelta(days=N_PRE - j)
-            ref = f"SET!{get_column_letter(C_D1 + d_prev.day - 1)}{lin}"
-            c.value = f'=IF({ref}="","",{ref})'
-            c.font = Font(name=F, size=9, color=INK2)
-            c.alignment = Alignment(horizontal="center")
-            c.border = BOX
-            c.fill = PatternFill("solid",
-                                 fgColor=LAVS if d_prev.weekday() >= 5 else CREME2)
-        for i in range(NDIAS):
-            col = C_D1 + i
-            letra = EB.ESBOCO.get(apelido, {}).get(i + 1)
-            c = ws.cell(row=lin, column=col)
-            c.alignment = Alignment(horizontal="center")
-            c.border = BOX
-            if letra:
-                c.value = letra
-                c.font = Font(name=F, size=9, bold=True,
-                              color="FFFFFF" if letra in BRANCO else INK)
-                if letra in FILLS:
-                    c.fill = PatternFill("solid", fgColor=FILLS[letra])
-        eh = expr_horas(lin, E_D1, E_CALC)
-        col_s1 = get_column_letter(E_TOT + 11)
-        col_sf = get_column_letter(E_TOT + 10 + N_SEM)
-        f = [f"=SUMPRODUCT({eh})",
-             f"=SUMPRODUCT(${L1}$4:${LN}$4,{eh})",
-             f'=SUMPRODUCT(${L1}$5:${LN}$5,(${L1}{lin}:${LN}{lin}="N")*1)',
-             f"=SUMPRODUCT(${L1}$6:${LN}$6,{eh})",
-             f"=ROUND({get_column_letter(C_CH)}{lin}*{semanas32},0)",
-             f"={get_column_letter(E_TOT)}{lin}-{get_column_letter(E_TOT+4)}{lin}",
-             f'=SUMPRODUCT((${L_PRE1}{lin}:${LN_1}{lin}="N")*'
-             f'((${L_PRE2}{lin}:${LN}{lin}="M")+(${L_PRE2}{lin}:${LN}{lin}="E")'
-             f'+(${L_PRE2}{lin}:${LN}{lin}="C")+(${L_PRE2}{lin}:${LN}{lin}="D")))',
-             f'=SUMPRODUCT((${L_PRE1}{lin}:${LN_1}{lin}="N")*(${L_PRE2}{lin}:${LN}{lin}="T"))',
-             f'=IFERROR(INDEX(CONFIG!$B${r_cota}:$D${r_cota+2},'
-             f'MATCH(${get_column_letter(C_CH)}{lin},CONFIG!$A${r_cota}:$A${r_cota+2},0),'
-             f'IF(COUNTIF(${L1}{lin}:${LN}{lin},"FE")>=10,1,'
-             f'IF(COUNTIF(${L1}{lin}:${LN}{lin},"FE")>=1,2,3))),"")',
-             f'=IF({get_column_letter(E_TOT+8)}{lin}="","",'
-             f'MAX(0,{get_column_letter(E_TOT+1)}{lin}-'
-             f'{get_column_letter(E_TOT+8)}{lin}*CONFIG!$E${r_cota}))',
-             f"=MAX({col_s1}{lin}:{col_sf}{lin})"]
-        f += ["=" + "+".join(f"SUMPRODUCT({expr_horas(lin, a2, b2)})"
-                             for a2, b2 in spans) for spans in jans_eb]
-        f += [""] * (N_SEM - len(jans_eb))
-        for i, formula in enumerate(f):
-            c = ws.cell(row=lin, column=E_TOT + i, value=formula or None)
-            c.number_format = "0"
-            c.font = Font(name=F, size=8, color=INK2 if (i < 5 or i > 10) else INK,
-                          bold=(i == 5))
-            c.alignment = Alignment(horizontal="center")
-            c.border = BOX
-        cg = ws.cell(row=lin, column=E_TOT + IDX_GRUPO, value=grupo_filtro(apelido))
-        cg.font = Font(name=F, size=8, color=INK3)
-        cg.border = BOX
-        cn = ws.cell(row=lin, column=E_TOT + IDX_NUM, value=k + 1)
-        cn.font = Font(name=F, size=8, color=INK3)
-        cn.alignment = Alignment(horizontal="center")
-        cn.border = BOX
-    col_exc = get_column_letter(E_TOT + 9)
-    ws.conditional_formatting.add(
-        f"{col_exc}{R_P0}:{col_exc}{R_P0+len(pessoas)-1}",
-        CellIsRule(operator="greaterThan", formula=["0"],
-                   fill=PatternFill("solid", bgColor=CORAL),
-                   font=Font(name=F, size=8, bold=True, color="FFFFFF")))
-    ws.conditional_formatting.add(
-        f"{get_column_letter(E_TOT + 10)}{R_P0}:"
-        f"{get_column_letter(E_TOT + 10 + N_SEM)}{R_P0+len(pessoas)-1}",
-        CellIsRule(operator="greaterThan", formula=["44"],
-                   fill=PatternFill("solid", bgColor=CORAL),
-                   font=Font(name=F, size=8, bold=True, color="FFFFFF")))
-    ultima = R_P0 + len(pessoas) - 1
-    r = ultima + 2
-    grupos = [(rot, [k2 for k2, v in D.TURNOS.items() if v[4 + gi]], gi)
-              for gi, rot in enumerate(("Manhã", "Tarde", "Noite"))]
-    for gi, (rot, letras, idx) in enumerate(grupos):
-        rl, rf, rm = r + gi, r + 4 + gi, r + 3
-        _tip(ws.cell(row=rl, column=C_MED, value=rot), "cob-turno")
-        ws.cell(row=rl, column=C_MED).font = Font(name=F, size=9, bold=True, color=LAVI)
-        ws.cell(row=rm, column=C_MED, value="Mínimo do dia").font = Font(
-            name=F, size=8, color=INK3)
-        cf0 = ws.cell(row=rf, column=C_MED, value=f"Falta {rot.lower()}")
-        cf0.font = Font(name=F, size=9, bold=True, color=CORALI)
-        _tip(cf0, "falta")
-        for i in range(NDIAS):
-            col = get_column_letter(C_D1 + i)
-            data = dt.date(2026, 11, 1) if i == 31 else dt.date(2026, 10, i + 1)
-            tipo = "útil" if data.weekday() < 5 else ("sábado" if data.weekday() == 5 else "domingo")
-            minimo = D.MINIMOS[tipo][idx]
-            faixa = f"{col}{R_P0}:{col}{ultima}"
-            conta = "+".join(f'COUNTIF({faixa},"{x}")' for x in letras)
-            c1 = ws.cell(row=rl, column=C_D1 + i, value=f"={conta}")
-            c1.font = Font(name=F, size=8, color=INK2)
-            c1.alignment = Alignment(horizontal="center")
-            if gi == 0:
-                cmin = ws.cell(row=rm, column=C_D1 + i,
-                               value="/".join(str(D.MINIMOS[tipo][j]) for j in range(3)))
-                cmin.font = Font(name=F, size=6.5, color=INK3)
-                cmin.alignment = Alignment(horizontal="center")
-            cf = ws.cell(row=rf, column=C_D1 + i, value=f"=MAX(0,{minimo}-{col}{r+gi})")
-            cf.font = Font(name=F, size=8, bold=True, color=CORALI)
-            cf.alignment = Alignment(horizontal="center")
-    for rf in (r + 4, r + 5, r + 6):
-        faixa = f"{get_column_letter(C_D1)}{rf}:{get_column_letter(C_D1+31)}{rf}"
-        ws.conditional_formatting.add(faixa, CellIsRule(
-            operator="greaterThan", formula=["0"],
-            fill=PatternFill("solid", bgColor=CORAL),
-            font=Font(name=F, size=8, bold=True, color="FFFFFF")))
-    creme(ws, r + 8, C_D1 + NDIAS + len(COLS_TOT) + 1)
-    ws.freeze_panes = f"{L_PRE1}{R_P0}"
     return ws
 
 
@@ -1563,140 +1493,87 @@ def aba_validador(wb, DIAS, pessoas):
     return ws
 
 
-def abas_mes_vivo(wb, ns, mov=None):
-    atend = _atend_do_v3()
-    ws = wb.create_sheet("ATENDIMENTO")
-    ws.sheet_properties.tabColor = PINK
-    estilo_titulo(ws, "Atendimento e justificativas · Outubro de 2026")
-    sub = ws.cell(row=2, column=1, value="Cobertura 100% nos 31 dias · convocações na aba "
-                  "ao lado · critério público, sem favoritismo")
-    sub.font = Font(name=F, size=10, italic=True, color=INK2)
-    for j, (h, w) in enumerate(zip(["Quem / o quê", "Status",
-                                    "Justificativa (critério público)"],
-                                   [22, 16, 120]), start=1):
-        c = ws.cell(row=4, column=j, value=h)
-        c.font = Font(name=F, bold=True, size=9, color="FFFFFF")
-        c.fill = PatternFill("solid", fgColor=LAVI)
-        ws.column_dimensions[get_column_letter(j)].width = w
-    for i, (quem, st, txt) in enumerate(atend, start=5):
-        ws.cell(row=i, column=1, value=quem).font = Font(name=F, bold=True, size=10, color=INK)
-        s = ws.cell(row=i, column=2, value=st)
-        s.font = Font(name=F, bold=True, size=9,
-                      color=("5A6E50" if st.startswith("✓") else CORALI))
-        t = ws.cell(row=i, column=3, value=txt)
-        t.font = Font(name=F, size=9, color=INK)
-        t.alignment = Alignment(wrap_text=True, vertical="top")
-        for j in (1, 2, 3):
-            ws.cell(row=i, column=j).border = BOX
-    creme(ws, len(atend) + 8, 3)
-    ws.freeze_panes = "A5"
+def aba_checagem(wb):
+    """a checagem de outubro (e-mail Marcos/Mari): regras reveladas, o que foi
+    mudado célula a célula e o que foi verificado sem mudar — pra Mari conferir."""
+    import checagem_out_v3 as CK
+    ws = wb.create_sheet("CHECAGEM OUT", wb.sheetnames.index("OUT · DIA A DIA") + 1)
+    ws.sheet_properties.tabColor = CORALI
+    ws.sheet_view.showGridLines = False
+    estilo_titulo(ws, "Checagem de outubro · O que mudou e por quê",
+                  "Correções do e-mail de 28/08 aplicadas sobre a versão viva da Mari (01/09)")
+    for col, w in zip("ABCDEF", (6, 13, 7, 8, 8, 110)):
+        ws.column_dimensions[col].width = w
+    r = 4
 
-    ws2 = wb.create_sheet("CONVOCAÇÕES")
-    ws2.sheet_properties.tabColor = CORALI
-    estilo_titulo(ws2, "Convocações · Outubro de 2026")
-    novas = (mov or {}).get("novas", [])
-    convoc = [(ap, d, t) for ap, d, t, _fase in novas]
-    fase_de = {(ap, d, t): fase for ap, d, t, fase in novas}
-    nconv = {}
-    for ap, _d, _s in convoc:
-        nconv[ap] = nconv.get(ap, 0) + 1
-    import ajustes_out as AJ
-    exp = ws2.cell(row=2, column=1, value=(
-        f"{len(convoc)} convocações da remontagem de 18/08, sob as regras novas (rotina só "
-        "manhã em dia útil e nunca FDS · teto de 44h/semana · compromissos de setembro). "
-        "Critério público: entra primeiro quem está mais abaixo do próprio alvo. Impedimento "
-        "com motivo declarado é intocável. Toda convocação gera CRÉDITO no mês seguinte."))
-    exp.font = Font(name=F, size=10, color=INK2)
-    exp.alignment = Alignment(wrap_text=True, vertical="top")
-    # 3 linhas de altura de verdade: o merge de 2 linhas cortava o texto no meio
-    ws2.merge_cells(start_row=2, start_column=1, end_row=4, end_column=5)
-    for rr in (2, 3, 4):
-        ws2.row_dimensions[rr].height = 17
-    for j, (h, w) in enumerate(zip(["Médico", "Convocações", "Dias", "Crédito em novembro"],
-                                   [16, 12, 46, 22]), start=1):
-        c = ws2.cell(row=5, column=j, value=h)
-        c.font = Font(name=F, bold=True, size=9, color="FFFFFF")
-        c.fill = PatternFill("solid", fgColor=LAVI)
-        ws2.column_dimensions[get_column_letter(j)].width = w
-    r = 6
-    wd = ns["wd"]
-    for ap, n in sorted(nconv.items(), key=lambda x: (-x[1], x[0])):
-        dias_txt = " · ".join(
-            f"{d:02d}/{WD_PT[wd(d)]} {s}"
-            + (" (set)" if fase_de.get((a2, d, s)) == "compromisso de setembro" else "")
-            for a2, d, s in sorted(convoc, key=lambda x: x[1])
-            if a2 == ap)
-        ws2.cell(row=r, column=1, value=ap).font = Font(name=F, size=9, bold=True, color=INK)
-        cn = ws2.cell(row=r, column=2, value=n)
-        cn.font = Font(name=F, size=10, bold=True, color=CORALI if n >= 3 else INK2)
-        cn.alignment = Alignment(horizontal="center")
-        cd = ws2.cell(row=r, column=3, value=dias_txt)
-        cd.font = Font(name=F, size=8, color=INK2)
-        cd.alignment = Alignment(wrap_text=True, vertical="top")
-        cc = ws2.cell(row=r, column=4, value="prioridade nas preferências")
-        cc.font = Font(name=F, size=8, color="5A6E50")
-        for j in range(1, 5):
-            ws2.cell(row=r, column=j).border = BOX
+    def titulo(txt):
+        nonlocal r
+        c = ws.cell(row=r, column=1, value=txt)
+        c.font = Font(name=DISPLAY, bold=True, size=12, color=LAVI)
         r += 1
-    # ajustes do feriado, com o motivo colado em cada linha
-    import ajustes_out
-    r += 1
-    ws2.cell(row=r, column=1, value="Ajustes do feriado 12/10").font = Font(
-        name=DISPLAY, bold=True, size=11, color=LAVI)
-    r += 1
-    for apelido, dia, letra, motivo in ajustes_out.AJUSTES:
-        ws2.cell(row=r, column=1, value=apelido).font = Font(
-            name=F, size=9, bold=True, color=INK)
-        cl = ws2.cell(row=r, column=2, value=f"{dia:02d}/10 {letra}")
-        cl.font = Font(name=F, size=9, bold=True, color=CORALI)
-        cl.alignment = Alignment(horizontal="center")
-        cm2 = ws2.cell(row=r, column=3, value=motivo)
-        cm2.font = Font(name=F, size=8, color=INK2)
-        cm2.alignment = Alignment(wrap_text=True, vertical="top")
-        ws2.merge_cells(start_row=r, start_column=3, end_row=r, end_column=4)
-        for j in range(1, 5):
-            ws2.cell(row=r, column=j).border = BOX
-        ws2.row_dimensions[r].height = 26
+
+    def cab(textos):
+        nonlocal r
+        for i, t in enumerate(textos, start=1):
+            c = ws.cell(row=r, column=i, value=t)
+            c.font = Font(name=F, bold=True, size=9, color="FFFFFF")
+            c.fill = PatternFill("solid", fgColor=LAVI)
+        r += 1
+
+    titulo("As regras que a checagem revelou (e a planilha passou a medir)")
+    cab(["", "Regra", "", "", "", "O que é"])
+    for nome, txt in CK.REGRAS:
+        ws.cell(row=r, column=2, value=nome).font = Font(name=F, size=9, bold=True, color=INK)
+        ws.merge_cells(start_row=r, start_column=2, end_row=r, end_column=5)
+        c = ws.cell(row=r, column=6, value=txt)
+        c.font = Font(name=F, size=9, color=INK2)
+        c.alignment = Alignment(wrap_text=True, vertical="top")
+        for j in range(2, 7):
+            ws.cell(row=r, column=j).border = BOX
+        ws.row_dimensions[r].height = 30
         r += 1
     r += 1
-    ws2.cell(row=r, column=1, value="Quem da rotina folga o feriado, e por quê").font = Font(
-        name=DISPLAY, bold=True, size=11, color=LAVI)
-    r += 1
-    for apelido, motivo in ajustes_out.FOLGAS:
-        ws2.cell(row=r, column=1, value=apelido).font = Font(
-            name=F, size=9, bold=True, color=INK)
-        cf2 = ws2.cell(row=r, column=3, value=motivo)
-        cf2.font = Font(name=F, size=8, color=INK2)
-        cf2.alignment = Alignment(wrap_text=True, vertical="top")
-        ws2.merge_cells(start_row=r, start_column=3, end_row=r, end_column=4)
-        for j in range(1, 5):
-            ws2.cell(row=r, column=j).border = BOX
-        ws2.row_dimensions[r].height = 26
+    titulo("Célula a célula — o que mudou na aba OUT")
+    cab(["Item", "Médico", "Dia", "Estava", "Ficou", "Por quê"])
+    for item, ap, dia, de, para, motivo in CK.EDITS:
+        vals = [item, ap, "01/11" if dia == 32 else f"{dia:02d}/10", de or "—", para or "—", motivo]
+        for j, v in enumerate(vals, start=1):
+            c = ws.cell(row=r, column=j, value=v)
+            c.font = Font(name=F, size=9, color=INK, bold=(j in (2, 5)))
+            c.alignment = Alignment(horizontal="left" if j == 6 else "center",
+                                    wrap_text=(j == 6), vertical="top")
+            c.border = BOX
+        if para in D.BHP:
+            ws.cell(row=r, column=5).fill = PatternFill("solid", fgColor=FILL_BHP)
+        elif para in D.BHN:
+            ws.cell(row=r, column=5).fill = PatternFill("solid", fgColor=FILL_BHN)
+        ws.row_dimensions[r].height = 28
         r += 1
     r += 1
-    ws2.cell(row=r, column=1, value="Registro das decisões").font = Font(
-        name=DISPLAY, bold=True, size=11, color=CORALI)
-    r += 1
-    for tema, status, texto in ajustes_out.NAO_FEITO:
-        ws2.cell(row=r, column=1, value=tema).font = Font(
-            name=F, size=9, bold=True, color=INK)
-        cs = ws2.cell(row=r, column=2, value=status)
-        cs.font = Font(name=F, size=8, bold=True, color=CORALI)
-        cs.alignment = Alignment(wrap_text=True, vertical="top", horizontal="center")
-        ct2 = ws2.cell(row=r, column=3, value=texto)
-        ct2.font = Font(name=F, size=8, color=INK2)
-        ct2.alignment = Alignment(wrap_text=True, vertical="top")
-        ws2.merge_cells(start_row=r, start_column=3, end_row=r, end_column=4)
-        for j in range(1, 5):
-            ws2.cell(row=r, column=j).border = BOX
-        ws2.row_dimensions[r].height = 58
+    titulo("Verificado sem mudar célula")
+    cab(["Item", "Quem", "", "", "", "O que foi visto"])
+    for item, ap, txt in CK.SEM_ALTERACAO:
+        ws.cell(row=r, column=1, value=item).font = Font(name=F, size=9, color=INK)
+        ws.cell(row=r, column=1).alignment = Alignment(horizontal="center", vertical="top")
+        ws.cell(row=r, column=2, value=ap).font = Font(name=F, size=9, bold=True, color=INK)
+        ws.merge_cells(start_row=r, start_column=2, end_row=r, end_column=5)
+        c = ws.cell(row=r, column=6, value=txt)
+        c.font = Font(name=F, size=9, color=INK2)
+        c.alignment = Alignment(wrap_text=True, vertical="top")
+        for j in range(1, 7):
+            ws.cell(row=r, column=j).border = BOX
+        ws.row_dimensions[r].height = 40
         r += 1
-    creme(ws2, r + 2, 5)
-    ws2.freeze_panes = "A6"
+    creme(ws, r + 2, 6)
+    ws.freeze_panes = "A4"
+    return ws
+
+
+NOME_ARQUIVO = "Escala UTI HCB 2026 - V3.xlsx"
 
 
 def main():
-    DIAS, rel_grade, ns = carregar_dados()
+    DIAS, rel_grade = carregar_dados()
     oficial = contagem_oficial_sxn()
     pessoas = [(a, ch) for a, _n, ch, *_ in D.ROSTER]
 
@@ -1704,24 +1581,23 @@ def main():
     wb.remove(wb.active)
     aba_leiame(wb, rel_grade)
     aba_cadastro(wb)
-    _cfg, fim_cod, r_cota = aba_config(wb)
+    _cfg, fim_cod, r_cota, r_desc = aba_config(wb)
     for mes in range(1, 13):
-        aba_mes(wb, mes, DIAS, fim_cod, pessoas, r_cota)
+        aba_mes(wb, mes, DIAS, fim_cod, pessoas, r_cota, r_desc)
     aba_dia_a_dia(wb, mes=10)
-    aba_esboco(wb, r_cota)
+    aba_checagem(wb)
     aba_painel(wb, pessoas, oficial)
     aba_senior(wb, pessoas, fim_cod)
     aba_validador(wb, DIAS, pessoas)
-    abas_mes_vivo(wb, ns, ns.get("_mov"))
     # painel de leitura: DADOS DASH alimenta os gráficos, DASHBOARD é a capa
     import v4_dashboard as VD
     VD.aba_dados(wb)
     VD.aba_dashboard(wb, mes_vivo="OUT", nome_mes="outubro")
 
-    destino = os.path.join(AQUI, "Escala UTI HCB 2026 - unificada v4.xlsx")
+    destino = os.path.join(AQUI, NOME_ARQUIVO)
     wb.save(destino)
     tam = os.path.getsize(destino) / 1024
-    print(f"\n=== planilha v4 salva ===\n{destino}\n{tam:.0f} kb · {len(wb.sheetnames)} abas")
+    print(f"\n=== planilha V3 salva ===\n{destino}\n{tam:.0f} kb · {len(wb.sheetnames)} abas")
     print("abas:", " · ".join(wb.sheetnames))
     return destino
 

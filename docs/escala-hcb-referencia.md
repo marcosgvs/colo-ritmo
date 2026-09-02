@@ -58,7 +58,7 @@ Lotação real observada (contando chefia): dia útil ≈ 14–16 manhã / 10–
    - **Sexta-noite obrigatória em rodízio**: pool ~27 nomes; quem fez entra na lista "já fez, não lançar". Estruturais fora do rodízio: LuAlice (sempre), Marcia (1ª semana), LeLemos (1/mês), Ernesto (15/15), Joaquim (voluntário 2/mês), Melara (2/mês por preferência).
    - **FDS extra obrigatório**: mês sim/mês não; pool: Amanda, AnaSeverino, CaAbreu, JuBrito, LeLemos, LuAlice, MayWobido, Melara, Raylander, Ricardo, Roberta.
    - **Feriados**: prioridade de folga = 1) menor CH total, 2) já fez todos os feriados do ano. Contagem anual por feriado por pessoa.
-   - **BHP/BHN** = banco de horas ("BHP: vá ao plantão / BHN: NÃO vá"). BHP inline no turno (conta na lotação); BHN geralmente em linha separada no fim do dia (dispensa do fixo). **Nunca lançar BH para LuAlice.**
+   - **BHP/BHN** = banco de horas ("BHP: vá ao plantão / BHN: NÃO vá"). BHP inline no turno (conta na lotação); BHN geralmente em linha separada no fim do dia (dispensa do fixo). **Nunca lançar BH para LuAlice.** Na planilha V3 (01/09/26) o banco tem código próprio: `M+ T+ D+ N+` = BHP (trabalha a mais; **o Senior não recebe**), `M- T- D- N-` = BHN (dispensa; **o Senior recebe o plantão normal**), `Dm+`/`Dt+` = dia em que só a manhã/tarde é BHP, `Tm-`/`Mt-` = meio período trabalhado com o outro dispensado. Ver §9.
 
 ## 4 · Regras duras de montagem
 
@@ -222,3 +222,19 @@ Calendário: 01/10 = quinta. Feriado: **12/10 N. Sra. Aparecida (segunda)**. Fds
 4. Rodízio MSalomão↔Vinicius: qual fds de outubro cabe a quem (paridade vem de setembro: MSalomão fez 26-27/09, Vinicius 05 e 19/09).
 5. Ariadne/Jaqueline: retorno de LM em outubro?
 6. Férias novas de outubro (quem entra na quinzena 05/10 e 19/10).
+
+## 9 · Checagem de outubro (Marcos + Mari, 28/08 → aplicada em 01/09/26 na planilha V3)
+
+Regras que a checagem dos 25 itens revelou e que a planilha passou a medir (aba CHECAGEM OUT lista cada célula alterada):
+
+- **A carga contratada é alvo POR SEMANA CIVIL (seg–dom)**, contando os dias de setembro/novembro que fecham a semana. Colunas `Sem k` (horas) e `BH k` (horas − alvo) vêm antes dos demais totais. BH positivo = BHP (fica no banco); negativo = BHN ou falta.
+- **BHP/BHN sempre grafados** na própria célula (códigos + e −). Pode fracionar 12h em 6+6. Sem a grafia não dá pra conferir.
+- **40h (DebAlves, MSalomão) = 42/42/36**: exatamente UMA semana de 36h no mês, as outras 42h. Alvo semanal 42 (CADASTRO, coluna Alvo/sem). Aline: alvo 40 (36 assistenciais + 4 de CEP).
+- **Semana de retorno de férias**: cada dia de férias/licença/abono na semana desconta 6h do alvo (CONFIG). Thamyres 24 → 18; Vinicius 36 → 30.
+- **Cota de fds é piso** além de teto (IsaRibeiro: 18h de 24h → completar).
+- **Regra fixa da Kariny**: sáb + dom do mesmo fds ⇒ BHN na segunda seguinte (ou no dia útil mais cheio) e BHP na quinta anterior. Nunca 4 dias de 12h emendados.
+- **Nunca 24h emendadas** (noite + dia seguinte inteiro). O alerta 18h⚠ pega.
+- **Senior**: BHP não é digitado; BHN aparece como o plantão normal. A aba SENIOR já traduz assim.
+- **Códigos com nome**: `CEP` (4h, código 6), `CP` (cuidados paliativos da Raquel, seg+qua manhã), `CRO` (tardes de ambulatório da LuAlice, 2/mês). Eram E/P/R e ninguém reconhecia.
+
+Fonte de setembro: a **grade do grupo** ("Escala setembro - UTI HCB.xlsx"), não o arquivo de códigos Senior — este veio incompleto em 29 e 30/09 (sem a chefia e sem várias pessoas). Os números da checagem (DebMatias 18h, Anna 24h no fim de setembro) batem com a grade.
