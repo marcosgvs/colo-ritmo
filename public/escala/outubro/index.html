@@ -84,8 +84,9 @@ input:focus-visible, button:focus-visible, .dia:focus-visible { outline:2px soli
 .m.falta { color:var(--coral); font-weight:700; }
 .m.falta .barra i { background:var(--coral); }
 .m .q { text-align:right; }
-.marca { position:absolute; inset:auto 6px 6px auto; font-size:10px; font-weight:700;
-  letter-spacing:.04em; color:var(--aqua); text-transform:uppercase; }
+.marca { display:block; margin-top:6px; padding-top:5px; border-top:1px solid var(--aqua);
+  font-size:10.5px; font-weight:700; letter-spacing:.04em; color:var(--aqua);
+  text-transform:uppercase; }
 .dia.tem { background:var(--aqua-soft); border-color:var(--aqua); }
 .dia.apagado { opacity:.36; }
 .dia.apagado .marca { display:none; }
@@ -176,8 +177,10 @@ const norm = s => s.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase(
 const semBhp = n => n.replace(" BHP","");
 const temPessoa = (d, nome) => !nome ? false : TURNOS.some(([c]) =>
   (filtro && c !== filtro) ? false : d[c].some(n => semBhp(n) === nome));
-const turnoDe = (d, nome) => TURNOS.filter(([c]) => d[c].some(n => semBhp(n) === nome))
-  .map(([c,r]) => r).join(" e ");
+const turnoDe = (d, nome) => {
+  const t = TURNOS.filter(([c]) => d[c].some(n => semBhp(n) === nome)).map(([c,r]) => r);
+  return (t.length === 2 && t[0] === "manhã" && t[1] === "tarde") ? "dia" : t.join(" e ");
+};
 
 document.getElementById("nomes").innerHTML =
   DADOS.pessoas.map(p => `<option value="${p}"></option>`).join("");
@@ -236,11 +239,11 @@ function pintaEu() {
   const caixa = document.getElementById("eu");
   if (!alvo) { caixa.innerHTML = ""; return; }
   const meus = outubro.filter(d => temPessoa(d, alvo));
-  const horas = meus.reduce((s,d) => s + (turnoDe(d,alvo).includes(" e ") ? 12 :
-    (turnoDe(d,alvo) === "noite" ? 12 : 6)), 0);
+  const t = d => turnoDe(d, alvo);
+  const horas = meus.reduce((s,d) => s + (["dia","noite"].includes(t(d)) ? 12 : 6), 0);
   caixa.innerHTML = `<div class="eu-lista"><h2>${alvo} em outubro</h2>
     <div class="resumo">${meus.length} ${meus.length === 1 ? "dia" : "dias"} de plantão${
-      filtro ? " no turno da " + filtro : ""}</div>
+      filtro ? " no turno da " + filtro : ""} · ${horas}h</div>
     <ol>${meus.map(d => `<li>${String(d.dia).padStart(2,"0")}/10
       <span>${d.dow3} · ${turnoDe(d, alvo)}</span></li>`).join("")
       || "<li>nenhum plantão com esse filtro</li>"}</ol></div>`;
