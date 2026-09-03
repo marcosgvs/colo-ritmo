@@ -1,0 +1,2367 @@
+{
+ "meta": {
+  "gerado": "02/09/2026 23:47",
+  "fonte": "Sheet · V5 (leitura)"
+ },
+ "dias": [
+  {
+   "data": "2026-09-28",
+   "label": "28/09",
+   "dia": 28,
+   "mes": 9,
+   "dow": "segunda",
+   "dow3": "seg",
+   "fds": false,
+   "vizinho": true,
+   "feriado": null,
+   "sigla": null,
+   "manha": [
+    "Fred",
+    "Milena",
+    "Pabdo",
+    "MSalomão",
+    "DebAlves",
+    "Vinicius",
+    "Amelio",
+    "Janaina",
+    "Kariny",
+    "Fernando",
+    "Leomara",
+    "DebMatias",
+    "Iggor",
+    "Laura",
+    "Marcia",
+    "Moabe",
+    "Patricia",
+    "Raquel"
+   ],
+   "tarde": [
+    "CaAbreu",
+    "Kariny",
+    "JuCoutinho",
+    "Leomara",
+    "Anna",
+    "DebMatias",
+    "Marcia",
+    "Moabe",
+    "Patricia",
+    "Pedro"
+   ],
+   "noite": [
+    "Aline",
+    "Neyde",
+    "AnaSeverino",
+    "Constantino",
+    "Grayce",
+    "Joaquim",
+    "JuliaFig",
+    "Raphael"
+   ],
+   "noitinha": [],
+   "bhn": [],
+   "cob": [
+    18,
+    10,
+    8
+   ],
+   "min": [
+    11,
+    8,
+    7
+   ],
+   "falta": [
+    0,
+    0,
+    0
+   ]
+  },
+  {
+   "data": "2026-09-29",
+   "label": "29/09",
+   "dia": 29,
+   "mes": 9,
+   "dow": "terça",
+   "dow3": "ter",
+   "fds": false,
+   "vizinho": true,
+   "feriado": null,
+   "sigla": null,
+   "manha": [
+    "Fred",
+    "Milena",
+    "Pabdo",
+    "MSalomão",
+    "DebAlves",
+    "Vinicius",
+    "Amelio",
+    "Janaina",
+    "Aline",
+    "Isabella",
+    "JuBrito",
+    "Mayana",
+    "Amanda",
+    "Anna",
+    "Bruna",
+    "Denise",
+    "Heloa",
+    "IsaRibeiro",
+    "Laura",
+    "Yuji"
+   ],
+   "tarde": [
+    "DebAlves",
+    "Amelio",
+    "CaAbreu",
+    "JuBrito",
+    "Mayana",
+    "Amanda",
+    "Bruna",
+    "DebMatias",
+    "IsaRibeiro",
+    "Yuji"
+   ],
+   "noite": [
+    "Fabiula",
+    "Neyde",
+    "Roberta",
+    "LuAlice",
+    "Ricardo",
+    "JuliaFig",
+    "Nishioka"
+   ],
+   "noitinha": [],
+   "bhn": [],
+   "cob": [
+    20,
+    10,
+    7
+   ],
+   "min": [
+    11,
+    8,
+    7
+   ],
+   "falta": [
+    0,
+    0,
+    0
+   ]
+  },
+  {
+   "data": "2026-09-30",
+   "label": "30/09",
+   "dia": 30,
+   "mes": 9,
+   "dow": "quarta",
+   "dow3": "qua",
+   "fds": false,
+   "vizinho": true,
+   "feriado": null,
+   "sigla": null,
+   "manha": [
+    "Fred",
+    "Milena",
+    "Pabdo",
+    "MSalomão",
+    "DebAlves",
+    "Vinicius",
+    "Janaina",
+    "JuBrito",
+    "Fernando",
+    "JuCoutinho",
+    "Marilia",
+    "Raylander",
+    "Anna",
+    "Ernesto",
+    "Iggor",
+    "Laura",
+    "Pjamile",
+    "Vanessa",
+    "Yuji"
+   ],
+   "tarde": [
+    "Aline",
+    "CaAbreu",
+    "Isabella",
+    "JuCoutinho",
+    "Marilia",
+    "Raylander",
+    "Anna",
+    "Ernesto",
+    "Iggor",
+    "Pedro",
+    "Pjamile",
+    "Vanessa"
+   ],
+   "noite": [
+    "Danielle",
+    "Fabiula",
+    "Neyde",
+    "LuCosta",
+    "Marcia",
+    "Melara",
+    "Moabe"
+   ],
+   "noitinha": [],
+   "bhn": [
+    "MayWobido BHN noite"
+   ],
+   "cob": [
+    19,
+    12,
+    7
+   ],
+   "min": [
+    11,
+    8,
+    7
+   ],
+   "falta": [
+    0,
+    0,
+    0
+   ]
+  },
+  {
+   "data": "2026-10-01",
+   "label": "01/10",
+   "dia": 1,
+   "mes": 10,
+   "dow": "quinta",
+   "dow3": "qui",
+   "fds": false,
+   "vizinho": false,
+   "feriado": null,
+   "sigla": null,
+   "manha": [
+    "Fred",
+    "Milena",
+    "Pabdo",
+    "MSalomão",
+    "Vinicius",
+    "Amelio BHP",
+    "Murilo",
+    "Janaina",
+    "JuBrito",
+    "Kariny BHP",
+    "Fernando",
+    "JuCoutinho",
+    "Denise",
+    "Grayce",
+    "Raquel"
+   ],
+   "tarde": [
+    "DebAlves",
+    "CaAbreu",
+    "Isabella",
+    "JuBrito",
+    "Kariny BHP",
+    "Mayana",
+    "Roberta",
+    "Grayce",
+    "Jaqueline",
+    "Laura"
+   ],
+   "noite": [
+    "Danielle",
+    "Fabiula",
+    "LuAlice",
+    "Raylander",
+    "Bruna",
+    "Kozak",
+    "Melara"
+   ],
+   "noitinha": [],
+   "bhn": [],
+   "cob": [
+    15,
+    10,
+    7
+   ],
+   "min": [
+    14,
+    10,
+    7
+   ],
+   "falta": [
+    0,
+    0,
+    0
+   ]
+  },
+  {
+   "data": "2026-10-02",
+   "label": "02/10",
+   "dia": 2,
+   "mes": 10,
+   "dow": "sexta",
+   "dow3": "sex",
+   "fds": false,
+   "vizinho": false,
+   "feriado": null,
+   "sigla": null,
+   "manha": [
+    "Fred",
+    "Milena",
+    "Pabdo",
+    "MSalomão",
+    "Vinicius",
+    "Amelio BHP",
+    "Murilo",
+    "Janaina",
+    "CaAbreu",
+    "Mayana",
+    "JuCoutinho",
+    "Ricardo",
+    "Pjamile",
+    "Yuji"
+   ],
+   "tarde": [
+    "DebAlves",
+    "CaAbreu",
+    "Isabella",
+    "Roberta",
+    "Leomara",
+    "Raylander",
+    "Ricardo",
+    "Beatriz",
+    "DebMatias",
+    "Pjamile"
+   ],
+   "noite": [
+    "Aline",
+    "AnaSeverino",
+    "Constantino",
+    "Heloa",
+    "IsaRibeiro",
+    "Joaquim",
+    "Marcia BHP",
+    "Pedro"
+   ],
+   "noitinha": [],
+   "bhn": [],
+   "cob": [
+    14,
+    10,
+    8
+   ],
+   "min": [
+    14,
+    10,
+    7
+   ],
+   "falta": [
+    0,
+    0,
+    0
+   ]
+  },
+  {
+   "data": "2026-10-03",
+   "label": "03/10",
+   "dia": 3,
+   "mes": 10,
+   "dow": "sábado",
+   "dow3": "sáb",
+   "fds": true,
+   "vizinho": false,
+   "feriado": null,
+   "sigla": null,
+   "manha": [
+    "Amelio",
+    "Janaina",
+    "Kariny",
+    "Fernando",
+    "Leomara",
+    "Marilia",
+    "Iggor",
+    "Moabe BHP",
+    "Nishioka",
+    "Vanessa"
+   ],
+   "tarde": [
+    "Amelio",
+    "Aline",
+    "Kariny",
+    "Marilia",
+    "Jaqueline",
+    "Moabe BHP",
+    "Nishioka",
+    "Vanessa"
+   ],
+   "noite": [
+    "Vinicius",
+    "Murilo",
+    "Mayana",
+    "Anna BHP",
+    "Denise",
+    "LuCosta",
+    "Raphael"
+   ],
+   "noitinha": [],
+   "bhn": [],
+   "cob": [
+    10,
+    8,
+    7
+   ],
+   "min": [
+    10,
+    8,
+    7
+   ],
+   "falta": [
+    0,
+    0,
+    0
+   ]
+  },
+  {
+   "data": "2026-10-04",
+   "label": "04/10",
+   "dia": 4,
+   "mes": 10,
+   "dow": "domingo",
+   "dow3": "dom",
+   "fds": true,
+   "vizinho": false,
+   "feriado": null,
+   "sigla": null,
+   "manha": [
+    "Amelio",
+    "Kariny",
+    "Fernando",
+    "Marilia",
+    "Beatriz",
+    "Heloa",
+    "Jaqueline",
+    "Kozak",
+    "Patricia"
+   ],
+   "tarde": [
+    "DebAlves",
+    "Kariny",
+    "Ricardo",
+    "Beatriz",
+    "Kozak",
+    "Laura BHP",
+    "Melara BHP",
+    "Patricia"
+   ],
+   "noite": [
+    "MSalomão",
+    "Danielle",
+    "Isabella",
+    "Neyde BHP",
+    "Roberta",
+    "Ernesto",
+    "MayWobido"
+   ],
+   "noitinha": [],
+   "bhn": [],
+   "cob": [
+    9,
+    8,
+    7
+   ],
+   "min": [
+    9,
+    8,
+    7
+   ],
+   "falta": [
+    0,
+    0,
+    0
+   ]
+  },
+  {
+   "data": "2026-10-05",
+   "label": "05/10",
+   "dia": 5,
+   "mes": 10,
+   "dow": "segunda",
+   "dow3": "seg",
+   "fds": false,
+   "vizinho": false,
+   "feriado": null,
+   "sigla": null,
+   "manha": [
+    "Fred",
+    "Milena",
+    "Pabdo",
+    "MSalomão",
+    "Vinicius",
+    "Amelio",
+    "Murilo",
+    "Janaina",
+    "Leomara",
+    "Ricardo",
+    "AnaSeverino",
+    "Beatriz BHP",
+    "Denise",
+    "Moabe"
+   ],
+   "tarde": [
+    "DebAlves",
+    "CaAbreu",
+    "Isabella",
+    "Roberta",
+    "Leomara",
+    "AnaSeverino",
+    "Anna",
+    "Beatriz BHP",
+    "Moabe",
+    "Pedro"
+   ],
+   "noite": [
+    "Aline",
+    "Fernando",
+    "Constantino",
+    "Grayce",
+    "Joaquim",
+    "LuCosta",
+    "Raphael",
+    "Vanessa"
+   ],
+   "noitinha": [],
+   "bhn": [
+    "Kariny BHN dia"
+   ],
+   "cob": [
+    14,
+    10,
+    8
+   ],
+   "min": [
+    14,
+    10,
+    7
+   ],
+   "falta": [
+    0,
+    0,
+    0
+   ]
+  },
+  {
+   "data": "2026-10-06",
+   "label": "06/10",
+   "dia": 6,
+   "mes": 10,
+   "dow": "terça",
+   "dow3": "ter",
+   "fds": false,
+   "vizinho": false,
+   "feriado": null,
+   "sigla": null,
+   "manha": [
+    "Fred",
+    "Milena",
+    "Pabdo",
+    "MSalomão",
+    "DebAlves",
+    "Vinicius",
+    "Murilo",
+    "Janaina",
+    "Aline",
+    "JuBrito",
+    "Kariny",
+    "Mayana",
+    "Marilia",
+    "DebMatias",
+    "Denise",
+    "Heloa",
+    "IsaRibeiro",
+    "Jaqueline",
+    "Yuji"
+   ],
+   "tarde": [
+    "DebAlves",
+    "Amelio",
+    "JuBrito",
+    "Kariny",
+    "Mayana",
+    "JuCoutinho",
+    "Marilia",
+    "DebMatias",
+    "IsaRibeiro",
+    "Jaqueline",
+    "Leticia"
+   ],
+   "noite": [
+    "Fabiula",
+    "Neyde",
+    "Roberta",
+    "LuAlice",
+    "Ricardo",
+    "JuliaFig",
+    "Melara",
+    "Nishioka",
+    "Pedro"
+   ],
+   "noitinha": [],
+   "bhn": [],
+   "cob": [
+    19,
+    11,
+    9
+   ],
+   "min": [
+    14,
+    10,
+    7
+   ],
+   "falta": [
+    0,
+    0,
+    0
+   ]
+  },
+  {
+   "data": "2026-10-07",
+   "label": "07/10",
+   "dia": 7,
+   "mes": 10,
+   "dow": "quarta",
+   "dow3": "qua",
+   "fds": false,
+   "vizinho": false,
+   "feriado": null,
+   "sigla": null,
+   "manha": [
+    "Fred",
+    "Milena",
+    "Pabdo",
+    "MSalomão",
+    "Vinicius",
+    "Murilo",
+    "Janaina",
+    "Mayana",
+    "Fernando",
+    "João",
+    "JuCoutinho",
+    "Marilia",
+    "Anna",
+    "Ernesto",
+    "Iggor",
+    "Laura",
+    "Leticia",
+    "Patricia"
+   ],
+   "tarde": [
+    "Aline",
+    "CaAbreu",
+    "Isabella",
+    "João",
+    "Anna",
+    "Ernesto",
+    "Iggor",
+    "Leticia",
+    "Patricia",
+    "Pedro",
+    "Thamyres"
+   ],
+   "noite": [
+    "Danielle",
+    "Neyde",
+    "Bruna",
+    "Constantino",
+    "Marcia",
+    "Pjamile",
+    "Yuji"
+   ],
+   "noitinha": [],
+   "bhn": [
+    "Raphael BHN noite"
+   ],
+   "cob": [
+    18,
+    11,
+    7
+   ],
+   "min": [
+    14,
+    10,
+    7
+   ],
+   "falta": [
+    0,
+    0,
+    0
+   ]
+  },
+  {
+   "data": "2026-10-08",
+   "label": "08/10",
+   "dia": 8,
+   "mes": 10,
+   "dow": "quinta",
+   "dow3": "qui",
+   "fds": false,
+   "vizinho": false,
+   "feriado": null,
+   "sigla": null,
+   "manha": [
+    "Fred",
+    "Milena",
+    "Pabdo",
+    "MSalomão",
+    "Vinicius",
+    "Amelio",
+    "Murilo",
+    "Janaina",
+    "Isabella",
+    "Kariny",
+    "Mayana",
+    "Fernando",
+    "Beatriz",
+    "Denise",
+    "Grayce",
+    "Heloa"
+   ],
+   "tarde": [
+    "MSalomão",
+    "DebAlves",
+    "Aline",
+    "Isabella",
+    "Kariny",
+    "Mayana",
+    "Roberta",
+    "Beatriz",
+    "Grayce",
+    "IsaRibeiro"
+   ],
+   "noite": [
+    "Danielle",
+    "Fabiula",
+    "LuAlice",
+    "AnaSeverino",
+    "Melara",
+    "Patricia",
+    "Raphael"
+   ],
+   "noitinha": [],
+   "bhn": [
+    "Laura BHN manhã",
+    "Moabe BHN dia"
+   ],
+   "cob": [
+    16,
+    10,
+    7
+   ],
+   "min": [
+    14,
+    10,
+    7
+   ],
+   "falta": [
+    0,
+    0,
+    0
+   ]
+  },
+  {
+   "data": "2026-10-09",
+   "label": "09/10",
+   "dia": 9,
+   "mes": 10,
+   "dow": "sexta",
+   "dow3": "sex",
+   "fds": false,
+   "vizinho": false,
+   "feriado": null,
+   "sigla": null,
+   "manha": [
+    "Fred",
+    "Milena",
+    "Pabdo",
+    "MSalomão",
+    "Vinicius",
+    "Murilo",
+    "Janaina",
+    "Mayana",
+    "Roberta",
+    "JuCoutinho",
+    "Anna",
+    "Heloa",
+    "Laura",
+    "Nishioka"
+   ],
+   "tarde": [
+    "DebAlves",
+    "Amelio",
+    "Murilo",
+    "Roberta",
+    "LeLemos",
+    "DebMatias",
+    "Denise",
+    "Nishioka",
+    "Vanessa",
+    "Yuji"
+   ],
+   "noite": [
+    "CaAbreu",
+    "Raylander",
+    "Ernesto",
+    "LuCosta",
+    "MayWobido",
+    "Pjamile",
+    "Thamyres"
+   ],
+   "noitinha": [],
+   "bhn": [],
+   "cob": [
+    14,
+    10,
+    7
+   ],
+   "min": [
+    14,
+    10,
+    7
+   ],
+   "falta": [
+    0,
+    0,
+    0
+   ]
+  },
+  {
+   "data": "2026-10-10",
+   "label": "10/10",
+   "dia": 10,
+   "mes": 10,
+   "dow": "sábado",
+   "dow3": "sáb",
+   "fds": true,
+   "vizinho": false,
+   "feriado": null,
+   "sigla": null,
+   "manha": [
+    "Amelio",
+    "Janaina",
+    "Isabella",
+    "Fernando",
+    "LeLemos",
+    "Leomara",
+    "Marilia",
+    "Ricardo",
+    "Heloa",
+    "Laura"
+   ],
+   "tarde": [
+    "Amelio",
+    "JuBrito",
+    "Leomara",
+    "Marilia",
+    "Ricardo",
+    "Beatriz",
+    "Thamyres BHP",
+    "Vanessa"
+   ],
+   "noite": [
+    "Aline",
+    "Fabiula",
+    "LuAlice",
+    "Raylander",
+    "Bruna",
+    "Joaquim",
+    "MayWobido"
+   ],
+   "noitinha": [],
+   "bhn": [],
+   "cob": [
+    10,
+    8,
+    7
+   ],
+   "min": [
+    10,
+    8,
+    7
+   ],
+   "falta": [
+    0,
+    0,
+    0
+   ]
+  },
+  {
+   "data": "2026-10-11",
+   "label": "11/10",
+   "dia": 11,
+   "mes": 10,
+   "dow": "domingo",
+   "dow3": "dom",
+   "fds": true,
+   "vizinho": false,
+   "feriado": null,
+   "sigla": null,
+   "manha": [
+    "DebAlves",
+    "CaAbreu",
+    "Isabella",
+    "JuBrito",
+    "DebMatias",
+    "Iggor",
+    "Jaqueline",
+    "Marcia"
+   ],
+   "tarde": [
+    "DebAlves",
+    "CaAbreu",
+    "JuBrito",
+    "Raylander",
+    "Iggor",
+    "IsaRibeiro",
+    "Jaqueline",
+    "Marcia"
+   ],
+   "noite": [
+    "Danielle",
+    "Neyde",
+    "João",
+    "JuCoutinho",
+    "LeLemos",
+    "JuliaFig"
+   ],
+   "noitinha": [],
+   "bhn": [],
+   "cob": [
+    8,
+    8,
+    6
+   ],
+   "min": [
+    9,
+    8,
+    7
+   ],
+   "falta": [
+    1,
+    0,
+    1
+   ]
+  },
+  {
+   "data": "2026-10-12",
+   "label": "12/10",
+   "dia": 12,
+   "mes": 10,
+   "dow": "segunda",
+   "dow3": "seg",
+   "fds": false,
+   "vizinho": false,
+   "feriado": "N. Sra. Aparecida",
+   "sigla": "N.Sra",
+   "manha": [
+    "Pabdo",
+    "Amelio",
+    "Murilo",
+    "Janaina",
+    "CaAbreu",
+    "Leomara",
+    "Marilia",
+    "AnaSeverino",
+    "Bruna",
+    "Denise",
+    "Iggor",
+    "Laura",
+    "Moabe",
+    "Thamyres",
+    "Yuji"
+   ],
+   "tarde": [
+    "DebAlves",
+    "Amelio",
+    "CaAbreu",
+    "Isabella",
+    "AnaSeverino",
+    "Anna",
+    "Beatriz",
+    "Bruna",
+    "Moabe",
+    "Thamyres"
+   ],
+   "noite": [
+    "Aline",
+    "JuBrito",
+    "Fernando",
+    "LeLemos",
+    "Raylander",
+    "Joaquim",
+    "LuCosta"
+   ],
+   "noitinha": [],
+   "bhn": [],
+   "cob": [
+    15,
+    10,
+    7
+   ],
+   "min": [
+    14,
+    10,
+    7
+   ],
+   "falta": [
+    0,
+    0,
+    0
+   ]
+  },
+  {
+   "data": "2026-10-13",
+   "label": "13/10",
+   "dia": 13,
+   "mes": 10,
+   "dow": "terça",
+   "dow3": "ter",
+   "fds": false,
+   "vizinho": false,
+   "feriado": null,
+   "sigla": null,
+   "manha": [
+    "Fred",
+    "Milena",
+    "Pabdo",
+    "MSalomão",
+    "DebAlves",
+    "Murilo",
+    "Janaina",
+    "Aline",
+    "Kariny",
+    "Mayana",
+    "Roberta",
+    "Amanda",
+    "Beatriz",
+    "Denise",
+    "Heloa",
+    "IsaRibeiro",
+    "Jaqueline",
+    "Yuji"
+   ],
+   "tarde": [
+    "DebAlves",
+    "CaAbreu",
+    "Kariny",
+    "Mayana",
+    "Roberta",
+    "Amanda",
+    "JuCoutinho",
+    "Beatriz",
+    "IsaRibeiro",
+    "Jaqueline"
+   ],
+   "noite": [
+    "Fabiula",
+    "Neyde",
+    "LuAlice",
+    "Ricardo",
+    "Grayce",
+    "JuliaFig",
+    "Nishioka"
+   ],
+   "noitinha": [],
+   "bhn": [],
+   "cob": [
+    18,
+    10,
+    7
+   ],
+   "min": [
+    14,
+    10,
+    7
+   ],
+   "falta": [
+    0,
+    0,
+    0
+   ]
+  },
+  {
+   "data": "2026-10-14",
+   "label": "14/10",
+   "dia": 14,
+   "mes": 10,
+   "dow": "quarta",
+   "dow3": "qua",
+   "fds": false,
+   "vizinho": false,
+   "feriado": null,
+   "sigla": null,
+   "manha": [
+    "Fred",
+    "Milena",
+    "Pabdo",
+    "MSalomão",
+    "Murilo",
+    "Janaina",
+    "Aline",
+    "CaAbreu",
+    "Isabella",
+    "JuBrito",
+    "Fernando",
+    "JuCoutinho",
+    "Marilia",
+    "DebMatias",
+    "Ernesto",
+    "Iggor",
+    "Patricia",
+    "Pjamile",
+    "Vanessa"
+   ],
+   "tarde": [
+    "Aline",
+    "CaAbreu",
+    "Isabella",
+    "Roberta",
+    "Amanda",
+    "LeLemos",
+    "Marilia",
+    "DebMatias",
+    "Ernesto",
+    "Iggor",
+    "Patricia",
+    "Pjamile",
+    "Vanessa"
+   ],
+   "noite": [
+    "Danielle",
+    "Neyde",
+    "João",
+    "Denise",
+    "LuCosta",
+    "MayWobido",
+    "Pedro",
+    "Yuji"
+   ],
+   "noitinha": [],
+   "bhn": [
+    "Anna BHN dia",
+    "Beatriz BHN manhã",
+    "Marcia BHN noite",
+    "Thamyres BHN dia"
+   ],
+   "cob": [
+    19,
+    13,
+    8
+   ],
+   "min": [
+    14,
+    10,
+    7
+   ],
+   "falta": [
+    0,
+    0,
+    0
+   ]
+  },
+  {
+   "data": "2026-10-15",
+   "label": "15/10",
+   "dia": 15,
+   "mes": 10,
+   "dow": "quinta",
+   "dow3": "qui",
+   "fds": false,
+   "vizinho": false,
+   "feriado": null,
+   "sigla": null,
+   "manha": [
+    "Fred",
+    "Milena",
+    "Pabdo",
+    "MSalomão",
+    "DebAlves",
+    "Amelio",
+    "Murilo",
+    "Janaina",
+    "Isabella",
+    "Kariny",
+    "Mayana",
+    "Fernando",
+    "LeLemos",
+    "Heloa",
+    "Laura",
+    "Leticia"
+   ],
+   "tarde": [
+    "MSalomão",
+    "DebAlves",
+    "CaAbreu",
+    "Isabella",
+    "Kariny",
+    "Mayana",
+    "João",
+    "JuCoutinho",
+    "Raylander",
+    "Ricardo",
+    "Rosana"
+   ],
+   "noite": [
+    "Aline",
+    "Danielle",
+    "Fabiula",
+    "LuAlice",
+    "Constantino",
+    "Joaquim",
+    "Melara",
+    "Raphael"
+   ],
+   "noitinha": [],
+   "bhn": [],
+   "cob": [
+    16,
+    11,
+    8
+   ],
+   "min": [
+    14,
+    10,
+    7
+   ],
+   "falta": [
+    0,
+    0,
+    0
+   ]
+  },
+  {
+   "data": "2026-10-16",
+   "label": "16/10",
+   "dia": 16,
+   "mes": 10,
+   "dow": "sexta",
+   "dow3": "sex",
+   "fds": false,
+   "vizinho": false,
+   "feriado": null,
+   "sigla": null,
+   "manha": [
+    "Fred",
+    "Milena",
+    "Pabdo",
+    "MSalomão",
+    "Amelio",
+    "Murilo",
+    "Janaina",
+    "LeLemos",
+    "Ricardo",
+    "Anna",
+    "Jaqueline",
+    "Laura",
+    "Marcia",
+    "MayWobido",
+    "Vanessa"
+   ],
+   "tarde": [
+    "Amelio",
+    "Isabella",
+    "Roberta",
+    "Leomara",
+    "Ricardo",
+    "Heloa",
+    "Jaqueline",
+    "Marcia",
+    "MayWobido",
+    "Vanessa"
+   ],
+   "noite": [
+    "Mayana",
+    "JuCoutinho",
+    "Marilia",
+    "Bruna",
+    "Grayce",
+    "IsaRibeiro",
+    "JuliaFig",
+    "Pedro"
+   ],
+   "noitinha": [],
+   "bhn": [],
+   "cob": [
+    15,
+    10,
+    8
+   ],
+   "min": [
+    14,
+    10,
+    7
+   ],
+   "falta": [
+    0,
+    0,
+    0
+   ]
+  },
+  {
+   "data": "2026-10-17",
+   "label": "17/10",
+   "dia": 17,
+   "mes": 10,
+   "dow": "sábado",
+   "dow3": "sáb",
+   "fds": true,
+   "vizinho": false,
+   "feriado": null,
+   "sigla": null,
+   "manha": [
+    "Amelio BHP",
+    "Janaina",
+    "JuBrito",
+    "Kariny",
+    "Leomara",
+    "Heloa",
+    "Leticia",
+    "Nishioka",
+    "Patricia",
+    "Pjamile"
+   ],
+   "tarde": [
+    "DebAlves",
+    "Amelio BHP",
+    "JuBrito",
+    "Kariny",
+    "Leticia",
+    "Nishioka",
+    "Patricia",
+    "Pjamile"
+   ],
+   "noite": [
+    "Murilo",
+    "LuAlice",
+    "Rosana",
+    "AnaSeverino",
+    "Constantino",
+    "Moabe"
+   ],
+   "noitinha": [],
+   "bhn": [
+    "Neyde BHN noite",
+    "Fernando BHN manhã"
+   ],
+   "cob": [
+    10,
+    8,
+    6
+   ],
+   "min": [
+    10,
+    8,
+    7
+   ],
+   "falta": [
+    0,
+    0,
+    1
+   ]
+  },
+  {
+   "data": "2026-10-18",
+   "label": "18/10",
+   "dia": 18,
+   "mes": 10,
+   "dow": "domingo",
+   "dow3": "dom",
+   "fds": true,
+   "vizinho": false,
+   "feriado": null,
+   "sigla": null,
+   "manha": [
+    "DebAlves",
+    "Amelio",
+    "Leomara",
+    "Raylander",
+    "DebMatias",
+    "Ernesto",
+    "Iggor",
+    "Melara"
+   ],
+   "tarde": [
+    "Amanda",
+    "Raylander",
+    "Rosana",
+    "DebMatias",
+    "Ernesto",
+    "Laura",
+    "Leticia",
+    "Melara"
+   ],
+   "noite": [
+    "MSalomão",
+    "Danielle",
+    "Fabiula",
+    "Roberta",
+    "João",
+    "Raphael"
+   ],
+   "noitinha": [],
+   "bhn": [],
+   "cob": [
+    8,
+    8,
+    6
+   ],
+   "min": [
+    9,
+    8,
+    7
+   ],
+   "falta": [
+    1,
+    0,
+    1
+   ]
+  },
+  {
+   "data": "2026-10-19",
+   "label": "19/10",
+   "dia": 19,
+   "mes": 10,
+   "dow": "segunda",
+   "dow3": "seg",
+   "fds": false,
+   "vizinho": false,
+   "feriado": null,
+   "sigla": null,
+   "manha": [
+    "Fred",
+    "Milena",
+    "Pabdo",
+    "MSalomão",
+    "Amelio",
+    "Murilo",
+    "Janaina",
+    "Kariny",
+    "Leomara",
+    "Marilia",
+    "AnaSeverino",
+    "Grayce",
+    "Marcia",
+    "Moabe"
+   ],
+   "tarde": [
+    "DebAlves",
+    "Amelio",
+    "CaAbreu",
+    "Kariny",
+    "Leomara",
+    "Marilia",
+    "Anna",
+    "Laura",
+    "Marcia",
+    "Moabe"
+   ],
+   "noite": [
+    "Amanda",
+    "Fernando",
+    "Raylander",
+    "Ricardo",
+    "Joaquim",
+    "JuliaFig",
+    "LuCosta",
+    "Raphael"
+   ],
+   "noitinha": [],
+   "bhn": [],
+   "cob": [
+    14,
+    10,
+    8
+   ],
+   "min": [
+    14,
+    10,
+    7
+   ],
+   "falta": [
+    0,
+    0,
+    0
+   ]
+  },
+  {
+   "data": "2026-10-20",
+   "label": "20/10",
+   "dia": 20,
+   "mes": 10,
+   "dow": "terça",
+   "dow3": "ter",
+   "fds": false,
+   "vizinho": false,
+   "feriado": null,
+   "sigla": null,
+   "manha": [
+    "Fred",
+    "Milena",
+    "Pabdo",
+    "MSalomão",
+    "Amelio",
+    "Murilo",
+    "Janaina",
+    "JuBrito",
+    "Kariny",
+    "Marilia",
+    "AnaSeverino",
+    "Denise",
+    "Jaqueline",
+    "Leticia",
+    "Pjamile"
+   ],
+   "tarde": [
+    "DebAlves",
+    "Amelio",
+    "CaAbreu",
+    "JuBrito",
+    "Kariny",
+    "JuCoutinho",
+    "Rosana",
+    "Heloa",
+    "Jaqueline",
+    "Leticia"
+   ],
+   "noite": [
+    "Danielle",
+    "Fabiula",
+    "Mayana",
+    "Roberta",
+    "LuAlice",
+    "Ricardo",
+    "Nishioka"
+   ],
+   "noitinha": [],
+   "bhn": [],
+   "cob": [
+    15,
+    10,
+    7
+   ],
+   "min": [
+    14,
+    10,
+    7
+   ],
+   "falta": [
+    0,
+    0,
+    0
+   ]
+  },
+  {
+   "data": "2026-10-21",
+   "label": "21/10",
+   "dia": 21,
+   "mes": 10,
+   "dow": "quarta",
+   "dow3": "qua",
+   "fds": false,
+   "vizinho": false,
+   "feriado": null,
+   "sigla": null,
+   "manha": [
+    "Fred",
+    "Milena",
+    "Pabdo",
+    "MSalomão",
+    "Murilo",
+    "Janaina",
+    "Isabella",
+    "JuBrito",
+    "Fernando",
+    "João",
+    "Marilia",
+    "Rosana",
+    "Anna",
+    "Ernesto",
+    "Iggor",
+    "Patricia"
+   ],
+   "tarde": [
+    "CaAbreu",
+    "Isabella",
+    "Roberta",
+    "João",
+    "Marilia",
+    "Raylander",
+    "Rosana",
+    "Anna",
+    "DebMatias",
+    "Ernesto",
+    "Iggor",
+    "Patricia",
+    "Pjamile"
+   ],
+   "noite": [
+    "Danielle",
+    "Fabiula",
+    "IsaRibeiro",
+    "Joaquim",
+    "Marcia",
+    "MayWobido",
+    "Thamyres",
+    "Vanessa"
+   ],
+   "noitinha": [],
+   "bhn": [],
+   "cob": [
+    16,
+    13,
+    8
+   ],
+   "min": [
+    14,
+    10,
+    7
+   ],
+   "falta": [
+    0,
+    0,
+    0
+   ]
+  },
+  {
+   "data": "2026-10-22",
+   "label": "22/10",
+   "dia": 22,
+   "mes": 10,
+   "dow": "quinta",
+   "dow3": "qui",
+   "fds": false,
+   "vizinho": false,
+   "feriado": null,
+   "sigla": null,
+   "manha": [
+    "Fred",
+    "Milena",
+    "Pabdo",
+    "MSalomão",
+    "DebAlves",
+    "Amelio",
+    "Murilo",
+    "Janaina",
+    "JuBrito",
+    "Kariny",
+    "Mayana",
+    "Beatriz",
+    "Denise",
+    "Heloa",
+    "Leticia",
+    "Moabe",
+    "Yuji"
+   ],
+   "tarde": [
+    "MSalomão",
+    "DebAlves",
+    "JuBrito",
+    "Kariny",
+    "Mayana",
+    "Beatriz",
+    "DebMatias",
+    "Kozak",
+    "Leticia",
+    "Moabe"
+   ],
+   "noite": [
+    "Fabiula",
+    "LuAlice",
+    "Constantino",
+    "Jaqueline",
+    "Laura",
+    "Melara",
+    "Patricia"
+   ],
+   "noitinha": [],
+   "bhn": [],
+   "cob": [
+    17,
+    10,
+    7
+   ],
+   "min": [
+    14,
+    10,
+    7
+   ],
+   "falta": [
+    0,
+    0,
+    0
+   ]
+  },
+  {
+   "data": "2026-10-23",
+   "label": "23/10",
+   "dia": 23,
+   "mes": 10,
+   "dow": "sexta",
+   "dow3": "sex",
+   "fds": false,
+   "vizinho": false,
+   "feriado": null,
+   "sigla": null,
+   "manha": [
+    "Fred",
+    "Milena",
+    "Pabdo",
+    "MSalomão",
+    "Amelio",
+    "Murilo",
+    "Janaina",
+    "Roberta",
+    "JuCoutinho",
+    "Leomara",
+    "Raylander",
+    "Anna",
+    "Heloa",
+    "Nishioka",
+    "Pjamile",
+    "Yuji"
+   ],
+   "tarde": [
+    "DebAlves",
+    "Murilo",
+    "CaAbreu",
+    "Roberta",
+    "Amanda",
+    "Leomara",
+    "Raylander",
+    "Nishioka",
+    "Pjamile",
+    "Thamyres"
+   ],
+   "noite": [
+    "Danielle",
+    "Isabella",
+    "Fernando",
+    "João",
+    "LeLemos",
+    "Rosana",
+    "Ernesto",
+    "Iggor",
+    "Raphael"
+   ],
+   "noitinha": [],
+   "bhn": [],
+   "cob": [
+    16,
+    10,
+    9
+   ],
+   "min": [
+    14,
+    10,
+    7
+   ],
+   "falta": [
+    0,
+    0,
+    0
+   ]
+  },
+  {
+   "data": "2026-10-24",
+   "label": "24/10",
+   "dia": 24,
+   "mes": 10,
+   "dow": "sábado",
+   "dow3": "sáb",
+   "fds": true,
+   "vizinho": false,
+   "feriado": null,
+   "sigla": null,
+   "manha": [
+    "MSalomão",
+    "Janaina",
+    "Mayana",
+    "JuCoutinho",
+    "Beatriz",
+    "DebMatias",
+    "Heloa",
+    "Laura",
+    "LuCosta",
+    "Vanessa"
+   ],
+   "tarde": [
+    "Mayana",
+    "LeLemos",
+    "Beatriz",
+    "DebMatias",
+    "Grayce",
+    "LuCosta",
+    "Thamyres",
+    "Vanessa"
+   ],
+   "noite": [
+    "LuAlice",
+    "Constantino",
+    "Denise",
+    "Kozak",
+    "MayWobido",
+    "Pedro",
+    "Raquel"
+   ],
+   "noitinha": [],
+   "bhn": [],
+   "cob": [
+    10,
+    8,
+    7
+   ],
+   "min": [
+    10,
+    8,
+    7
+   ],
+   "falta": [
+    0,
+    0,
+    0
+   ]
+  },
+  {
+   "data": "2026-10-25",
+   "label": "25/10",
+   "dia": 25,
+   "mes": 10,
+   "dow": "domingo",
+   "dow3": "dom",
+   "fds": true,
+   "vizinho": false,
+   "feriado": null,
+   "sigla": null,
+   "manha": [
+    "DebAlves",
+    "CaAbreu",
+    "Roberta",
+    "Amanda",
+    "Fernando BHP",
+    "LeLemos",
+    "Ricardo",
+    "Grayce",
+    "Yuji"
+   ],
+   "tarde": [
+    "DebAlves",
+    "CaAbreu",
+    "Amanda",
+    "João",
+    "LeLemos",
+    "Grayce",
+    "Thamyres BHP",
+    "Yuji"
+   ],
+   "noite": [
+    "Isabella",
+    "JuCoutinho",
+    "AnaSeverino",
+    "IsaRibeiro",
+    "JuliaFig",
+    "Melara",
+    "Pedro"
+   ],
+   "noitinha": [],
+   "bhn": [],
+   "cob": [
+    9,
+    8,
+    7
+   ],
+   "min": [
+    9,
+    8,
+    7
+   ],
+   "falta": [
+    0,
+    0,
+    0
+   ]
+  },
+  {
+   "data": "2026-10-26",
+   "label": "26/10",
+   "dia": 26,
+   "mes": 10,
+   "dow": "segunda",
+   "dow3": "seg",
+   "fds": false,
+   "vizinho": false,
+   "feriado": null,
+   "sigla": null,
+   "manha": [
+    "Fred",
+    "Milena",
+    "Pabdo",
+    "MSalomão",
+    "Murilo",
+    "Janaina",
+    "Kariny",
+    "LeLemos",
+    "Leomara",
+    "Beatriz",
+    "Denise",
+    "Iggor",
+    "Laura",
+    "Moabe",
+    "Yuji"
+   ],
+   "tarde": [
+    "DebAlves",
+    "CaAbreu",
+    "Kariny",
+    "LeLemos",
+    "Leomara",
+    "Beatriz",
+    "Iggor",
+    "Moabe",
+    "Patricia",
+    "Pedro"
+   ],
+   "noite": [
+    "Isabella",
+    "Fernando",
+    "Raylander",
+    "Constantino",
+    "Joaquim",
+    "JuliaFig",
+    "LuCosta",
+    "Raphael"
+   ],
+   "noitinha": [],
+   "bhn": [
+    "Amelio BHN manhã"
+   ],
+   "cob": [
+    15,
+    10,
+    8
+   ],
+   "min": [
+    14,
+    10,
+    7
+   ],
+   "falta": [
+    0,
+    0,
+    0
+   ]
+  },
+  {
+   "data": "2026-10-27",
+   "label": "27/10",
+   "dia": 27,
+   "mes": 10,
+   "dow": "terça",
+   "dow3": "ter",
+   "fds": false,
+   "vizinho": false,
+   "feriado": null,
+   "sigla": null,
+   "manha": [
+    "Fred",
+    "Milena",
+    "Pabdo",
+    "MSalomão",
+    "DebAlves",
+    "Vinicius BHP",
+    "Murilo",
+    "Janaina",
+    "Kariny",
+    "Mayana",
+    "Amanda",
+    "Marilia",
+    "Ricardo",
+    "Rosana",
+    "Denise",
+    "Heloa",
+    "Raquel"
+   ],
+   "tarde": [
+    "DebAlves",
+    "CaAbreu",
+    "Kariny",
+    "Mayana",
+    "Amanda",
+    "JuCoutinho",
+    "Marilia",
+    "Ricardo",
+    "Rosana",
+    "DebMatias",
+    "IsaRibeiro"
+   ],
+   "noite": [
+    "JuBrito",
+    "Roberta",
+    "LuAlice",
+    "Ariadne",
+    "Grayce",
+    "Nishioka",
+    "Pedro"
+   ],
+   "noitinha": [],
+   "bhn": [
+    "Amelio BHN manhã",
+    "Melara BHN tarde"
+   ],
+   "cob": [
+    17,
+    11,
+    7
+   ],
+   "min": [
+    14,
+    10,
+    7
+   ],
+   "falta": [
+    0,
+    0,
+    0
+   ]
+  },
+  {
+   "data": "2026-10-28",
+   "label": "28/10",
+   "dia": 28,
+   "mes": 10,
+   "dow": "quarta",
+   "dow3": "qua",
+   "fds": false,
+   "vizinho": false,
+   "feriado": null,
+   "sigla": null,
+   "manha": [
+    "Fred",
+    "Milena",
+    "Pabdo",
+    "MSalomão",
+    "Vinicius",
+    "Murilo",
+    "Janaina",
+    "Isabella",
+    "Fernando",
+    "JuCoutinho",
+    "Marilia",
+    "Ernesto",
+    "Iggor",
+    "Jaqueline",
+    "Laura",
+    "Pjamile",
+    "Vanessa"
+   ],
+   "tarde": [
+    "CaAbreu",
+    "Isabella",
+    "JuCoutinho",
+    "Marilia",
+    "Raylander",
+    "Rosana",
+    "DebMatias",
+    "Ernesto",
+    "Iggor",
+    "Jaqueline",
+    "Melara",
+    "Pjamile",
+    "Thamyres BHP",
+    "Vanessa"
+   ],
+   "noite": [
+    "Danielle",
+    "Fabiula",
+    "João",
+    "IsaRibeiro",
+    "LuCosta",
+    "Marcia",
+    "MayWobido"
+   ],
+   "noitinha": [],
+   "bhn": [
+    "Amelio BHN manhã"
+   ],
+   "cob": [
+    17,
+    14,
+    7
+   ],
+   "min": [
+    14,
+    10,
+    7
+   ],
+   "falta": [
+    0,
+    0,
+    0
+   ]
+  },
+  {
+   "data": "2026-10-29",
+   "label": "29/10",
+   "dia": 29,
+   "mes": 10,
+   "dow": "quinta",
+   "dow3": "qui",
+   "fds": false,
+   "vizinho": false,
+   "feriado": null,
+   "sigla": null,
+   "manha": [
+    "Fred",
+    "Milena",
+    "Pabdo",
+    "MSalomão",
+    "DebAlves",
+    "Vinicius",
+    "Murilo",
+    "Janaina",
+    "JuBrito",
+    "Kariny",
+    "Mayana",
+    "Roberta",
+    "Fernando",
+    "LeLemos",
+    "Marilia",
+    "Grayce",
+    "Heloa",
+    "Leticia",
+    "Vanessa",
+    "Yuji"
+   ],
+   "tarde": [
+    "MSalomão",
+    "DebAlves",
+    "Isabella",
+    "Mayana",
+    "Roberta",
+    "Amanda",
+    "João",
+    "LeLemos",
+    "Grayce",
+    "Leticia",
+    "Moabe",
+    "Patricia"
+   ],
+   "noite": [
+    "Danielle",
+    "Fabiula",
+    "LuAlice",
+    "AnaSeverino",
+    "Ariadne",
+    "Constantino",
+    "Kozak",
+    "Raphael"
+   ],
+   "noitinha": [],
+   "bhn": [
+    "Amelio BHN manhã",
+    "MayWobido BHN tarde"
+   ],
+   "cob": [
+    20,
+    12,
+    8
+   ],
+   "min": [
+    14,
+    10,
+    7
+   ],
+   "falta": [
+    0,
+    0,
+    0
+   ]
+  },
+  {
+   "data": "2026-10-30",
+   "label": "30/10",
+   "dia": 30,
+   "mes": 10,
+   "dow": "sexta",
+   "dow3": "sex",
+   "fds": false,
+   "vizinho": false,
+   "feriado": null,
+   "sigla": null,
+   "manha": [
+    "Fred",
+    "Milena",
+    "Pabdo",
+    "MSalomão",
+    "Vinicius",
+    "Murilo",
+    "Janaina",
+    "JuBrito",
+    "JuCoutinho",
+    "LeLemos",
+    "Raylander",
+    "Rosana",
+    "Denise",
+    "Jaqueline",
+    "Thamyres",
+    "Vanessa"
+   ],
+   "tarde": [
+    "DebAlves",
+    "Isabella",
+    "JuBrito",
+    "Raylander",
+    "Ricardo",
+    "Ernesto",
+    "Jaqueline",
+    "MayWobido",
+    "Patricia",
+    "Pedro",
+    "Raquel",
+    "Thamyres"
+   ],
+   "noite": [
+    "Amanda",
+    "Leomara",
+    "Anna",
+    "Beatriz",
+    "DebMatias",
+    "Kozak",
+    "Melara"
+   ],
+   "noitinha": [],
+   "bhn": [],
+   "cob": [
+    16,
+    12,
+    7
+   ],
+   "min": [
+    14,
+    10,
+    7
+   ],
+   "falta": [
+    0,
+    0,
+    0
+   ]
+  },
+  {
+   "data": "2026-10-31",
+   "label": "31/10",
+   "dia": 31,
+   "mes": 10,
+   "dow": "sábado",
+   "dow3": "sáb",
+   "fds": true,
+   "vizinho": false,
+   "feriado": null,
+   "sigla": null,
+   "manha": [
+    "Janaina",
+    "Fernando",
+    "AnaSeverino",
+    "Denise",
+    "Heloa",
+    "Laura",
+    "Leticia",
+    "Marcia",
+    "Pjamile",
+    "Thamyres"
+   ],
+   "tarde": [
+    "AnaSeverino",
+    "Heloa",
+    "IsaRibeiro",
+    "Leticia",
+    "Marcia",
+    "Moabe",
+    "Pjamile",
+    "Thamyres"
+   ],
+   "noite": [
+    "Vinicius",
+    "Murilo",
+    "CaAbreu",
+    "Mayana",
+    "LuAlice",
+    "Anna",
+    "Joaquim"
+   ],
+   "noitinha": [],
+   "bhn": [],
+   "cob": [
+    10,
+    8,
+    7
+   ],
+   "min": [
+    10,
+    8,
+    7
+   ],
+   "falta": [
+    0,
+    0,
+    0
+   ]
+  },
+  {
+   "data": "2026-11-01",
+   "label": "01/11",
+   "dia": 1,
+   "mes": 11,
+   "dow": "domingo",
+   "dow3": "dom",
+   "fds": true,
+   "vizinho": true,
+   "feriado": null,
+   "sigla": null,
+   "manha": [
+    "Amelio",
+    "Danielle",
+    "Kariny",
+    "Ricardo",
+    "Ernesto",
+    "JuliaFig",
+    "Laura",
+    "Nishioka"
+   ],
+   "tarde": [
+    "Amelio",
+    "CaAbreu",
+    "Danielle",
+    "Ricardo",
+    "JuliaFig",
+    "Nishioka"
+   ],
+   "noite": [
+    "Fabiula",
+    "Roberta",
+    "João",
+    "Ariadne",
+    "Yuji"
+   ],
+   "noitinha": [],
+   "bhn": [],
+   "cob": [
+    8,
+    6,
+    5
+   ],
+   "min": [
+    9,
+    8,
+    7
+   ],
+   "falta": [
+    1,
+    2,
+    2
+   ]
+  }
+ ]
+}

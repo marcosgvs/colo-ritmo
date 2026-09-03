@@ -259,6 +259,10 @@ def carregar_dados():
             if p not in novo and (s_[0] in D.AUSENCIAS or s_[0] == "A"):
                 novo[p] = s_
         DIAS[data] = novo
+    # SETEMBRO: as correções que a escalista fez à mão (a verdade é a dela — Marcos,
+    # 03/09/26). Vêm depois da grade porque corrigem justamente o que a grade não sabe.
+    import mari_set_dados as MS
+    MS.aplicar(DIAS)
     # OUTUBRO: a versão VIVA da Mari (re-transcrita em 01/09/26) + as correções
     # da checagem dela e do Marcos. Substituição total da matriz: célula que ela
     # deixou vazia fica vazia (ela preferiu buraco a convocação).

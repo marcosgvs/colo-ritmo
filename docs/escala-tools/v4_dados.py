@@ -365,7 +365,10 @@ PROCEDENCIA = {
                   "no dia 6 (1–5 vêm do arquivo de junho) e traz 01–02/08."),
     8:  ("grade", GRADE + " Agosto: 'Escala agosto - UTI HCB' (1–2 vêm do arquivo de julho)."),
     9:  ("grade", GRADE + " Setembro: 'Escala setembro - UTI HCB'. O arquivo Senior de setembro "
-                  "estava incompleto em 29–30/09 — mais um motivo pra grade ser a fonte."),
+                  "estava incompleto em 29–30/09 — mais um motivo pra grade ser a fonte. MAIS as "
+                  "nove correções que a escalista fez à mão em 28–30/09 (mari_set_dados.py): a "
+                  "versão dela é a fonte de verdade, e a grade não registra licença nem troca de "
+                  "última hora."),
     10: ("montado", "ESCALA DA MARI — a versão viva do Sheet, re-transcrita em 01/09/26 "
                      "(mari_out_dados.py v2), mais as correções da checagem Marcos/Mari "
                      "(checagem_out_v3.py — cada uma listada na aba CHECAGEM OUT). Buracos "
