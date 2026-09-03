@@ -66,6 +66,14 @@
       "destination": "/ritmo/escala/preferencias/index.html"
     },
     {
+      "source": "/escala/outubro",
+      "destination": "/ritmo/escala/outubro/index.html"
+    },
+    {
+      "source": "/escala/outubro/",
+      "destination": "/ritmo/escala/outubro/index.html"
+    },
+    {
       "source": "/escala/regras",
       "destination": "/ritmo/escala/regras/index.html"
     },

@@ -292,3 +292,20 @@ html = (HTML.replace("__DADOS__", json.dumps(dados, ensure_ascii=False))
 destino = os.path.join(E.SAIDA, "4 · dia a dia · painel.html")
 open(destino, "w").write(html)
 print(destino, round(len(html) / 1024), "kb ·", len(pessoas), "pessoas no índice")
+
+# a mesma página servida em colopediatria.com.br/escala/outubro. Mesmo padrão das
+# outras páginas públicas da escala: documento completo e noindex (a página tem o
+# nome de 63 pessoas — não é para cair em buscador; quem tem o link, abre).
+SITE = os.path.join(os.path.dirname(AQUI), "..", "public", "escala", "outubro")
+SITE = os.path.normpath(SITE)
+os.makedirs(SITE, exist_ok=True)
+cabeca, corpo = html.split("</style>", 1)
+pagina = ("<!doctype html>\n<html lang=\"pt-BR\">\n<head>\n<meta charset=\"utf-8\">\n"
+          "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n"
+          "<meta name=\"robots\" content=\"noindex,nofollow\">\n"
+          "<meta name=\"description\" content=\"Escala da UTI do Hospital da Criança de "
+          "Brasília em outubro de 2026: quem está em cada turno, dia a dia.\">\n"
+          + cabeca + "</style>\n</head>\n<body>" + corpo + "\n</body>\n</html>\n")
+alvo = os.path.join(SITE, "index.html")
+open(alvo, "w").write(pagina)
+print(alvo, round(len(pagina) / 1024), "kb")
